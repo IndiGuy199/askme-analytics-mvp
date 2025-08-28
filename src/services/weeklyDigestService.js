@@ -1,34 +1,39 @@
 // src/services/weeklyDigestService.js
 import axios from 'axios';
-import { POSTHOG_HOST, injectClientFilter } from '../config/posthog.js';
+import { getApiHost, injectClientFilter } from '../config/posthog.js';
 import { CLIENTS } from '../config/clients.js';
 import { createMailer } from '../config/mailer.js';
 
 async function runQuery({ projectId, apiKey, query }) {
-  // Use the Query API (NOT /api/insights)
-  const url = `${POSTHOG_HOST}/api/projects/${projectId}/query`;
+  // Use Query API (current API for PostHog Cloud)
+  const url = `${getApiHost()}/api/projects/${encodeURIComponent(projectId)}/query`;
   const headers = {
     Authorization: `Bearer ${apiKey}`,
     'Content-Type': 'application/json',
     Accept: 'application/json',
   };
 
-  // The Query API expects { query: <Your InsightVizNode / TrendsQuery / FunnelsQuery ...> }
-  console.log('PostHog Query URL:', url);
-  console.log('Query payload:', JSON.stringify({ query }, null, 2));
+  console.log('PostHog Query API URL:', url);
+  console.log('Query payload:', JSON.stringify(query, null, 2));
 
   try {
-    const res = await axios.post(url, { query }, { headers });
+    // Query API expects { query: InsightVizNode }
+    const payload = { query };
+    const res = await axios.post(url, payload, { headers });
     console.log('PostHog Response:', JSON.stringify(res.data, null, 2));
+    if (res?.data?.error) {
+      console.error('PostHog error field:', res.data.error);
+      throw new Error(res.data.error);
+    }
     return res.data;
   } catch (err) {
     const data = err?.response?.data;
     if (data) {
       console.error('PostHog error response:', JSON.stringify(data, null, 2));
-      if (err.response.status === 404) {
-        console.error('Hint: 404 often means wrong host or path. Use https://us.i.posthog.com and /api/projects/{id}/query');
-      } else if (err.response.status === 401) {
+      if (err.response.status === 401) {
         console.error('Hint: 401 means bad/expired personal API key or wrong project.');
+      } else if (err.response.status === 403) {
+        console.error('Hint: 403 means insufficient permissions for this project');
       }
     } else {
       console.error('PostHog request error:', err.message);
@@ -37,9 +42,10 @@ async function runQuery({ projectId, apiKey, query }) {
   }
 }
 
-/* ---------- Parsers (tolerant to shape differences) ---------- */
+/* ---------- Parsers (updated to handle Insights API response) ---------- */
 function parseTraffic(trendsJson) {
-  const series = trendsJson?.result?.[0];
+  // Handle both results and result (Insights vs Query API response shapes)
+  const series = trendsJson?.results?.[0] || trendsJson?.result?.[0];
   const data = series?.data || [];
   const total = data.reduce((a, b) => a + (b || 0), 0);
   const uniques = series?.aggregated_value ?? total;
@@ -47,54 +53,70 @@ function parseTraffic(trendsJson) {
 }
 
 function parseFunnel(funnelJson) {
-  const res = funnelJson?.result?.[0] || funnelJson?.result;
-  const steps = (res?.steps || []).map((s) => ({
-    name: s.name || s.custom_name || 'step',
-    count: s.count || 0,
-  }));
-  const conversion_rate = res?.aggregate?.conversion_rate ?? res?.conversion_rate ?? 0;
-  const median_time_to_convert_sec =
-    res?.aggregate?.median_conversion_time_seconds ?? res?.median_conversion_time_seconds ?? 0;
+  if (Array.isArray(funnelJson?.results) && funnelJson.results.length) {
+    const steps = funnelJson.results.map((s, i) => ({
+      name: s.custom_name || s.name || `Step ${i + 1}`,
+      count: s.count || 0,
+    }));
+    const first = steps[0]?.count || 0;
+    const last = steps[steps.length - 1]?.count || 0;
+    const conversion_rate = first ? last / first : 0;
+    const median_time_to_convert_sec = funnelJson.results[funnelJson.results.length - 1]?.median_conversion_time || 0;
+
+    let top = { from: 'N/A', to: 'N/A', dropRate: 0 };
+    for (let i = 0; i < steps.length - 1; i++) {
+      const a = steps[i], b = steps[i + 1];
+      const drop = a.count ? (a.count - (b.count || 0)) / a.count : 0;
+      if (drop > top.dropRate) top = { from: a.name, to: b.name, dropRate: drop };
+    }
+    return { steps, conversion_rate, median_time_to_convert_sec, top_drop: top, top_drop_rate: top.dropRate };
+  }
+
+  // Fallback (older aggregate shape)
+  const result = funnelJson?.results?.[0] || funnelJson?.result?.[0] || funnelJson?.result;
+  const steps = (result?.steps || []).map((s, i) => ({ name: s.name || s.custom_name || `Step ${i + 1}`, count: s.count || 0 }));
+  const conversion_rate = result?.aggregate?.conversion_rate ?? result?.conversion_rate ?? 0;
+  const median_time_to_convert_sec = result?.aggregate?.median_conversion_time_seconds ?? result?.median_conversion_time_seconds ?? 0;
 
   let top = { from: 'N/A', to: 'N/A', dropRate: 0 };
   for (let i = 0; i < steps.length - 1; i++) {
-    const from = steps[i], to = steps[i + 1];
-    const rate = from.count ? (from.count - (to.count || 0)) / from.count : 0;
-    if (rate > top.dropRate) top = { from: from.name, to: to.name, dropRate: rate };
+    const a = steps[i], b = steps[i + 1];
+    const drop = a.count ? (a.count - (b.count || 0)) / a.count : 0;
+    if (drop > top.dropRate) top = { from: a.name, to: b.name, dropRate: drop };
   }
-
-  return {
-    steps,
-    conversion_rate,
-    median_time_to_convert_sec,
-    top_drop: `${top.from} → ${top.to}`,
-    top_drop_rate: top.dropRate,
-  };
+  return { steps, conversion_rate, median_time_to_convert_sec, top_drop: top, top_drop_rate: top.dropRate };
 }
 
 function parseRetention(retJson) {
-  const d7 =
-    retJson?.result?.[0]?.values?.[7]?.value ??
-    retJson?.result?.insight?.d7 ??
-    0;
-  return { d7_retention: d7 };
+  const result = retJson?.results?.[0] || retJson?.result?.[0];
+  const values = result?.values || result?.data || [];
+  const day0 = values?.[0]?.count || values?.[0]?.value || 0;
+  const day7 = values?.[7]?.count || values?.[7]?.value || 0;
+  const d7_retention = day0 ? day7 / day0 : 0;
+  return { d7_retention };
 }
 
 function parseDeviceMix(trendsJson) {
-  const series = trendsJson?.result || [];
-  const totals = series.map((s) => s.aggregated_value || (s.data || []).reduce((a, b) => a + (b || 0), 0));
-  const sum = totals.reduce((a, b) => a + b, 0) || 1;
-  const mix = {};
-  series.forEach((s, i) => {
-    const label = (s.label || s.breakdown_value || `device_${i}`).toString().toLowerCase();
-    mix[label] = +(totals[i] / sum).toFixed(3);
+  const results = trendsJson?.results || trendsJson?.result || [];
+  if (!Array.isArray(results) || results.length === 0) return { device_mix: {} };
+  
+  const totals = results.map((s) => ({
+    label: s.label || s.breakdown_value || 'Other',
+    value: s.count || (Array.isArray(s.data) ? s.data.reduce((a, b) => a + (b || 0), 0) : 0),
+  }));
+  
+  const sum = totals.reduce((acc, item) => acc + item.value, 0) || 1;
+  const device_mix = {};
+  totals.forEach((item) => {
+    device_mix[item.label] = item.value / sum;
   });
-  return { device_mix: mix };
+  
+  return { device_mix };
 }
 
 /* ---------- (Optional) AI summary placeholder ---------- */
 async function aiSummary(kpis) {
-  return `Traffic ${kpis.traffic.unique_users} users; conversion ${(kpis.funnel.conversion_rate * 100).toFixed(1)}%. Biggest drop: ${kpis.funnel.top_drop}. Median time to convert ${Math.round(kpis.funnel.median_time_to_convert_sec)}s. D7 ${(kpis.retention.d7_retention * 100).toFixed(1)}%.`;
+  return `This week saw ${kpis.traffic.unique_users} unique users with ${kpis.traffic.pageviews} pageviews. Conversion rate was ${(kpis.funnel.conversion_rate * 100).toFixed(1)}%.`;
 }
 
 /* ---------- Email renderer ---------- */
@@ -102,6 +124,7 @@ function renderEmail({ clientName, kpis, summary }) {
   const pct = (x) => (x * 100).toFixed(1) + '%';
   const deviceList = Object.entries(kpis.device.device_mix || {})
     .map(([k, v]) => `${k}: ${pct(v)}`).join(' • ');
+  const topDrop = `${kpis.funnel.top_drop.from} → ${kpis.funnel.top_drop.to}`;
 
   return {
     subject: `Weekly Analytics – ${clientName}`,
@@ -110,7 +133,7 @@ function renderEmail({ clientName, kpis, summary }) {
       <ul>
         <li><b>Traffic</b>: ${kpis.traffic.unique_users} users, ${kpis.traffic.pageviews} pageviews</li>
         <li><b>Conversion</b>: ${(kpis.funnel.conversion_rate * 100).toFixed(1)}%</li>
-        <li><b>Top drop</b>: ${kpis.funnel.top_drop} (${pct(kpis.funnel.top_drop_rate)})</li>
+        <li><b>Top drop</b>: ${topDrop} (${pct(kpis.funnel.top_drop_rate)})</li>
         <li><b>Time-to-convert</b>: ${Math.round(kpis.funnel.median_time_to_convert_sec)}s</li>
         <li><b>D7 retention</b>: ${(kpis.retention.d7_retention * 100).toFixed(1)}%</li>
         <li><b>Device mix</b>: ${deviceList}</li>
@@ -129,9 +152,13 @@ export async function runForClientId(clientId) {
   console.log('Processing client:', client.name);
   
   try {
+    // Use the configured FunnelsQuery directly (mirrors your saved insight JSON).
+    // This avoids 403s from Insights endpoints and union_tag_invalid errors.
+    const funnelQueryNode = client.queries.funnel.query;
+
     // Inject client_id filter into each query
     const qTraffic   = injectClientFilter(client.queries.traffic.query,   client.clientId);
-    const qFunnel    = injectClientFilter(client.queries.funnel.query,    client.clientId);
+    const qFunnel    = injectClientFilter(funnelQueryNode,                client.clientId);
     const qRetention = injectClientFilter(client.queries.retention.query, client.clientId);
     const qDevice    = injectClientFilter(client.queries.deviceMix.query, client.clientId);
 
@@ -143,7 +170,6 @@ export async function runForClientId(clientId) {
       runQuery({ projectId: client.projectId, apiKey: client.apiKey, query: qDevice }),
     ]);
 
-    // Parse metrics
     const traffic   = parseTraffic(trafficJ);
     const funnel    = parseFunnel(funnelJ);
     const retention = parseRetention(retentionJ);
@@ -163,23 +189,17 @@ export async function runForClientId(clientId) {
 
     const info = await mailer.sendMail({
       from: process.env.FROM_EMAIL || 'insights@your-saas.com',
-      to: (client.recipients || [process.env.DEFAULT_RECIPIENT]).join(','),
+      to: client.recipients.join(', '),
       subject,
       html,
     });
 
-    // Log Ethereal preview URL if available
-    if (info.messageId && info.messageId.includes('ethereal.email')) {
-      console.log('📧 Ethereal preview URL:', `https://ethereal.email/message/${info.messageId}`);
-    }
-
-    console.log('✅ Email sent successfully to:', client.recipients || [process.env.DEFAULT_RECIPIENT]);
+    console.log('Email sent:', info.messageId);
     return { ok: true };
-
-  } catch (error) {
-    console.error('Error processing client:', client.name, error);
-    throw error;
+  } catch (e) {
+    console.error('Client processing error:', e.message);
+    throw e;
   }
 }
 
-export default { runForClientId };    // Run queries in parallel
+export default { runForClientId };
