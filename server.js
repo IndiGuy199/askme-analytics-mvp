@@ -1,12 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import weeklyDigestRouter from './src/routes/weeklyDigest.js';
+import analyticsPreviewRouter from './src/routes/analyticsPreview.js';
+import aiRouter from './src/routes/ai.js';
 import cron from 'node-cron';
 import { CLIENTS } from './src/config/clients.js';
 import { runForClientId } from './src/services/weeklyDigestService.js';
 import dotenv from 'dotenv';
-import analyticsPreviewRouter from './src/routes/analyticsPreview.js';
-import aiRoutes from './src/routes/ai.js';
 
 
 dotenv.config(); // loads .env
@@ -26,7 +26,8 @@ app.use(express.json({
 
 // API routes
 app.use('/api/digest', weeklyDigestRouter);
-app.use('/api/ai', aiRoutes);
+app.use('/api/analytics', analyticsPreviewRouter);
+app.use('/api/ai', aiRouter);
 
 // Optional: send for every client Mondays 8am America/New_York
 cron.schedule('0 8 * * 1', async () => {
@@ -39,8 +40,6 @@ cron.schedule('0 8 * * 1', async () => {
     }
   }
 }, { timezone: 'America/New_York' });
-
-app.use('/api/digest', analyticsPreviewRouter);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log(`Server listening on http://localhost:${PORT}`));

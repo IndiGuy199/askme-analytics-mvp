@@ -4,8 +4,18 @@ const nextConfig = {
   transpilePackages: ['recharts'],
   async rewrites() {
     return [
-      { source: '/api/digest/:path*', destination: 'http://localhost:4000/api/digest/:path*' },
-      { source: '/api/ai/:path*',     destination: 'http://localhost:4000/api/ai/:path*' }, // add this
+      {
+        source: '/api/analytics/:path*',
+        destination: 'http://localhost:4000/api/analytics/:path*',
+      },
+      {
+        source: '/api/digest/:path*',
+        destination: 'http://localhost:4000/api/digest/:path*',
+      },
+      {
+        source: '/api/ai/:path*',
+        destination: 'http://localhost:4000/api/ai/:path*',
+      },
     ];
   },
 };
