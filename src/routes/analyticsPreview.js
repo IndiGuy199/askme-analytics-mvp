@@ -45,6 +45,11 @@ function parseTraffic(json) {
   const total = data.reduce((a, b) => a + (b || 0), 0);
   const uniques = s.aggregated_value ?? s.count ?? total;
   
+  // Remove this comparison handling since we're using separate queries
+  // let previousUniques = 0;
+  // let previousPageviews = 0;
+  // if (json.compare_results && json.compare_results.length > 0) { ... }
+  
   // Generate simple labels for the data points
   const labels = data.map((_, i) => `Day ${i + 1}`);
   
@@ -53,6 +58,7 @@ function parseTraffic(json) {
     labels: labels,
     unique_users: uniques,
     pageviews: total
+    // previous_unique_users and previous_pageviews will be added separately
   };
 }
 
@@ -114,11 +120,32 @@ function parseFunnel(json) {
 
   console.log('[DEBUG] Parsed funnel with custom names:', { steps, conversion_rate, topDrop });
   
+  // Handle PostHog's native funnel comparison
+  let previousConversionRate = 0;
+  let previousSignups = 0;
+  
+  if (json.compare_results && json.compare_results.length > 0) {
+    const compareResults = json.compare_results[0];
+    if (compareResults.results && compareResults.results.length > 0) {
+      const compareSteps = compareResults.results.map(step => ({
+        name: step.custom_name || step.name || 'Unnamed Step',
+        count: step.count || 0
+      }));
+      
+      const compareFirstCount = compareSteps[0]?.count || 0;
+      const compareLastCount = compareSteps[compareSteps.length - 1]?.count || 0;
+      previousConversionRate = compareFirstCount > 0 ? compareLastCount / compareFirstCount : 0;
+      previousSignups = compareLastCount;
+    }
+  }
+  
   return {
     steps,
     conversion_rate,
     median_time_to_convert_sec: json?.median_time_to_convert_sec || 0,
-    top_drop: topDrop
+    top_drop: topDrop,
+    previous_conversion_rate: previousConversionRate,
+    previous_signups: previousSignups
   };
 }
 
@@ -278,6 +305,7 @@ function parseRetention(json, selectedDateRange = '7d') {
     };
   });
   
+  // FIX: Change selectedRetentionDays to selectedDateRange
   console.log('[DEBUG] Processed cohort values for', selectedDateRange, ':', cohortValues);
   
   // Calculate retention rate based on the actual available data
@@ -392,7 +420,8 @@ router.get('/preview', async (req, res) => {
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   const clientId = (req.query.clientId || '').toString();
-  const dateRange = (req.query.dateRange || '7d').toString(); // Get dateRange from query
+  const dateRange = (req.query.dateRange || '7d').toString();
+  const enableComparison = req.query.compare === 'true';
   
   const client = findClient(clientId);
   if (!client) {
@@ -401,6 +430,7 @@ router.get('/preview', async (req, res) => {
 
   console.log(`[Analytics Preview] Processing request for client: ${client.name} (${clientId})`);
   console.log(`[Analytics Preview] Date range: ${dateRange}`);
+  console.log(`[Analytics Preview] Comparison enabled: ${enableComparison}`);
 
   // Convert dateRange to PostHog format
   const getDateRangeFilter = (range) => {
@@ -414,83 +444,41 @@ router.get('/preview', async (req, res) => {
     }
   };
 
-  const dateFilter = getDateRangeFilter(dateRange);
-  console.log(`[Analytics Preview] Using date filter:`, dateFilter);
+  // Get comparison date range (previous period)
+  const getComparisonDateRange = (range) => {
+    switch (range) {
+      case '7d':
+        return { date_from: '-14d', date_to: '-7d' };
+      case '30d':
+        return { date_from: '-60d', date_to: '-30d' };
+      default:
+        return { date_from: '-14d', date_to: '-7d' };
+    }
+  };
 
-  // Create dynamic queries with the selected date range
+  const dateFilter = getDateRangeFilter(dateRange);
+  const comparisonDateFilter = enableComparison ? getComparisonDateRange(dateRange) : null;
+  
+  console.log(`[Analytics Preview] Using date filter:`, dateFilter);
+  if (comparisonDateFilter) {
+    console.log(`[Analytics Preview] Using comparison date filter:`, comparisonDateFilter);
+  }
+
+  // Create dynamic queries with the selected date range (REMOVE compareFilter)
   const createQueryWithDateRange = (baseQuery, dateRange) => {
-    const query = JSON.parse(JSON.stringify(baseQuery)); // Deep clone
+    const query = JSON.parse(JSON.stringify(baseQuery));
     
-    console.log(`[createQueryWithDateRange] Original query:`, JSON.stringify(query, null, 2));
-    console.log(`[createQueryWithDateRange] Applying date range:`, dateRange);
-    
-    // Apply date range based on query structure
     if (query.kind === 'InsightVizNode' && query.source) {
-      // Most queries follow this pattern
       query.source.dateRange = dateRange;
-      
-      // Special handling for RetentionQuery
-      if (query.source.kind === 'RetentionQuery') {
-        query.source.dateRange = {
-          ...dateRange,
-          explicitDate: false
-        };
-      }
-    } 
-    else if (query.kind === 'FunnelsQuery') {
-      // Direct FunnelsQuery
+      // REMOVE: Don't add compareFilter - use separate queries instead
+    } else if (query.kind === 'FunnelsQuery') {
       query.dateRange = dateRange;
-    }
-    else if (query.dateRange) {
-      // Fallback for any query with direct dateRange
-      query.dateRange = dateRange;
-    }
-    else {
-      console.warn(`[createQueryWithDateRange] Unknown query structure for date range application:`, query.kind);
     }
     
-    console.log(`[createQueryWithDateRange] Updated query:`, JSON.stringify(query, null, 2));
     return query;
   };
 
-  // Apply date range to all queries
-  const trafficQuery = client.queries.traffic ? 
-    createQueryWithDateRange(client.queries.traffic.query, dateFilter) : null;
-    
-  console.log(`[Analytics Preview] Traffic query with date range:`, JSON.stringify(trafficQuery, null, 2));
-    
-  const lifecycleQuery = client.queries.lifecycle ? 
-    createQueryWithDateRange(client.queries.lifecycle.query, dateFilter) : null; // ✅ Use dateFilter instead of hardcoded 30d
-    
-  console.log(`[Analytics Preview] Lifecycle query with date range:`, JSON.stringify(lifecycleQuery, null, 2));
-    
-  const deviceQuery = client.queries.deviceMix ? 
-    createQueryWithDateRange(client.queries.deviceMix.query, dateFilter) : null;
-    
-  console.log(`[Analytics Preview] Device query with date range:`, JSON.stringify(deviceQuery, null, 2));
-    
-  const retentionQuery = client.queries.retention ? 
-    createQueryWithDateRange(client.queries.retention.query, {
-      // Use the exact date range selected by the user
-      // -7d for 7-day selection, -30d for 30-day selection
-      date_from: dateRange === '7d' ? '-7d' : '-30d',
-      date_to: null,
-      explicitDate: false
-    }) : null;
-    
-  console.log(`[Analytics Preview] Retention query with date range:`, JSON.stringify(retentionQuery, null, 2));
-    
-  const geographyQuery = client.queries.geography ? 
-    createQueryWithDateRange(client.queries.geography.query, dateFilter) : null;
-    
-  console.log(`[Analytics Preview] Geography query with date range:`, JSON.stringify(geographyQuery, null, 2));
-    
-  const cityGeographyQuery = client.queries.cityGeography ? 
-    createQueryWithDateRange(client.queries.cityGeography.query, dateFilter) : null;
-    
-  console.log(`[Analytics Preview] City geography query with date range:`, JSON.stringify(cityGeographyQuery, null, 2));
-
-  // Funnel query with dynamic date range
+  // Check if funnel query exists
   const fallbackFunnelQuery = client?.queries?.funnel?.query || null;
   if (!fallbackFunnelQuery) {
     return res.status(400).json({
@@ -506,50 +494,181 @@ router.get('/preview', async (req, res) => {
     });
   }
 
+  // Create current period queries
+  const trafficQuery = client.queries.traffic ? 
+    createQueryWithDateRange(client.queries.traffic.query, dateFilter) : null;
+
   const funnelQuery = createQueryWithDateRange(fallbackFunnelQuery, dateFilter);
-  console.log(`[Analytics Preview] Funnel query with date range:`, JSON.stringify(funnelQuery, null, 2));
+
+  const lifecycleQuery = client.queries.lifecycle ? 
+    createQueryWithDateRange(client.queries.lifecycle.query, dateFilter) : null;
+
+  const deviceQuery = client.queries.deviceMix ? 
+    createQueryWithDateRange(client.queries.deviceMix.query, dateFilter) : null;
+
+  const retentionQuery = client.queries.retention ? 
+    createQueryWithDateRange(client.queries.retention.query, {
+      date_from: dateRange === '7d' ? '-7d' : '-30d',
+      date_to: null,
+      explicitDate: false
+    }) : null;
+
+  const geographyQuery = client.queries.geography ? 
+    createQueryWithDateRange(client.queries.geography.query, dateFilter) : null;
+
+  const cityGeographyQuery = client.queries.cityGeography ? 
+    createQueryWithDateRange(client.queries.cityGeography.query, dateFilter) : null;
+
+  // Create comparison period queries (separate queries for previous period)
+  let comparisonTrafficQuery = null;
+  let comparisonFunnelQuery = null;
+  let comparisonDeviceQuery = null;
+  let comparisonLifecycleQuery = null;
+  let comparisonRetentionQuery = null;
+  let comparisonGeographyQuery = null;
+  let comparisonCityGeographyQuery = null;
+
+  if (enableComparison && comparisonDateFilter) {
+    console.log('[Analytics Preview] Creating comparison queries...');
+    
+    // Traffic comparison
+    comparisonTrafficQuery = client.queries.traffic ? 
+      createQueryWithDateRange(client.queries.traffic.query, comparisonDateFilter) : null;
+    
+    // Funnel comparison
+    comparisonFunnelQuery = createQueryWithDateRange(fallbackFunnelQuery, comparisonDateFilter);
+
+    // Device comparison
+    comparisonDeviceQuery = client.queries.deviceMix ? 
+      createQueryWithDateRange(client.queries.deviceMix.query, comparisonDateFilter) : null;
+
+    // Lifecycle comparison
+    comparisonLifecycleQuery = client.queries.lifecycle ? 
+      createQueryWithDateRange(client.queries.lifecycle.query, comparisonDateFilter) : null;
+
+    // Retention comparison
+    comparisonRetentionQuery = client.queries.retention ? 
+      createQueryWithDateRange(client.queries.retention.query, {
+        date_from: dateRange === '7d' ? '-14d' : '-60d',
+        date_to: dateRange === '7d' ? '-7d' : '-30d',
+        explicitDate: false
+      }) : null;
+
+    // Geography comparison
+    comparisonGeographyQuery = client.queries.geography ? 
+      createQueryWithDateRange(client.queries.geography.query, comparisonDateFilter) : null;
+
+    // City Geography comparison
+    comparisonCityGeographyQuery = client.queries.cityGeography ? 
+      createQueryWithDateRange(client.queries.cityGeography.query, comparisonDateFilter) : null;
+  }
 
   // Inject client filters
   const withFunnelFilter = (q) => injectClientFilter(q, client.clientId);
 
-  // Run queries in parallel
-  const pTraffic = trafficQuery ? 
-    callQuery({ projectId: client.projectId, apiKey: client.apiKey, name: 'traffic', query: withFunnelFilter(trafficQuery) }) : 
-    Promise.resolve({ ok: false, reason: 'Traffic query not configured' });
-    
-  const pLifecycle = lifecycleQuery ? 
-    callQuery({ projectId: client.projectId, apiKey: client.apiKey, name: 'lifecycle', query: lifecycleQuery }) : 
-    Promise.resolve({ ok: false, reason: 'Lifecycle query not configured' });
-    
-  const pDevice = deviceQuery ? 
-    callQuery({ projectId: client.projectId, apiKey: client.apiKey, name: 'deviceMix', query: withFunnelFilter(deviceQuery) }) : 
-    Promise.resolve({ ok: false, reason: 'Device query not configured' });
-    
-  const pRetention = retentionQuery ? 
-    callQuery({ projectId: client.projectId, apiKey: client.apiKey, name: 'retention', query: retentionQuery }) : 
-    Promise.resolve({ ok: false, reason: 'Retention query not configured' });
-    
-  const pGeography = geographyQuery ? 
-    callQuery({ projectId: client.projectId, apiKey: client.apiKey, name: 'geography', query: geographyQuery }) : 
-    Promise.resolve({ ok: false, reason: 'Geography query not configured' });
-    
-  const pCityGeography = cityGeographyQuery ? 
-    callQuery({ projectId: client.projectId, apiKey: client.apiKey, name: 'cityGeography', query: cityGeographyQuery }) : 
-    Promise.resolve({ ok: false, reason: 'City geography query not configured' });
+  // Prepare all promises (current period + comparison if enabled)
+  const promises = [
+    // Current period queries
+    trafficQuery ? 
+      callQuery({ projectId: client.projectId, apiKey: client.apiKey, name: 'traffic', query: withFunnelFilter(trafficQuery) }) : 
+      Promise.resolve({ ok: false, reason: 'Traffic query not configured' }),
+      
+    funnelQuery ? 
+      callQuery({ projectId: client.projectId, apiKey: client.apiKey, name: 'funnel', query: withFunnelFilter(funnelQuery) }) : 
+      Promise.resolve({ ok: false, reason: 'Funnel query not configured' }),
+      
+    lifecycleQuery ? 
+      callQuery({ projectId: client.projectId, apiKey: client.apiKey, name: 'lifecycle', query: lifecycleQuery }) : 
+      Promise.resolve({ ok: false, reason: 'Lifecycle query not configured' }),
+      
+    deviceQuery ? 
+      callQuery({ projectId: client.projectId, apiKey: client.apiKey, name: 'deviceMix', query: withFunnelFilter(deviceQuery) }) : 
+      Promise.resolve({ ok: false, reason: 'Device query not configured' }),
+      
+    retentionQuery ? 
+      callQuery({ projectId: client.projectId, apiKey: client.apiKey, name: 'retention', query: retentionQuery }) : 
+      Promise.resolve({ ok: false, reason: 'Retention query not configured' }),
+      
+    geographyQuery ? 
+      callQuery({ projectId: client.projectId, apiKey: client.apiKey, name: 'geography', query: geographyQuery }) : 
+      Promise.resolve({ ok: false, reason: 'Geography query not configured' }),
+      
+    cityGeographyQuery ? 
+      callQuery({ projectId: client.projectId, apiKey: client.apiKey, name: 'cityGeography', query: cityGeographyQuery }) : 
+      Promise.resolve({ ok: false, reason: 'City geography query not configured' })
+  ];
 
-  // Funnel query
-  const rFunnel = await callQuery({
-    projectId: client.projectId,
-    apiKey: client.apiKey,
-    name: 'funnel',
-    query: withFunnelFilter(funnelQuery),
-  });
+  // Add comparison queries if enabled
+  if (enableComparison && comparisonDateFilter) {
+    promises.push(
+      // Traffic comparison
+      comparisonTrafficQuery ? 
+        callQuery({ projectId: client.projectId, apiKey: client.apiKey, name: 'comparisonTraffic', query: withFunnelFilter(comparisonTrafficQuery) }) : 
+        Promise.resolve({ ok: false, reason: 'Comparison traffic query not configured' }),
+        
+      // Funnel comparison
+      comparisonFunnelQuery ? 
+        callQuery({ projectId: client.projectId, apiKey: client.apiKey, name: 'comparisonFunnel', query: withFunnelFilter(comparisonFunnelQuery) }) : 
+        Promise.resolve({ ok: false, reason: 'Comparison funnel query not configured' }),
 
-  const [rTraffic, rLifecycle, rDevice, rRetention, rGeography, rCityGeography] = await Promise.all([
-    pTraffic, pLifecycle, pDevice, pRetention, pGeography, pCityGeography
-  ]);
+      // Device comparison
+      comparisonDeviceQuery ? 
+        callQuery({ projectId: client.projectId, apiKey: client.apiKey, name: 'comparisonDevice', query: withFunnelFilter(comparisonDeviceQuery) }) : 
+        Promise.resolve({ ok: false, reason: 'Comparison device query not configured' }),
 
-  // Build response with proper error handling
+      // Lifecycle comparison
+      comparisonLifecycleQuery ? 
+        callQuery({ projectId: client.projectId, apiKey: client.apiKey, name: 'comparisonLifecycle', query: comparisonLifecycleQuery }) : 
+        Promise.resolve({ ok: false, reason: 'Comparison lifecycle query not configured' }),
+
+      // Retention comparison
+      comparisonRetentionQuery ? 
+        callQuery({ projectId: client.projectId, apiKey: client.apiKey, name: 'comparisonRetention', query: comparisonRetentionQuery }) : 
+        Promise.resolve({ ok: false, reason: 'Comparison retention query not configured' }),
+
+      // Geography comparison
+      comparisonGeographyQuery ? 
+        callQuery({ projectId: client.projectId, apiKey: client.apiKey, name: 'comparisonGeography', query: comparisonGeographyQuery }) : 
+        Promise.resolve({ ok: false, reason: 'Comparison geography query not configured' }),
+
+      // City Geography comparison
+      comparisonCityGeographyQuery ? 
+        callQuery({ projectId: client.projectId, apiKey: client.apiKey, name: 'comparisonCityGeography', query: comparisonCityGeographyQuery }) : 
+        Promise.resolve({ ok: false, reason: 'Comparison city geography query not configured' })
+    );
+  }
+
+  // Execute all queries in parallel
+  const results = await Promise.all(promises);
+  
+  // Extract results
+  const [rTraffic, rFunnel, rLifecycle, rDevice, rRetention, rGeography, rCityGeography] = results;
+  
+  // Extract comparison results if enabled
+  let rComparisonTraffic, rComparisonFunnel, rComparisonDevice, rComparisonLifecycle, rComparisonRetention, rComparisonGeography, rComparisonCityGeography;
+
+  if (enableComparison && results.length > 7) {
+    // Current period queries are indices 0-6, comparison queries start at index 7
+    rComparisonTraffic = results[7];
+    rComparisonFunnel = results[8];
+    rComparisonDevice = results[9];
+    rComparisonLifecycle = results[10];
+    rComparisonRetention = results[11];
+    rComparisonGeography = results[12];
+    rComparisonCityGeography = results[13];
+    
+    console.log('[Analytics Preview] Comparison results available:', {
+      traffic: rComparisonTraffic?.ok,
+      funnel: rComparisonFunnel?.ok,
+      device: rComparisonDevice?.ok,
+      lifecycle: rComparisonLifecycle?.ok,
+      retention: rComparisonRetention?.ok,
+      geography: rComparisonGeography?.ok,
+      cityGeography: rComparisonCityGeography?.ok
+    });
+  }
+
+  // Build errors object
   const errors = {};
   if (!rTraffic.ok) errors.traffic = rTraffic.reason;
   if (!rFunnel.ok) errors.funnel = rFunnel.reason;
@@ -559,32 +678,102 @@ router.get('/preview', async (req, res) => {
   if (!rGeography.ok) errors.geography = rGeography.reason;
   if (!rCityGeography.ok) errors.cityGeography = rCityGeography.reason;
 
+  // Parse current period data
+  const traffic = rTraffic.ok ? parseTraffic(rTraffic.data) : { series: [], labels: [], unique_users: 0, pageviews: 0 };
+  const funnel = rFunnel.ok ? parseFunnel(rFunnel.data) : { steps: [], conversion_rate: 0, median_time_to_convert_sec: 0, top_drop: { from: 'N/A', to: 'N/A', dropRate: 0 } };
+
+  // Add comparison data if available
+  if (enableComparison && rComparisonTraffic?.ok) {
+    console.log('[Analytics Preview] Processing comparison traffic data...');
+    const comparisonTraffic = parseTraffic(rComparisonTraffic.data);
+    traffic.previous_unique_users = comparisonTraffic.unique_users;
+    traffic.previous_pageviews = comparisonTraffic.pageviews;
+    console.log('[Analytics Preview] Comparison traffic:', {
+      current: { users: traffic.unique_users, pageviews: traffic.pageviews },
+      previous: { users: traffic.previous_unique_users, pageviews: traffic.previous_pageviews }
+    });
+  }
+
+  if (enableComparison && rComparisonFunnel?.ok) {
+    console.log('[Analytics Preview] Processing comparison funnel data...');
+    const comparisonFunnel = parseFunnel(rComparisonFunnel.data);
+    funnel.previous_conversion_rate = comparisonFunnel.conversion_rate;
+    funnel.previous_signups = comparisonFunnel.steps[comparisonFunnel.steps.length - 1]?.count || 0;
+    console.log('[Analytics Preview] Comparison funnel:', {
+      current: { conversion: funnel.conversion_rate, signups: funnel.steps[funnel.steps.length - 1]?.count || 0 },
+      previous: { conversion: funnel.previous_conversion_rate, signups: funnel.previous_signups }
+    });
+  }
+
+  // Build KPIs with comparison data
   const kpis = {
-    traffic: rTraffic.ok ? parseTraffic(rTraffic.data) : { series: [], labels: [], unique_users: 0, pageviews: 0 },
-    funnel: rFunnel.ok
-      ? parseFunnel(rFunnel.data)
-      : { steps: [], conversion_rate: 0, median_time_to_convert_sec: 0, top_drop: { from: 'N/A', to: 'N/A', dropRate: 0 } },
-    lifecycle: rLifecycle.ok
-      ? parseLifecycle(rLifecycle.data)
-      : { labels: [], series: { new: [], returning: [], resurrecting: [], dormant: [] } },
+    traffic,
+    funnel,
+    lifecycle: rLifecycle.ok ? parseLifecycle(rLifecycle.data) : { labels: [], series: { new: [], returning: [], resurrecting: [], dormant: [] } },
     device: rDevice.ok ? parseDeviceMix(rDevice.data) : { device_mix: {} },
-    retention: rRetention.ok ? parseRetention(rRetention.data, dateRange) : { d7_retention: 0, values: [], retention_period: dateRange === '7d' ? 7 : 30 }, // Pass dateRange to parser
+    retention: rRetention.ok ? parseRetention(rRetention.data, dateRange) : { d7_retention: 0, values: [], retention_period: dateRange === '7d' ? 7 : 30 },
     geography: rGeography.ok ? parseGeography(rGeography.data) : { countries: {} },
     cityGeography: rCityGeography.ok ? parseCityGeography(rCityGeography.data) : { cities: {} },
-    meta: { errors, dateRange: dateRange },
+    meta: { 
+      errors, 
+      dateRange: dateRange,
+      comparisonEnabled: enableComparison
+    },
   };
 
-  console.log(`[Analytics Preview] Query results for ${dateRange}:`, {
-    traffic: rTraffic.ok ? 'SUCCESS' : `FAILED: ${rTraffic.reason}`,
-    lifecycle: rLifecycle.ok ? 'SUCCESS' : `FAILED: ${rLifecycle.reason}`,
-    device: rDevice.ok ? 'SUCCESS' : `FAILED: ${rDevice.reason}`,
-    funnel: rFunnel.ok ? 'SUCCESS' : `FAILED: ${rFunnel.reason}`,
-    retention: rRetention.ok ? 'SUCCESS' : `FAILED: ${rRetention.reason}`,
-    geography: rGeography.ok ? 'SUCCESS' : `FAILED: ${rGeography.reason}`,
-    cityGeography: rCityGeography.ok ? 'SUCCESS' : `FAILED: ${rCityGeography.reason}`,
+  // Add comparison data to all KPIs if available
+  if (enableComparison) {
+    // Device comparison
+    if (rComparisonDevice?.ok) {
+      console.log('[Analytics Preview] Processing comparison device data...');
+      const comparisonDevice = parseDeviceMix(rComparisonDevice.data);
+      kpis.device.previous_device_mix = comparisonDevice.device_mix;
+    }
+
+    // Lifecycle comparison
+    if (rComparisonLifecycle?.ok) {
+      console.log('[Analytics Preview] Processing comparison lifecycle data...');
+      const comparisonLifecycle = parseLifecycle(rComparisonLifecycle.data);
+      kpis.lifecycle.previous_series = comparisonLifecycle.series;
+    }
+
+    // Retention comparison
+    if (rComparisonRetention?.ok) {
+      console.log('[Analytics Preview] Processing comparison retention data...');
+      const comparisonRetention = parseRetention(rComparisonRetention.data, dateRange);
+      kpis.retention.previous_d7_retention = comparisonRetention.d7_retention;
+      kpis.retention.previous_values = comparisonRetention.values;
+    }
+
+    // Geography comparison
+    if (rComparisonGeography?.ok) {
+      console.log('[Analytics Preview] Processing comparison geography data...');
+      const comparisonGeography = parseGeography(rComparisonGeography.data);
+      kpis.geography.previous_countries = comparisonGeography.countries;
+    }
+
+    // City Geography comparison
+    if (rComparisonCityGeography?.ok) {
+      console.log('[Analytics Preview] Processing comparison city geography data...');
+      const comparisonCityGeography = parseCityGeography(rComparisonCityGeography.data);
+      kpis.cityGeography.previous_cities = comparisonCityGeography.cities;
+    }
+  }
+
+  console.log(`[Analytics Preview] Final KPIs with comparison:`, {
+    traffic: {
+      current_users: kpis.traffic.unique_users,
+      previous_users: kpis.traffic.previous_unique_users,
+      comparison_enabled: enableComparison
+    },
+    funnel: {
+      current_conversion: kpis.funnel.conversion_rate,
+      previous_conversion: kpis.funnel.previous_conversion_rate,
+      comparison_enabled: enableComparison
+    }
   });
 
-  return res.json({ kpis, errors });
+  res.json({ kpis });
 });
 
 export default router;

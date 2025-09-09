@@ -15,10 +15,24 @@ export const CLIENTS = [
           kind: 'InsightVizNode',
           source: {
             kind: 'TrendsQuery',
-            series: [{ kind: 'EventsNode', event: 'page_view', name: 'page_view', math: 'dau' }],
-            // Remove hardcoded dateRange - will be set dynamically
+            series: [{ 
+              kind: 'EventsNode', 
+              event: 'page_view', 
+              name: 'page_view', 
+              math: 'dau' 
+            }],
+            version: 2,
+            trendsFilter: {
+              display: "ActionsLineGraph",
+              showLegend: false,
+              showTrendLines: false,
+              showMultipleYAxes: false,
+              showValuesOnSeries: true,
+              showAlertThresholdLines: false
+            },
             interval: 'day',
           },
+          full: true
         },
       },
       funnel: {
@@ -296,3 +310,20 @@ export const CLIENTS = [
 
   // Add more clients here, only change clientId/name/recipients if needed
 ];
+
+const createQueryWithDateRange = (baseQuery, dateRange, enableComparison = false) => {
+  const query = JSON.parse(JSON.stringify(baseQuery));
+  
+  if (query.kind === 'InsightVizNode' && query.source) {
+    query.source.dateRange = dateRange;
+    
+    // Add compare filter if comparison is enabled
+    if (enableComparison) {
+      query.source.compareFilter = {
+        compare: true
+      };
+    }
+  }
+  
+  return query;
+};
