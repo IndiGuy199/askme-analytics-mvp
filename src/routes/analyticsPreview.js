@@ -3,6 +3,8 @@ import express from 'express';
 import axios from 'axios';
 import { CLIENTS } from '../config/clients.js';
 import { getApiHost, injectClientFilter } from '../config/posthog.js';
+import { getCompanyPostHogConfig } from '../services/companyService.js';
+import { getQueryConfigForCompany } from '../services/queryConfigService.js';
 
 const router = express.Router();
 const findClient = (id) => CLIENTS.find((c) => c.clientId === id);
@@ -412,7 +414,7 @@ function parseCityGeography(json) {
   return { cities };
 }
 
-/* ---------- GET /api/analytics/preview?clientId=askme-ai-app&dateRange=7d ---------- */
+/* ---------- GET /api/analytics/preview?clientId=askme-ai-app&dateRange=7d (DATABASE-DRIVEN) ---------- */
 router.get('/preview', async (req, res) => {
   // CORS for frontend
   res.header('Access-Control-Allow-Origin', '*');
@@ -420,15 +422,58 @@ router.get('/preview', async (req, res) => {
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   const clientId = (req.query.clientId || '').toString();
+  const companyId = (req.query.companyId || '').toString();
   const dateRange = (req.query.dateRange || '7d').toString();
   const enableComparison = req.query.compare === 'true';
   
-  const client = findClient(clientId);
-  if (!client) {
-    return res.status(400).json({ error: `Unknown clientId: ${clientId}` });
+  let client = null;
+  let useDatabase = false;
+
+  // Try database-driven approach first (preferred)
+  if (companyId) {
+    console.log(`[Analytics Preview] Using database mode for company: ${companyId}`);
+    try {
+      const company = await getCompanyPostHogConfig(companyId);
+      const queries = await getQueryConfigForCompany(companyId);
+      
+      // Convert to client-like structure for compatibility
+      client = {
+        clientId: company.clientId,
+        name: company.name,
+        projectId: company.projectId,
+        apiKey: company.apiKey,
+        queries: {
+          traffic: { query: queries.traffic },
+          funnel: { query: queries.funnel },
+          retention: { query: queries.retention },
+          deviceMix: { query: queries.deviceMix },
+          geography: { query: queries.geography },
+          lifecycle: { query: queries.lifecycle },
+          cityGeography: { query: queries.geography } // Use same as geography for now
+        }
+      };
+      useDatabase = true;
+    } catch (error) {
+      console.error(`[Analytics Preview] Database error for company ${companyId}:`, error.message);
+      return res.status(404).json({ error: `Company not found or PostHog not configured: ${error.message}` });
+    }
+  }
+  
+  // Fallback to legacy hardcoded clients
+  if (!client && clientId) {
+    console.log(`[Analytics Preview] Using legacy mode for client: ${clientId}`);
+    client = findClient(clientId);
+    if (!client) {
+      return res.status(400).json({ error: `Unknown clientId: ${clientId}. Use companyId parameter for database-driven mode.` });
+    }
+    useDatabase = false;
   }
 
-  console.log(`[Analytics Preview] Processing request for client: ${client.name} (${clientId})`);
+  if (!client) {
+    return res.status(400).json({ error: 'Either clientId or companyId parameter is required' });
+  }
+
+  console.log(`[Analytics Preview] Processing request for: ${client.name} (${useDatabase ? 'database' : 'legacy'} mode)`);
   console.log(`[Analytics Preview] Date range: ${dateRange}`);
   console.log(`[Analytics Preview] Comparison enabled: ${enableComparison}`);
 

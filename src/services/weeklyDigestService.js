@@ -3,6 +3,8 @@ import axios from 'axios';
 import { getApiHost, injectClientFilter } from '../config/posthog.js';
 import { CLIENTS } from '../config/clients.js';
 import { createMailer } from '../config/mailer.js';
+import { getCompanyPostHogConfig, getCompanyEmailRecipients, getAllActiveCompanies } from './companyService.js';
+import { getQueryConfigForCompany } from './queryConfigService.js';
 
 async function runQuery({ projectId, apiKey, query }) {
   // Use Query API (current API for PostHog Cloud)
@@ -144,16 +146,90 @@ function renderEmail({ clientName, kpis, summary }) {
   };
 }
 
-/* ---------- Public entry ---------- */
-export async function runForClientId(clientId) {
-  const client = CLIENTS.find((c) => c.clientId === clientId);
-  if (!client) throw new Error(`Unknown clientId: ${clientId}`);
-
-  console.log('Processing client:', client.name);
+/* ---------- Public entry (DATABASE-DRIVEN) ---------- */
+export async function runForCompanyId(companyId) {
+  console.log(`Processing company: ${companyId}`);
   
   try {
-    // Use the configured FunnelsQuery directly (mirrors your saved insight JSON).
-    // This avoids 403s from Insights endpoints and union_tag_invalid errors.
+    // Get PostHog config from database instead of hardcoded clients
+    const company = await getCompanyPostHogConfig(companyId);
+    console.log('Processing company:', company.name);
+    
+    // Get query configurations from database
+    const queries = await getQueryConfigForCompany(companyId);
+    
+    // Inject client_id filter into each query
+    const qTraffic   = injectClientFilter(queries.traffic,   company.clientId);
+    const qFunnel    = injectClientFilter(queries.funnel,    company.clientId);
+    const qRetention = injectClientFilter(queries.retention, company.clientId);
+    const qDevice    = injectClientFilter(queries.deviceMix, company.clientId);
+
+    // Run queries with company's PostHog credentials
+    const [trafficJ, funnelJ, retentionJ, deviceJ] = await Promise.all([
+      runQuery({ projectId: company.projectId, apiKey: company.apiKey, query: qTraffic }),
+      runQuery({ projectId: company.projectId, apiKey: company.apiKey, query: qFunnel }),
+      runQuery({ projectId: company.projectId, apiKey: company.apiKey, query: qRetention }),
+      runQuery({ projectId: company.projectId, apiKey: company.apiKey, query: qDevice }),
+    ]);
+
+    const traffic   = parseTraffic(trafficJ);
+    const funnel    = parseFunnel(funnelJ);
+    const retention = parseRetention(retentionJ);
+    const device    = parseDeviceMix(deviceJ);
+
+    console.log('Parsed metrics:', { traffic, funnel, retention, device });
+
+    const summary = await aiSummary({ traffic, funnel, retention, device });
+
+    // Get email recipients from database
+    const recipients = await getCompanyEmailRecipients(companyId);
+    
+    if (!recipients || recipients.length === 0) {
+      console.log(`No email recipients configured for company: ${company.name}`);
+      return { ok: false, error: 'No recipients configured' };
+    }
+
+    // Email
+    const mailer = await createMailer();
+    const { subject, html } = renderEmail({
+      clientName: company.name,
+      kpis: { traffic, funnel, retention, device },
+      summary,
+    });
+
+    const info = await mailer.sendMail({
+      from: process.env.FROM_EMAIL || 'insights@your-saas.com',
+      to: recipients.join(', '),
+      subject,
+      html,
+    });
+
+    console.log(`Email sent to ${recipients.length} recipients:`, info.messageId);
+    return { 
+      ok: true, 
+      company: company.name,
+      recipients: recipients.length,
+      messageId: info.messageId
+    };
+  } catch (e) {
+    console.error(`Company processing error for ${companyId}:`, e.message);
+    throw e;
+  }
+}
+
+// Legacy method for backward compatibility
+export async function runForClientId(clientId) {
+  console.warn('runForClientId is deprecated. Use runForCompanyId instead.');
+  
+  // Try to find client in hardcoded list first (backward compatibility)
+  const client = CLIENTS.find((c) => c.clientId === clientId);
+  if (!client) {
+    throw new Error(`Unknown clientId: ${clientId}. Please use runForCompanyId with company UUID instead.`);
+  }
+
+  console.log('Processing legacy client:', client.name);
+  
+  try {
     const funnelQueryNode = client.queries.funnel.query;
 
     // Inject client_id filter into each query
@@ -202,4 +278,49 @@ export async function runForClientId(clientId) {
   }
 }
 
-export default { runForClientId };
+// New method to process all companies from database
+export async function runForAllCompanies() {
+  try {
+    const companies = await getAllActiveCompanies();
+    console.log(`Processing ${companies.length} companies from database`);
+    
+    const results = [];
+    
+    for (const company of companies) {
+      try {
+        const result = await runForCompanyId(company.companyId);
+        results.push({
+          companyId: company.companyId,
+          name: company.name,
+          ...result
+        });
+      } catch (error) {
+        console.error(`Failed to process company ${company.name}:`, error.message);
+        results.push({
+          companyId: company.companyId,
+          name: company.name,
+          ok: false,
+          error: error.message
+        });
+      }
+    }
+    
+    const successful = results.filter(r => r.ok).length;
+    const failed = results.filter(r => !r.ok).length;
+    
+    console.log(`Batch processing complete: ${successful} successful, ${failed} failed`);
+    
+    return {
+      total: companies.length,
+      successful,
+      failed,
+      results
+    };
+    
+  } catch (error) {
+    console.error('Batch processing error:', error);
+    throw error;
+  }
+}
+
+export default { runForClientId, runForCompanyId, runForAllCompanies };
