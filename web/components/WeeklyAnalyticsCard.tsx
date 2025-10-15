@@ -1,99 +1,43 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
+import React, { useState, useEffect } from 'react';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, CartesianGrid } from 'recharts';
 
-/** ------- Types that match /api/analytics/preview ------- */
-type FunnelStep = { name: string; count: number };
-type TopDrop = { from: string; to: string; dropRate: number };
-type Funnel = { 
-  steps: FunnelStep[]; 
-  conversion_rate: number; 
-  median_time_to_convert_sec: number; 
-  top_drop: TopDrop;
-  previous_conversion_rate?: number;
-  previous_signups?: number;
-};
-type Traffic = { 
-  series: number[]; 
-  labels: string[]; 
-  unique_users: number; 
-  pageviews: number;
-  previous_unique_users?: number;
-  previous_pageviews?: number;
-};
-type LifecycleSeries = { new: number[]; returning: number[]; resurrecting: number[]; dormant: number[] };
-type Lifecycle = { 
-  labels: string[]; 
-  series: LifecycleSeries;
-  previous_series?: LifecycleSeries;
-};
-type DeviceMix = { 
-  device_mix: Record<string, number>;
-  previous_device_mix?: Record<string, number>;
-};
-type Retention = { 
-  d7_retention: number; 
-  values: { day: number; count: number; percentage: number }[];
-  previous_d7_retention?: number;
-  previous_values?: { day: number; count: number; percentage: number }[];
-};
-type Geography = { 
-  countries: Record<string, number>;
-  previous_countries?: Record<string, number>;
-};
-type CityGeography = { 
-  cities: Record<string, { city: string; country: string; count: number }>;
-  previous_cities?: Record<string, { city: string; country: string; count: number }>;
-};
-
-type KPIs = {
-  traffic: Traffic;
-  funnel: Funnel;
-  lifecycle: Lifecycle;
-  device: DeviceMix;
-  retention: Retention;
-  geography: Geography;
-  cityGeography: CityGeography;
-  meta: { errors: Record<string, string>; dateRange: string; comparisonEnabled: boolean };
-};
-
-type ApiResponse = {
-  kpis: KPIs;
-};
-
-// AI Insights types
-type AiInsights = {
-  headline: string;
-  highlights: string[];
-  bottleneck: string;
-  actions: string[];
-};
+// Chart color palette
+const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#84CC16', '#F97316'];
 
 interface WeeklyAnalyticsCardProps {
-  clientId?: string;
+  clientId: string;
+  dateRange?: string;
+  comparisonMode?: string;
+  onDateRangeChange?: (value: string) => void;
+  onComparisonModeChange?: (value: string) => void;
   customLabels?: {
     title?: string;
-    conversionTarget?: string;
+    traffic?: string;
+    signups?: string;
+    funnel?: string;
   };
 }
 
-const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'];
-
-export default function WeeklyAnalyticsCard({ 
-  clientId = 'askme-ai-app',
+export default function WeeklyAnalyticsCard({
+  clientId,
+  dateRange = '7d',
+  comparisonMode = 'none',
+  onDateRangeChange,
+  onComparisonModeChange,
   customLabels = {}
 }: WeeklyAnalyticsCardProps) {
-  const [kpis, setKPIs] = useState<KPIs | null>(null);
+  console.log('WeeklyAnalyticsCard: component started with props:', { clientId, dateRange, comparisonMode });
+  
+  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
-  const [dateRange, setDateRange] = useState<'7d' | '30d'>('30d');
-  const [comparisonMode, setComparisonMode] = useState<'none' | 'previous'>('previous');
+  const [kpis, setKpis] = useState<any>(null);
   const [geographyTab, setGeographyTab] = useState<'countries' | 'cities'>('countries');
 
-  // AI Insights state
-  const [aiInsights, setAiInsights] = useState<AiInsights | null>(null);
+  // AI insights state
+  const [aiInsights, setAiInsights] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 
@@ -101,107 +45,132 @@ export default function WeeklyAnalyticsCard({
     setMounted(true);
   }, []);
 
-  // Helper function to calculate percentage change
-  const calculateChange = (current: number, previous: number) => {
-    if (previous === 0) {
-      if (current === 0) return { value: 0, formatted: 'No change' };
-      return { value: Infinity, formatted: '+∞%' };
+  const fetchAnalytics = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const params = new URLSearchParams({
+        clientId,
+        dateRange,
+        comparisonMode
+      });
+
+      console.log('WeeklyAnalyticsCard: fetching with params', { clientId, dateRange, comparisonMode });
+
+      const response = await fetch(`/api/analytics/preview?${params}`);
+      const data = await response.json();
+
+      console.log('WeeklyAnalyticsCard: API response', data);
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch analytics');
+      }
+
+      if (data.success) {
+        console.log('WeeklyAnalyticsCard: setting kpis data');
+        // API returns data.kpis, not data.data
+        setKpis(data.kpis);
+        
+        // Fetch AI insights after successful data load
+        if (data.kpis && Object.keys(data.kpis).length > 0) {
+          fetchAiInsights(data.kpis);
+        }
+      } else {
+        throw new Error(data.error || 'Failed to fetch analytics');
+      }
+    } catch (err) {
+      console.error('WeeklyAnalyticsCard: error fetching analytics', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch analytics');
+    } finally {
+      console.log('WeeklyAnalyticsCard: setting loading to false');
+      setLoading(false);
     }
-    const change = ((current - previous) / previous) * 100;
-    const sign = change > 0 ? '+' : '';
-    return { 
-      value: change, 
-      formatted: `${sign}${change.toFixed(1)}% vs previous ${dateRange === '7d' ? '7' : '30'} days`
-    };
   };
 
-  // Helper function to format comparison text
-  const formatComparison = (current: number, previous: number, unit: string = '') => {
-    if (!kpis?.meta.comparisonEnabled || previous === undefined) {
-      return 'No comparison data';
-    }
-    const change = calculateChange(current, previous);
-    return change.formatted;
-  };
-
-  // Helper function to get total from previous data
-  const getPreviousTotal = (previousData: Record<string, any>) => {
-    if (!previousData) return 0;
-    return Object.values(previousData).reduce((sum: number, value: any) => {
-      if (typeof value === 'number') return sum + value;
-      if (typeof value === 'object' && value.count) return sum + value.count;
-      return sum;
-    }, 0);
-  };
-
-  // Fetch AI insights
-  const fetchAiInsights = async (kpisData: KPIs) => {
+  const fetchAiInsights = async (analyticsData: any) => {
     try {
       setAiLoading(true);
       setAiError(null);
-      
-      const response = await fetch('/api/ai/summary', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ kpis: kpisData }),
-      });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+      const response = await fetch('/api/analytics/insights', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId,
+          analyticsData,
+          dateRange,
+          comparisonMode
+        })
+      });
 
       const data = await response.json();
-      setAiInsights(data.summary);
+
+      if (response.ok && data.success) {
+        setAiInsights(data.insights);
+      } else {
+        console.warn('AI insights failed:', data.error);
+        setAiError(data.error || 'Failed to generate AI insights');
+      }
     } catch (err) {
-      console.error('Failed to fetch AI insights:', err);
-      setAiError(err instanceof Error ? err.message : 'Failed to generate insights');
-      // Set fallback insights
-      setAiInsights({
-        headline: 'AI insights temporarily unavailable',
-        highlights: ['Data analysis in progress', 'Check back in a few minutes', 'Manual review recommended'],
-        bottleneck: 'Unable to identify bottlenecks automatically',
-        actions: ['Review data manually', 'Check analytics configuration', 'Contact support if needed']
-      });
+      console.warn('AI insights error:', err);
+      setAiError('Failed to generate AI insights');
     } finally {
       setAiLoading(false);
     }
   };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const compareParam = comparisonMode === 'previous' ? '&compare=true' : '';
-        const response = await fetch(`/api/analytics/preview?clientId=${clientId}&dateRange=${dateRange}${compareParam}`);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        
-        const data: ApiResponse = await response.json();
-        setKPIs(data.kpis);
-        setError(null);
-        
-        // Fetch AI insights after getting KPIs
-        if (data.kpis) {
-          fetchAiInsights(data.kpis);
-        }
-      } catch (err) {
-        console.error('Failed to fetch analytics data:', err);
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    };
+    if (clientId && mounted) {
+      fetchAnalytics();
+    }
+  }, [clientId, dateRange, comparisonMode, mounted]);
 
-    fetchData();
-  }, [clientId, dateRange, comparisonMode]);
+  // Helper functions
+  const getPreviousTotal = (previousData: any) => {
+    if (!previousData) return 0;
+    return Object.values(previousData).reduce((a: number, b: any) => a + (typeof b === 'number' ? b : 0), 0);
+  };
+
+  const formatComparison = (current: number, previous?: number) => {
+    if (previous === undefined) return '';
+    const change = current - previous;
+    const percentage = previous > 0 ? ((change / previous) * 100).toFixed(1) : '0.0';
+    const sign = change > 0 ? '+' : '';
+    return `${sign}${change} (${sign}${percentage}%)`;
+  };
+
+  const calculateChange = (current: number, previous?: number) => {
+    if (previous === undefined || previous === 0) {
+      return {
+        value: current,
+        percentage: 0,
+        formatted: `${current.toLocaleString()}`,
+        color: 'text-gray-500'
+      };
+    }
+
+    const change = current - previous;
+    const percentage = ((change / previous) * 100);
+    const sign = change > 0 ? '+' : '';
+    const color = change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : 'text-gray-500';
+
+    return {
+      value: change,
+      percentage,
+      formatted: `${sign}${Math.abs(change).toLocaleString()} (${sign}${percentage.toFixed(1)}%)`,
+      color
+    };
+  };
 
   if (loading) {
+    console.log('WeeklyAnalyticsCard: showing loading state');
     return (
       <div className="w-full max-w-7xl mx-auto p-6">
+        <div className="bg-blue-100 p-4 mb-4 rounded">
+          <p className="text-blue-800">WeeklyAnalyticsCard Loading State</p>
+          <p className="text-sm">clientId: {clientId}</p>
+        </div>
         <div className="animate-pulse">
           <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
@@ -220,6 +189,7 @@ export default function WeeklyAnalyticsCard({
   }
 
   if (error) {
+    console.log('WeeklyAnalyticsCard: showing error state:', error);
     return (
       <div className="w-full max-w-7xl mx-auto p-6">
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
@@ -230,52 +200,78 @@ export default function WeeklyAnalyticsCard({
     );
   }
 
-  if (!kpis) return null;
+  // Provide default empty data structure if no kpis
+  const safeKpis = kpis || {
+    traffic: { unique_users: 0, pageviews: 0, series: [] },
+    funnel: { steps: [], conversion_rate: 0 },
+    lifecycle: { series: {}, labels: [] },
+    device: { device_mix: {} },
+    geography: { countries: {} },
+    cityGeography: { cities: {} },
+    retention: { values: [], d7_retention: 0 },
+    meta: { errors: [], comparisonEnabled: false }
+  };
+
+  console.log('WeeklyAnalyticsCard: rendering main dashboard with safeKpis:', !!safeKpis);
 
   // Calculate derived metrics
-  const totalTraffic = kpis.traffic.unique_users || 0;
-  const totalSignups = kpis.funnel.steps[kpis.funnel.steps.length - 1]?.count || 0;
-  const conversionRate = totalTraffic > 0 ? (totalSignups / totalTraffic) * 100 : 0;
+  const totalTraffic = safeKpis.traffic?.unique_users || 0;
+  const totalSignups = safeKpis.funnel?.steps?.length > 0 ? safeKpis.funnel.steps[safeKpis.funnel.steps.length - 1]?.count || 0 : 0;
+  const conversionRate = safeKpis.funnel?.conversion_rate || 0;
 
-  // Calculate changes for comparison
-  const trafficChange = calculateChange(totalTraffic, kpis.traffic.previous_unique_users || 0);
-  const signupChange = calculateChange(totalSignups, kpis.funnel.previous_signups || 0);
-  const conversionChange = calculateChange(conversionRate, 
-    kpis.traffic.previous_unique_users && kpis.traffic.previous_unique_users > 0 
-      ? ((kpis.funnel.previous_signups || 0) / kpis.traffic.previous_unique_users) * 100 
-      : 0
-  );
+  // Calculate changes for comparison mode
+  const trafficChange = calculateChange(totalTraffic, safeKpis.traffic?.previous_unique_users);
+  const conversionChange = calculateChange(conversionRate, safeKpis.funnel?.previous_conversion_rate ? safeKpis.funnel?.previous_conversion_rate * 100 : undefined);
 
-  // Prepare chart data
-  const trafficData = kpis.traffic.series.map((value, index) => ({
+  // Prepare traffic chart data - API returns 'series' not 'daily_data'
+  // Debug log at top level to see all data structure
+  console.log('Full safeKpis structure:', {
+    kpis,
+    safeKpis,
+    kpisKeys: Object.keys(safeKpis),
+    geography: safeKpis.geography,
+    device: safeKpis.device,
+    traffic: safeKpis.traffic,
+    lifecycle: safeKpis.lifecycle,
+    funnel: safeKpis.funnel
+  });
+
+  const trafficData = safeKpis.traffic?.series?.map((value: number, index: number) => ({
     dayNum: index,
-    value: value,
-    day: kpis.traffic.labels[index] || `Day ${index + 1}`
-  }));
+    value: Math.max(value, 0), // Ensure non-negative values
+    name: `Day ${index + 1}`
+  })) || [];
 
-  const dateRangeLabel = dateRange === '7d' ? 'Last 7 days' : 'Last 30 days';
+  // Debug: Add console log to see what's happening
+  console.log('WeeklyAnalyticsCard render:', { loading, error, mounted, kpis: !!safeKpis, trafficDataLength: trafficData.length });
 
   return (
     <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
+      {/* Debug info */}
+      <div className="bg-yellow-100 p-2 text-xs">
+        Debug: loading={loading.toString()}, error={error || 'none'}, mounted={mounted.toString()},
+        kpis={!!safeKpis ? 'exists' : 'null'}, trafficData.length={trafficData.length}
+      </div>
+
       {/* Header with Controls */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-2xl font-bold text-gray-900">
           {customLabels.title || 'Analytics Dashboard'}
         </h2>
-        
+
         <div className="flex flex-col sm:flex-row gap-2">
-          <select 
-            value={dateRange} 
-            onChange={(e) => setDateRange(e.target.value as '7d' | '30d')}
+          <select
+            value={dateRange}
+            onChange={(e) => onDateRangeChange?.(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-md bg-white text-sm"
           >
             <option value="7d">Last 7 days</option>
             <option value="30d">Last 30 days</option>
           </select>
-          
-          <select 
-            value={comparisonMode} 
-            onChange={(e) => setComparisonMode(e.target.value as 'none' | 'previous')}
+
+          <select
+            value={comparisonMode}
+            onChange={(e) => onComparisonModeChange?.(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-md bg-white text-sm"
           >
             <option value="none">No comparison between periods</option>
@@ -324,7 +320,7 @@ export default function WeeklyAnalyticsCard({
                   Key Highlights
                 </h4>
                 <ul className="space-y-2">
-                  {aiInsights.highlights.map((highlight, index) => (
+                  {aiInsights.highlights.map((highlight: string, index: number) => (
                     <li key={index} className="text-sm text-gray-700 flex items-start gap-2">
                       <span className="text-green-600 mt-0.5">•</span>
                       <span>{highlight}</span>
@@ -353,7 +349,7 @@ export default function WeeklyAnalyticsCard({
                   Recommended Actions
                 </h4>
                 <ul className="space-y-2">
-                  {aiInsights.actions.map((action, index) => (
+                  {aiInsights.actions.map((action: string, index: number) => (
                     <li key={index} className="text-sm text-gray-700 flex items-start gap-2">
                       <span className="text-blue-600 mt-0.5">→</span>
                       <span>{action}</span>
@@ -379,7 +375,7 @@ export default function WeeklyAnalyticsCard({
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
+
         {/* Traffic Chart */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
@@ -393,7 +389,7 @@ export default function WeeklyAnalyticsCard({
               </div>
             </div>
           </div>
-          
+
           {/* Traffic metrics row */}
           <div className="grid grid-cols-2 gap-4 mb-4 p-3 bg-gray-50 rounded-lg">
             <div className="text-center">
@@ -401,20 +397,20 @@ export default function WeeklyAnalyticsCard({
                 {totalTraffic.toLocaleString()}
               </div>
               <div className="text-xs text-gray-500">Unique Users</div>
-              {kpis.meta.comparisonEnabled && kpis.traffic.previous_unique_users !== undefined && (
+              {safeKpis.meta?.comparisonEnabled && safeKpis.traffic?.previous_unique_users !== undefined && (
                 <div className="text-xs text-gray-400 mt-1">
-                  Previous: {kpis.traffic.previous_unique_users}
+                  Previous: {safeKpis.traffic?.previous_unique_users}
                 </div>
               )}
             </div>
             <div className="text-center">
               <div className="text-lg font-semibold text-green-600">
-                {(kpis?.traffic?.pageviews || 0).toLocaleString()}
+                {(safeKpis?.traffic?.pageviews || 0).toLocaleString()}
               </div>
               <div className="text-xs text-gray-500">Pageviews</div>
-              {kpis.meta.comparisonEnabled && kpis.traffic.previous_pageviews !== undefined && (
+              {safeKpis.meta?.comparisonEnabled && safeKpis.traffic?.previous_pageviews !== undefined && (
                 <div className="text-xs text-gray-400 mt-1">
-                  Previous: {kpis.traffic.previous_pageviews}
+                  Previous: {safeKpis.traffic?.previous_pageviews}
                 </div>
               )}
             </div>
@@ -431,17 +427,17 @@ export default function WeeklyAnalyticsCard({
                       <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.05}/>
                     </linearGradient>
                   </defs>
-                  <XAxis 
-                    dataKey="dayNum" 
+                  <XAxis
+                    dataKey="dayNum"
                     axisLine={false}
                     tickLine={false}
                     tick={{ fontSize: 12, fill: '#6B7280' }}
                     tickFormatter={(value) => `Day ${value + 1}`}
                   />
                   <YAxis hide />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'white', 
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'white',
                       border: '1px solid #E5E7EB',
                       borderRadius: '8px',
                       boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
@@ -449,26 +445,27 @@ export default function WeeklyAnalyticsCard({
                     formatter={(value) => [value, 'Users']}
                     labelFormatter={(day) => `Day ${day + 1}`}
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey="value" 
-                    stroke="#3B82F6" 
+                  <Area
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#3B82F6"
                     strokeWidth={2}
-                    fill="url(#trafficGradient)" 
+                    fill="url(#trafficGradient)"
                   />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
               <div className="w-full h-full bg-gray-50 rounded-lg flex items-center justify-center">
-                <span className="text-gray-400 text-sm">No traffic data available</span>
+                <span className="text-gray-400 text-sm">
+                  {mounted ? 'No traffic data available' : 'Loading...'}
+                </span>
               </div>
             )}
           </div>
         </div>
 
-        {/* Enhanced Signup Funnel Chart with integrated metrics */}
+        {/* Signup Funnel Chart */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          {/* Header with key metrics */}
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Signup Funnel</h3>
             <div className="text-right">
@@ -481,143 +478,78 @@ export default function WeeklyAnalyticsCard({
             </div>
           </div>
 
-          {/* Funnel metrics row */}
-          <div className="grid grid-cols-3 gap-4 mb-4 p-3 bg-gray-50 rounded-lg">
-            {/* Signups */}
-            <div className="text-center">
-              <div className="text-lg font-semibold text-green-600">
-                {totalSignups}
-              </div>
-              <div className="text-xs text-gray-500">Signups</div>
-              {kpis.meta.comparisonEnabled && (
-                <div className="text-xs text-gray-400 mt-1">
-                  {formatComparison(totalSignups, kpis.funnel.previous_signups)}
-                </div>
-              )}
-            </div>
-
-            {/* Conversion Rate */}
-            <div className="text-center">
-              <div className="text-lg font-semibold text-red-500">
-                {conversionRate.toFixed(1)}%
-              </div>
-              <div className="text-xs text-gray-500">Conversion</div>
-              {kpis.meta.comparisonEnabled && kpis.funnel.previous_conversion_rate !== undefined && (
-                <div className="text-xs text-gray-400 mt-1">
-                  Previous: {(kpis.funnel.previous_conversion_rate * 100).toFixed(1)}%
-                </div>
-              )}
-            </div>
-
-            {/* Drop-off Rate */}
-            <div className="text-center">
-              <div className="text-lg font-semibold text-orange-600">
-                {((kpis?.funnel?.top_drop?.dropRate || 0) * 100).toFixed(0)}%
-              </div>
-              <div className="text-xs text-gray-500">Top Drop</div>
-              <div className="text-xs text-gray-400 mt-1">
-                {kpis?.funnel?.top_drop?.from ? 
-                  `${kpis.funnel.top_drop.from.substring(0, 15)}...` : 
-                  'No data'
-                }
-              </div>
-            </div>
-          </div>
-
-          {/* Funnel chart */}
           <div className="h-48">
-            {mounted ? (
-              kpis?.funnel?.steps && kpis.funnel.steps.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart 
-                    data={kpis.funnel.steps} 
-                    layout="vertical"
-                    margin={{ top: 10, right: 30, left: 140, bottom: 10 }}
-                  >
-                    <XAxis 
-                      type="number" 
-                      axisLine={false} 
-                      tickLine={false}
-                      tick={{ fontSize: 10, fill: '#6B7280' }}
-                      domain={[0, 'dataMax']}
-                    />
-                    <YAxis 
-                      type="category"
-                      dataKey="name" 
-                      axisLine={false} 
-                      tickLine={false}
-                      tick={{ fontSize: 8, fill: '#6B7280' }}
-                      width={130}
-                      tickFormatter={(value) => {
-                        return value.length > 20 ? value.substring(0, 20) + '...' : value;
-                      }}
-                    />
-                    <Tooltip 
-                      contentStyle={{
-                        backgroundColor: 'white',
-                        border: '1px solid #E5E7EB',
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                      }}
-                      formatter={(value, name) => [value, 'Count']}
-                      labelFormatter={(label) => label}
-                    />
-                    <Bar 
-                      dataKey="count" 
-                      fill="#3B82F6"
-                      radius={[0, 4, 4, 0]}
-                      minPointSize={2}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="w-full h-full bg-gray-50 rounded-lg flex items-center justify-center">
-                  <div className="text-center">
-                    <span className="text-gray-400 text-sm block">No funnel data available</span>
-                    <span className="text-xs text-gray-400 mt-1">
-                      Steps: {kpis?.funnel?.steps?.length || 0}
-                    </span>
-                  </div>
-                </div>
-              )
+            {mounted && safeKpis?.funnel?.steps && safeKpis.funnel.steps.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={safeKpis.funnel.steps}
+                  layout="vertical"
+                  margin={{ top: 10, right: 30, left: 140, bottom: 10 }}
+                >
+                  <XAxis
+                    type="number"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: '#6B7280' }}
+                    domain={[0, 'dataMax']}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 8, fill: '#6B7280' }}
+                    width={130}
+                    tickFormatter={(value) => {
+                      return value.length > 20 ? value.substring(0, 20) + '...' : value;
+                    }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'white',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }}
+                    formatter={(value, name) => [value, 'Count']}
+                    labelFormatter={(label) => label}
+                  />
+                  <Bar
+                    dataKey="count"
+                    fill="#3B82F6"
+                    radius={[0, 4, 4, 0]}
+                    minPointSize={2}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
             ) : (
               <div className="w-full h-full bg-gray-50 rounded-lg flex items-center justify-center">
-                <span className="text-gray-400 text-sm">Loading chart...</span>
+                <div className="text-center">
+                  <span className="text-gray-400 text-sm block">
+                    {mounted ? 'No funnel data available' : 'Loading chart...'}
+                  </span>
+                  {mounted && (
+                    <span className="text-xs text-gray-400 mt-1">
+                      Steps: {safeKpis?.funnel?.steps?.length || 0}
+                    </span>
+                  )}
+                </div>
               </div>
             )}
           </div>
-
-          {/* Simplified footer with only biggest drop-off info */}
-          {kpis?.funnel?.top_drop && kpis.funnel.top_drop.from && kpis.funnel.top_drop.to && (
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <div className="text-sm text-gray-600">
-                <span className="font-medium">Biggest drop-off:</span> {kpis.funnel.top_drop.from} → {kpis.funnel.top_drop.to} 
-                <span className="font-medium text-red-600 ml-1">
-                  ({((kpis.funnel.top_drop.dropRate || 0) * 100).toFixed(0)}% drop)
-                </span>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* User Lifecycle Chart */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">User Lifecycle</h3>
-            {kpis.meta.comparisonEnabled && kpis.lifecycle.previous_series && (
-              <div className="text-xs text-gray-500">
-                Current vs Previous Period
-              </div>
-            )}
           </div>
           <div className="h-48">
             {mounted ? (
               (() => {
-                const hasCurrentData = Object.values(kpis.lifecycle.series).some(arr => arr.some(val => val !== 0));
-                const hasPreviousData = kpis.lifecycle.previous_series && 
-                  Object.values(kpis.lifecycle.previous_series).some(arr => arr.some(val => val !== 0));
+                const hasCurrentData = Object.values(safeKpis.lifecycle?.series || {}).some(arr => Array.isArray(arr) && arr.some(val => val !== 0));
                 
-                if (!hasCurrentData && !hasPreviousData) {
+                if (!hasCurrentData) {
                   return (
                     <div className="w-full h-full bg-gray-50 rounded-lg flex items-center justify-center">
                       <span className="text-gray-400 text-sm">No lifecycle data available</span>
@@ -625,19 +557,18 @@ export default function WeeklyAnalyticsCard({
                   );
                 }
 
-                // Prepare data for the chart
-                const lifecycleData = kpis.lifecycle.labels.map((label, index) => ({
+                const lifecycleData = safeKpis.lifecycle?.labels?.map((label: string, index: number) => ({
                   day: label,
-                  new: kpis.lifecycle.series.new[index] || 0,
-                  returning: kpis.lifecycle.series.returning[index] || 0,
-                  resurrecting: kpis.lifecycle.series.resurrecting[index] || 0,
-                  dormant: Math.abs(kpis.lifecycle.series.dormant[index] || 0), // Make dormant positive for chart
-                }));
+                  new: safeKpis.lifecycle?.series?.new?.[index] || 0,
+                  returning: safeKpis.lifecycle?.series?.returning?.[index] || 0,
+                  resurrecting: safeKpis.lifecycle?.series?.resurrecting?.[index] || 0,
+                  dormant: Math.abs(safeKpis.lifecycle?.series?.dormant?.[index] || 0),
+                })) || [];
 
                 return (
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={lifecycleData}>
-                      <XAxis 
+                      <XAxis
                         dataKey="day"
                         axisLine={false}
                         tickLine={false}
@@ -646,7 +577,7 @@ export default function WeeklyAnalyticsCard({
                         tickFormatter={(value) => value.replace('Day ', '')}
                       />
                       <YAxis hide />
-                      <Tooltip 
+                      <Tooltip
                         contentStyle={{
                           backgroundColor: 'white',
                           border: '1px solid #E5E7EB',
@@ -668,269 +599,133 @@ export default function WeeklyAnalyticsCard({
               </div>
             )}
           </div>
-          
-          {/* Enhanced Lifecycle summary with comparison totals */}
-          <div className="mt-4 pt-4 border-t border-gray-100">
-            <div className="grid grid-cols-2 gap-2 text-xs mb-3">
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-green-500 rounded"></div>
-                <span>New</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-blue-500 rounded"></div>
-                <span>Returning</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-                <span>Resurrecting</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-red-500 rounded"></div>
-                <span>Dormant</span>
-              </div>
-            </div>
-            
-            {/* Comparison summary */}
-            {kpis.meta.comparisonEnabled && kpis.lifecycle.previous_series && (
-              <div className="text-xs text-gray-500 space-y-1">
-                <div className="flex justify-between">
-                  <span>Current Total New:</span>
-                  <span>{kpis.lifecycle.series.new.reduce((a, b) => a + b, 0)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Previous Total New:</span>
-                  <span>{kpis.lifecycle.previous_series.new.reduce((a, b) => a + b, 0)}</span>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
 
-        {/* Device Mix Chart */}
+          {/* Device Mix Chart */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Device Mix</h3>
-            {kpis.meta.comparisonEnabled && kpis.device.previous_device_mix && (
-              <div className="text-xs text-gray-500">
-                Current vs Previous Period
-              </div>
-            )}
           </div>
           <div className="h-48">
-            {mounted && Object.keys(kpis.device.device_mix).length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={Object.entries(kpis.device.device_mix).map(([device, count], index) => ({
-                      name: device,
-                      value: count,
-                      count: count
-                    }))}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={40}
-                    outerRadius={80}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {Object.entries(kpis.device.device_mix).map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    formatter={(value) => [value, 'Users']}
-                    contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #E5E7EB',
-                      borderRadius: '8px',
-                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="w-full h-full bg-gray-50 rounded-lg flex items-center justify-center">
-                <span className="text-gray-400 text-sm">No device data available</span>
-              </div>
-            )}
-          </div>
-          
-          {/* Device legend with comparison */}
-          <div className="mt-4 space-y-2">
-            {Object.entries(kpis.device.device_mix).map(([device, count], index) => {
-              const total = Object.values(kpis.device.device_mix).reduce((a, b) => a + b, 0);
-              const percentage = total > 0 ? (count / total) * 100 : 0;
-              const previousCount = kpis.device.previous_device_mix?.[device] || 0;
+            {(() => {
+              const deviceData = safeKpis.device?.device_mix || {};
+              const deviceKeys = Object.keys(deviceData);
+              console.log('Device mix debug:', { 
+                device: safeKpis.device,
+                device_mix: deviceData, 
+                deviceKeys, 
+                keysLength: deviceKeys.length,
+                mounted 
+              });
               
-              return (
-                <div key={device} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <div 
-                      className="w-3 h-3 rounded" 
-                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                    ></div>
-                    <span className="text-gray-700">{device}</span>
+              if (mounted && deviceKeys.length > 0) {
+                // Show chart even if values are 0, but with special handling
+                const chartData = Object.entries(deviceData).map(([device, count], index) => ({
+                  name: device,
+                  value: Math.max(count, 0.1), // Ensure minimum value for visibility
+                  actualValue: count,
+                  count: count
+                }));
+                
+                return (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={chartData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={40}
+                        outerRadius={80}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value, name, props) => [props.payload.actualValue, 'Users']}
+                        contentStyle={{
+                          backgroundColor: 'white',
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                );
+              } else {
+                return (
+                  <div className="w-full h-full bg-gray-50 rounded-lg flex items-center justify-center">
+                    <span className="text-gray-400 text-sm">
+                      {mounted ? `No device data available (keys: ${deviceKeys.length})` : 'Loading chart...'}
+                    </span>
                   </div>
-                  <div className="text-right">
-                    <div className="font-medium">{count} ({percentage.toFixed(1)}%)</div>
-                    {kpis.meta.comparisonEnabled && kpis.device.previous_device_mix && (
-                      <div className="text-xs text-gray-400">
-                        Previous: {previousCount}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              }
+            })()}
           </div>
         </div>
 
-        {/* Combined Geography & Cities Chart with Tabs */}
+        {/* Geography Chart */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-4">
-              <h3 className="text-lg font-semibold text-gray-900">Geography</h3>
-              {/* Tab Navigation */}
-              <div className="flex bg-gray-100 rounded-lg p-1">
-                <button
-                  onClick={() => setGeographyTab('countries')}
-                  className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-                    geographyTab === 'countries'
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  Countries
-                </button>
-                <button
-                  onClick={() => setGeographyTab('cities')}
-                  className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-                    geographyTab === 'cities'
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  Cities
-                </button>
-              </div>
-            </div>
-            {kpis.meta.comparisonEnabled && (
-              (geographyTab === 'countries' && kpis.geography.previous_countries) ||
-              (geographyTab === 'cities' && kpis.cityGeography.previous_cities)
-            ) && (
-              <div className="text-xs text-gray-500">
-                Current vs Previous Period
-              </div>
-            )}
+            <h3 className="text-lg font-semibold text-gray-900">Top Locations</h3>
           </div>
-
-          {/* Tab Content */}
-          <div className="space-y-3 min-h-[200px]">
-            {geographyTab === 'countries' ? (
-              /* Countries Tab Content */
-              <>
-                {Object.entries(kpis.geography.countries)
-                  .sort(([,a], [,b]) => b - a)
-                  .slice(0, 5)
-                  .map(([country, count]) => {
-                    const total = Object.values(kpis.geography.countries).reduce((a, b) => a + b, 0);
-                    const percentage = total > 0 ? (count / total) * 100 : 0;
-                    const previousCount = kpis.geography.previous_countries?.[country] || 0;
-                    
-                    return (
-                      <div key={country} className="space-y-1">
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="font-medium text-gray-700">{country}</span>
-                          <div className="text-right">
-                            <span className="font-medium">{count} users</span>
-                            {kpis.meta.comparisonEnabled && kpis.geography.previous_countries && (
-                              <div className="text-xs text-gray-400">
-                                Previous: {previousCount}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${percentage}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    );
-                  })}
+          <div className="h-48">
+            {(() => {
+              // Use the correct path: geography.countries instead of just geography
+              const geoData = safeKpis.geography?.countries || {};
+              const geoKeys = Object.keys(geoData);
+              console.log('Geography debug:', { 
+                geography: safeKpis.geography, 
+                countries: geoData,
+                geoKeys, 
+                keysLength: geoKeys.length,
+                mounted 
+              });
+              
+              if (mounted && geoKeys.length > 0) {
+                const chartData = Object.entries(geoData).map(([location, count]) => ({
+                  name: location,
+                  users: count
+                }));
                 
-                {/* Show previous period totals summary */}
-                {kpis.meta.comparisonEnabled && kpis.geography.previous_countries && (
-                  <div className="mt-4 pt-3 border-t border-gray-100 text-xs text-gray-500">
-                    <div className="flex justify-between">
-                      <span>Current Period Total:</span>
-                      <span>{Object.values(kpis.geography.countries).reduce((a, b) => a + b, 0)} users</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Previous Period Total:</span>
-                      <span>{getPreviousTotal(kpis.geography.previous_countries)} users</span>
-                    </div>
+                return (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis 
+                        dataKey="name" 
+                        tick={{ fontSize: 12 }}
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
+                      />
+                      <YAxis tick={{ fontSize: 12 }} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'white',
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                        }}
+                      />
+                      <Bar dataKey="users" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                );
+              } else {
+                return (
+                  <div className="w-full h-full bg-gray-50 rounded-lg flex items-center justify-center">
+                    <span className="text-gray-400 text-sm">
+                      {mounted ? `No geography data available (keys: ${geoKeys.length})` : 'Loading chart...'}
+                    </span>
                   </div>
-                )}
-                
-                {Object.keys(kpis.geography.countries).length === 0 && (
-                  <div className="text-center py-8">
-                    <span className="text-gray-400 text-sm">No geography data available</span>
-                  </div>
-                )}
-              </>
-            ) : (
-              /* Cities Tab Content */
-              <>
-                {Object.entries(kpis.cityGeography.cities)
-                  .sort(([,a], [,b]) => b.count - a.count)
-                  .slice(0, 5)
-                  .map(([key, cityData]) => {
-                    // Try to find matching previous city data by city name
-                    const previousCityData = kpis.cityGeography.previous_cities?.[key] || 
-                      Object.values(kpis.cityGeography.previous_cities || {}).find(
-                        city => city.city === cityData.city && city.country === cityData.country
-                      );
-                    
-                    return (
-                      <div key={key} className="flex justify-between items-center py-3 border-b border-gray-100 last:border-b-0">
-                        <div>
-                          <div className="font-medium text-gray-900 text-sm">{cityData.city}</div>
-                          <div className="text-xs text-gray-500">{cityData.country}</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-medium text-gray-900">{cityData.count}</div>
-                          {kpis.meta.comparisonEnabled && kpis.cityGeography.previous_cities && (
-                            <div className="text-xs text-gray-400">
-                              Previous: {previousCityData?.count || 0}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                
-                {/* Show previous period cities summary */}
-                {kpis.meta.comparisonEnabled && kpis.cityGeography.previous_cities && (
-                  <div className="mt-4 pt-3 border-t border-gray-100">
-                    <div className="text-xs text-gray-500 mb-2">Previous Period Cities:</div>
-                    {Object.entries(kpis.cityGeography.previous_cities).map(([key, cityData]) => (
-                      <div key={key} className="flex justify-between text-xs text-gray-400 mb-1">
-                        <span>{cityData.city}, {cityData.country}</span>
-                        <span>{cityData.count}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                
-                {Object.keys(kpis.cityGeography.cities).length === 0 && (
-                  <div className="text-center py-8">
-                    <span className="text-gray-400 text-sm">No city data available</span>
-                  </div>
-                )}
-              </>
-            )}
+                );
+              }
+            })()}
           </div>
         </div>
 
@@ -938,105 +733,80 @@ export default function WeeklyAnalyticsCard({
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">User Retention</h3>
-            {kpis.meta.comparisonEnabled && kpis.retention.previous_d7_retention !== undefined && (
-              <div className="text-right text-sm">
-                <div className="text-gray-600">
-                  Current: {kpis.retention.d7_retention.toFixed(1)}%
-                </div>
-                <div className="text-gray-400">
-                  Previous: {kpis.retention.previous_d7_retention.toFixed(1)}%
-                </div>
-              </div>
-            )}
           </div>
           <div className="h-48">
-            {mounted ? (
-              kpis.retention.values && kpis.retention.values.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={kpis.retention.values}>
-                    <XAxis 
-                      dataKey="day"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 12, fill: '#6B7280' }}
-                      tickFormatter={(value) => `Day ${value}`}
-                    />
-                    <YAxis 
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 12, fill: '#6B7280' }}
-                      tickFormatter={(value) => `${value}%`}
-                      domain={[0, 100]}
-                    />
-                    <Tooltip 
-                      contentStyle={{
-                        backgroundColor: 'white',
-                        border: '1px solid #E5E7EB',
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                      }}
-                      formatter={(value, name) => [`${value}%`, 'Retention Rate']}
-                      labelFormatter={(day) => `Day ${day}`}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="percentage" 
-                      stroke="#3B82F6" 
-                      strokeWidth={3}
-                      dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }}
-                      activeDot={{ r: 6, stroke: '#3B82F6', strokeWidth: 2 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="w-full h-full bg-gray-50 rounded-lg flex items-center justify-center">
-                  <div className="text-center">
-                    <span className="text-gray-400 text-sm block">No retention data available</span>
-                    <span className="text-xs text-gray-400 mt-1">
-                      Period: {kpis.retention.retention_period || 7} days
+            {(() => {
+              const retentionData = safeKpis.retention?.values || [];
+              const hasRetentionData = retentionData.some((item: any) => item.count > 0);
+              console.log('Retention debug:', { 
+                retention: safeKpis.retention, 
+                values: retentionData,
+                hasData: hasRetentionData,
+                mounted 
+              });
+              
+              if (mounted && hasRetentionData) {
+                // Filter to show only first 14 days for better visibility
+                const chartData = retentionData.slice(0, 14).map((item: any) => ({
+                  day: item.day,
+                  percentage: item.percentage,
+                  count: item.count
+                }));
+                
+                return (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis 
+                        dataKey="day" 
+                        tick={{ fontSize: 10 }}
+                        tickFormatter={(value) => `D${value}`}
+                      />
+                      <YAxis tick={{ fontSize: 10 }} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'white',
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                        }}
+                        formatter={(value, name) => [
+                          name === 'percentage' ? `${value.toFixed(1)}%` : value,
+                          name === 'percentage' ? 'Retention' : 'Users'
+                        ]}
+                        labelFormatter={(day) => `Day ${day}`}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="percentage" 
+                        stroke="#10B981" 
+                        strokeWidth={2}
+                        dot={{ fill: '#10B981', strokeWidth: 2, r: 3 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                );
+              } else {
+                return (
+                  <div className="w-full h-full bg-gray-50 rounded-lg flex items-center justify-center">
+                    <span className="text-gray-400 text-sm">
+                      {mounted ? 'No retention data available' : 'Loading chart...'}
                     </span>
                   </div>
-                </div>
-              )
-            ) : (
-              <div className="w-full h-full bg-gray-50 rounded-lg flex items-center justify-center">
-                <span className="text-gray-400 text-sm">Loading chart...</span>
-              </div>
-            )}
-          </div>
-          
-          {/* Retention summary with comparison */}
-          <div className="mt-4 pt-4 border-t border-gray-100">
-            <div className="flex justify-between items-center text-sm">
-              <div className="text-gray-600">
-                <span className="font-medium">{kpis.retention.label || '7-day'}</span> retention rate
-              </div>
-              <div className="text-right">
-                <div className="font-medium text-gray-900">
-                  {kpis.retention.d7_retention.toFixed(1)}%
-                </div>
-                {kpis.meta.comparisonEnabled && kpis.retention.previous_d7_retention !== undefined && (
-                  <div className="text-xs text-gray-400">
-                    Previous: {kpis.retention.previous_d7_retention.toFixed(1)}%
-                  </div>
-                )}
-              </div>
-            </div>
-            {kpis.retention.note && (
-              <div className="mt-2 text-xs text-gray-500">
-                Note: {kpis.retention.note}
-              </div>
-            )}
+                );
+              }
+            })()}
           </div>
         </div>
+
       </div>
 
       {/* Errors Display */}
-      {Object.keys(kpis.meta.errors).length > 0 && (
+      {Object.keys(safeKpis.meta?.errors || {}).length > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <h4 className="text-yellow-800 font-semibold mb-2">Some data could not be loaded:</h4>
           <ul className="text-yellow-700 text-sm space-y-1">
-            {Object.entries(kpis.meta.errors).map(([metric, error]) => (
+            {Object.entries(safeKpis.meta?.errors || {}).map(([metric, error]) => (
               <li key={metric}>
                 <strong>{metric}:</strong> {error}
               </li>
