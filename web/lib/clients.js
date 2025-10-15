@@ -31,6 +31,22 @@ export const CLIENTS = [
               showAlertThresholdLines: false
             },
             interval: 'day',
+            properties: {
+              type: 'AND',
+              values: [
+                {
+                  type: 'AND',
+                  values: [
+                    {
+                      key: 'client_id',
+                      value: ['askme-ai-app'],
+                      operator: 'exact',
+                      type: 'event'
+                    }
+                  ]
+                }
+              ]
+            }
           },
           full: true
         },
@@ -99,6 +115,22 @@ export const CLIENTS = [
             },
           ],
           funnelsFilter: { funnelVizType: 'steps' },
+          properties: {
+            type: 'AND',
+            values: [
+              {
+                type: 'AND',
+                values: [
+                  {
+                    key: 'client_id',
+                    value: ['askme-ai-app'],
+                    operator: 'exact',
+                    type: 'event'
+                  }
+                ]
+              }
+            ]
+          }
         },
       },
       lifecycle: {
@@ -188,6 +220,22 @@ export const CLIENTS = [
               breakdown_type: 'event',
               breakdown: '$device_type',
             },
+            properties: {
+              type: 'AND',
+              values: [
+                {
+                  type: 'AND',
+                  values: [
+                    {
+                      key: 'client_id',
+                      value: ['askme-ai-app'],
+                      operator: 'exact',
+                      type: 'event'
+                    }
+                  ]
+                }
+              ]
+            }
           },
         },
       },
@@ -307,6 +355,8 @@ export const CLIENTS = [
       },
     },
   },
+  
+  // Add this new client configuration
   {
     clientId: 'ask-me-ltp', // This matches posthog_client_id in your database
     name: 'AskMe LTP',
@@ -319,8 +369,8 @@ export const CLIENTS = [
             kind: 'TrendsQuery',
             series: [{ 
               kind: 'EventsNode', 
-              event: 'page_view', // Make sure this matches your PostHog events
-              name: 'page_view',
+              event: 'page_view', // ✅ Change back to 'page_view'
+              name: 'page_view',   // ✅ Change back to 'page_view'
               math: 'dau',
               properties: [
                 {
@@ -340,157 +390,28 @@ export const CLIENTS = [
               showValuesOnSeries: true,
               showAlertThresholdLines: false
             },
-            interval: 'day',
-            // Note: dateRange will be injected dynamically by createQueryWithDateRange
+            interval: 'day'
           },
           full: true
         },
       },
       funnel: {
         query: {
-          kind: 'FunnelsQuery',
-          series: [
-            {
-              kind: "EventsNode",
-              name: "All events",
-              event: null,
-              properties: [
-                {
-                  key: "$current_url",
-                  type: "event",
-                  value: "/app/profile/createProfile",
-                  operator: "icontains"
-                },
-                {
-                  key: "client_id",
-                  type: "event",
-                  value: [
-                    "ask-me-ltp"
-                  ],
-                  operator: "exact"
-                }
-              ],
-              custom_name: "Profile Creation Start View"
-            },
-            {
-              kind: "EventsNode",
-              name: "All events",
-              event: null,
-              properties: [
-                {
-                  key: "$event_type",
-                  type: "event",
-                  value: [
-                    "submit"
-                  ],
-                  operator: "exact"
-                },
-                {
-                  key: "selector",
-                  type: "element",
-                  value: [
-                    "#membershipProfile"
-                  ],
-                  operator: "exact"
-                }
-              ],
-              custom_name: "Step 1 completed"
-            },
-            {
-              kind: "EventsNode",
-              name: "All events",
-              event: null,
-              properties: [
-                {
-                  key: "$event_type",
-                  type: "event",
-                  value: [
-                    "submit"
-                  ],
-                  operator: "exact"
-                },
-                {
-                  key: "selector",
-                  type: "element",
-                  value: [
-                    "#contactForm"
-                  ],
-                  operator: "exact"
-                }
-              ],
-              custom_name: "Step 2 Completed"
-            },
-            {
-              kind: "EventsNode",
-              name: "All events",
-              event: null,
-              properties: [
-                {
-                  key: "$event_type",
-                  type: "event",
-                  value: [
-                    "submit"
-                  ],
-                  operator: "exact"
-                },
-                {
-                  key: "selector",
-                  type: "element",
-                  value: [
-                    "#createProfileStep3Form"
-                  ],
-                  operator: "exact"
-                }
-              ],
-              custom_name: "Security Q&A Completed"
-            },
-            {
-              kind: "EventsNode",
-              name: "$autocapture",
-              event: "$autocapture",
-              properties: [
-                {
-                  key: "text",
-                  type: "element",
-                  value: "I CONSENT",
-                  operator: "icontains"
-                }
-              ],
-              custom_name: "Consent Provided"
-            },
-            {
-              kind: "EventsNode",
-              name: "All events",
-              event: null,
-              properties: [
-                {
-                  key: "$current_url",
-                  type: "event",
-                  value: "/auth/dashboard",
-                  operator: "icontains"
-                }
-              ],
-              custom_name: "Profile Completed"
-            }
-          ],
-          interval: "hour",
-          funnelsFilter: {
-            layout: "vertical",
-            funnelVizType: "steps"
-          }
-        },
-      },
-      renewalFunnel: {
-        query: {
           kind: "InsightVizNode",
           source: {
             kind: "FunnelsQuery",
             series: [
               {
-                kind: "ActionsNode",
-                id: "206367",
-                name: "RENEWAL_STARTED",
+                kind: "EventsNode",
+                name: "All events",
+                event: null,
                 properties: [
+                  {
+                    key: "$current_url",
+                    type: "event",
+                    value: "/app/profile/createProfile",
+                    operator: "icontains"
+                  },
                   {
                     key: "client_id",
                     type: "event",
@@ -499,35 +420,115 @@ export const CLIENTS = [
                     ],
                     operator: "exact"
                   }
-                ]
+                ],
+                custom_name: "Profile Creation Start View"
               },
               {
-                kind: "ActionsNode",
-                id: "206358",
-                name: "PRODUCT_SELECTED"
+                kind: "EventsNode",
+                name: "All events",
+                event: null,
+                properties: [
+                  {
+                    key: "$event_type",
+                    type: "event",
+                    value: [
+                      "submit"
+                    ],
+                    operator: "exact"
+                  },
+                  {
+                    key: "selector",
+                    type: "element",
+                    value: [
+                      "#membershipProfile"
+                    ],
+                    operator: "exact"
+                  }
+                ],
+                custom_name: "Step 1 completed"
               },
               {
-                kind: "ActionsNode",
-                id: "206363",
-                name: "CHECKOUT_VIEWED"
+                kind: "EventsNode",
+                name: "All events",
+                event: null,
+                properties: [
+                  {
+                    key: "$event_type",
+                    type: "event",
+                    value: [
+                      "submit"
+                    ],
+                    operator: "exact"
+                  },
+                  {
+                    key: "selector",
+                    type: "element",
+                    value: [
+                      "#contactForm"
+                    ],
+                    operator: "exact"
+                  }
+                ],
+                custom_name: "Step 2 Completed"
               },
               {
-                kind: "ActionsNode",
-                id: "206375",
-                name: "CHECKOUT_SUBMITTED"
+                kind: "EventsNode",
+                name: "All events",
+                event: null,
+                properties: [
+                  {
+                    key: "$event_type",
+                    type: "event",
+                    value: [
+                      "submit"
+                    ],
+                    operator: "exact"
+                  },
+                  {
+                    key: "selector",
+                    type: "element",
+                    value: [
+                      "#createProfileStep3Form"
+                    ],
+                    operator: "exact"
+                  }
+                ],
+                custom_name: "Security Q&A Completed"
               },
               {
-                kind: "ActionsNode",
-                id: "206365",
-                name: "RENEWAL_COMPLETED"
+                kind: "EventsNode",
+                name: "$autocapture",
+                event: "$autocapture",
+                properties: [
+                  {
+                    key: "text",
+                    type: "element",
+                    value: "I CONSENT",
+                    operator: "icontains"
+                  }
+                ],
+                custom_name: "Consent Provided"
+              },
+              {
+                kind: "EventsNode",
+                name: "All events",
+                event: null,
+                properties: [
+                  {
+                    key: "$current_url",
+                    type: "event",
+                    value: "/auth/dashboard",
+                    operator: "icontains"
+                  }
+                ],
+                custom_name: "Profile Completed"
               }
             ],
+            interval: "hour",
             funnelsFilter: {
-              funnelVizType: "steps",
-              layout: "horizontal"
-            },
-            interval: "day",
-            breakdownFilter: {}
+              layout: "vertical",
+              funnelVizType: "steps"
+            }
           },
           full: true
         },
@@ -540,7 +541,7 @@ export const CLIENTS = [
             series: [
               {
                 kind: 'EventsNode',
-                 event: "$pageview",
+                event: "$pageview",
                 name: "$pageview",
                 math: 'total'
               }
@@ -739,11 +740,9 @@ export const CLIENTS = [
       },
     },
   }
-
-  // Add more clients here, only change clientId/name/recipients if needed
 ];
 
-const createQueryWithDateRange = (baseQuery, dateRange, enableComparison = false) => {
+export const createQueryWithDateRange = (baseQuery, dateRange, enableComparison = false) => {
   const query = JSON.parse(JSON.stringify(baseQuery));
   
   if (query.kind === 'InsightVizNode' && query.source) {
@@ -756,9 +755,20 @@ const createQueryWithDateRange = (baseQuery, dateRange, enableComparison = false
       };
     }
   } else if (query.kind === 'FunnelsQuery') {
-    // Handle FunnelsQuery type by adding dateRange directly to the query
+    // Handle FunnelsQuery dateRange
     query.dateRange = dateRange;
+    
+    // Add compare filter if comparison is enabled  
+    if (enableComparison) {
+      query.compareFilter = {
+        compare: true
+      };
+    }
   }
   
   return query;
+};
+
+export const getClientConfig = (clientId) => {
+  return CLIENTS.find(client => client.clientId === clientId);
 };

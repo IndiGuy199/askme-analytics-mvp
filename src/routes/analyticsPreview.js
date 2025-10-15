@@ -11,12 +11,34 @@ const findClient = (id) => CLIENTS.find((c) => c.clientId === id);
 
 async function callQuery({ projectId, apiKey, name, query }) {
   const url = `${getApiHost()}/api/projects/${encodeURIComponent(projectId)}/query`;
+  
+  // Add comprehensive debugging
+  console.log(`[${name}] PostHog API Configuration Check:`);
+  console.log(`[${name}] - API Host: ${getApiHost()}`);
+  console.log(`[${name}] - Project ID: ${projectId}`);
+  console.log(`[${name}] - API Key exists: ${!!apiKey}`);
+  console.log(`[${name}] - API Key format: ${apiKey ? (apiKey.startsWith('phx_') ? 'Personal API Key' : 'Unknown format') : 'MISSING'}`);
+  console.log(`[${name}] - Full URL: ${url}`);
+  
+  if (!apiKey) {
+    return { ok: false, reason: 'Missing PostHog API key' };
+  }
+  
+  if (!apiKey.startsWith('phx_')) {
+    return { ok: false, reason: 'Invalid PostHog API key format (should start with phx_)' };
+  }
+
   try {
     console.log(`[${name}] Making query to:`, url);
     console.log(`[${name}] Query payload:`, JSON.stringify(query, null, 2));
     
     const res = await axios.post(url, { query }, {
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: { 
+        Authorization: `Bearer ${apiKey}`, 
+        'Content-Type': 'application/json', 
+        Accept: 'application/json' 
+      },
+      timeout: 30000 // Add 30 second timeout
     });
 
     console.log(`[${name}] Response status:`, res.status);
@@ -30,9 +52,19 @@ async function callQuery({ projectId, apiKey, name, query }) {
     console.log(`[${name}] Query successful`);
     return { ok: true, data: res.data };
   } catch (err) {
+    console.error(`[${name}] Request failed with full error:`, {
+      message: err.message,
+      code: err.code,
+      response: err.response?.data,
+      status: err.response?.status,
+      config: {
+        url: err.config?.url,
+        method: err.config?.method,
+        headers: err.config?.headers ? Object.keys(err.config.headers) : 'none'
+      }
+    });
+    
     const errorMsg = err.response?.data?.detail || err.response?.data?.error || err.message;
-    console.error(`[${name}] Query failed:`, errorMsg);
-    console.error(`[${name}] Full error response:`, err.response?.data);
     return { ok: false, reason: errorMsg };
   }
 }
@@ -42,25 +74,82 @@ const firstSeries = (j) =>
   (Array.isArray(j?.results) ? j.results[0] : (Array.isArray(j?.result) ? j.result[0] : j?.result || {}));
 
 function parseTraffic(json) {
+  console.log('[DEBUG] Raw traffic JSON:', JSON.stringify(json, null, 2));
+  
+  // Handle the PostHog Query API response format (array of results)
+  if (Array.isArray(json) && json.length > 0) {
+    const firstResult = json[0];
+    
+    if (firstResult && Array.isArray(firstResult.data)) {
+      const data = firstResult.data;
+      const labels = firstResult.labels || firstResult.days || data.map((_, i) => `Day ${i + 1}`);
+      const total = data.reduce((a, b) => a + (b || 0), 0);
+      const uniques = firstResult.count || total;
+      
+      console.log('[DEBUG] Parsed traffic (array format):', { 
+        dataLength: data.length,
+        series: data, 
+        labels: labels.slice(0, 5), // Show first 5 labels
+        unique_users: uniques, 
+        pageviews: total 
+      });
+      
+      return {
+        series: data,                    // ✅ Use the full 31-day array
+        labels: labels,                  // ✅ Use the full 31-day labels
+        unique_users: uniques,           // ✅ Use count from PostHog
+        pageviews: total                 // ✅ Sum all data points
+      };
+    }
+  }
+  
+  // Handle PostHog results format (wrapped in results array)
+  if (json && Array.isArray(json.results) && json.results.length > 0) {
+    const firstResult = json.results[0];
+    
+    if (firstResult && Array.isArray(firstResult.data)) {
+      const data = firstResult.data;
+      const labels = firstResult.labels || firstResult.days || data.map((_, i) => `Day ${i + 1}`);
+      const total = data.reduce((a, b) => a + (b || 0), 0);
+      const uniques = firstResult.count || total;
+      
+      console.log('[DEBUG] Parsed traffic (results format):', { 
+        dataLength: data.length,
+        series: data, 
+        labels: labels.slice(0, 5),
+        unique_users: uniques, 
+        pageviews: total 
+      });
+      
+      return {
+        series: data,
+        labels: labels,
+        unique_users: uniques,
+        pageviews: total
+      };
+    }
+  }
+  
+  // Handle legacy format (fallback)
   const s = firstSeries(json) || {};
   const data = s.data || [];
   const total = data.reduce((a, b) => a + (b || 0), 0);
   const uniques = s.aggregated_value ?? s.count ?? total;
-  
-  // Remove this comparison handling since we're using separate queries
-  // let previousUniques = 0;
-  // let previousPageviews = 0;
-  // if (json.compare_results && json.compare_results.length > 0) { ... }
-  
-  // Generate simple labels for the data points
   const labels = data.map((_, i) => `Day ${i + 1}`);
+  
+  console.log('[DEBUG] Parsed traffic (legacy format):', { 
+    dataLength: data.length,
+    series: data, 
+    labels: labels.slice(0, 5),
+    unique_users: uniques, 
+    pageviews: total 
+  });
   
   return {
     series: data,
     labels: labels,
     unique_users: uniques,
     pageviews: total
-    // previous_unique_users and previous_pageviews will be added separately
   };
 }
 
