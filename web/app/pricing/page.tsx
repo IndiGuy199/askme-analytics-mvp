@@ -8,10 +8,33 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Check, Sparkles, Zap, Crown, ArrowRight } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
-import { Plan, User } from '@/src/types'
+
+// Define types locally instead of importing potentially problematic ones
+interface Plan {
+  id: string
+  name: string
+  description: string
+  price_cents: number
+  interval: 'month' | 'year'
+  is_popular: boolean
+  is_active: boolean
+  max_team_members: number
+  ai_insights: boolean
+  email_digest: boolean
+  slack_integration: boolean
+  priority_support: boolean
+}
+
+interface User {
+  id: string
+  email: string
+  name?: string
+  role?: string
+}
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
+// Remove any PricingPageProps interface - not needed for client components
 export default function PricingPage() {
   const router = useRouter()
   const [plans, setPlans] = useState<Plan[]>([])
@@ -45,22 +68,24 @@ export default function PricingPage() {
         .single()
 
       if (userData) {
-        setCurrentUser(userData)
-        const subscription = (userData.companies as any)?.subscriptions?.[0]
-        if (subscription && ['active', 'trialing'].includes(subscription.status)) {
-          setCurrentPlan(subscription.plan_id)
+        setCurrentUser(userData as User)
+        const activeSubscription = userData.companies?.subscriptions?.find(
+          (sub: any) => sub.status === 'active'
+        )
+        if (activeSubscription) {
+          setCurrentPlan(activeSubscription.plan_id)
         }
       }
 
-      // Get plans
+      // Get available plans
       const { data: plansData } = await supabase
         .from('plans')
         .select('*')
         .eq('is_active', true)
-        .order('sort_order')
+        .order('price_cents', { ascending: true })
 
       if (plansData) {
-        setPlans(plansData)
+        setPlans(plansData as Plan[])
       }
 
       setIsLoading(false)
@@ -70,10 +95,8 @@ export default function PricingPage() {
   }, [router])
 
   const handleCheckout = async (planId: string) => {
-    if (!currentUser) return
-
     setCheckoutLoading(planId)
-
+    
     try {
       const response = await fetch('/api/billing/checkout', {
         method: 'POST',
@@ -208,67 +231,45 @@ export default function PricingPage() {
               >
                 {plan.is_popular && (
                   <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                    <div className="bg-indigo-600 text-white px-3 py-1 rounded-full text-sm font-medium">
+                    <span className="bg-indigo-500 text-white px-3 py-1 rounded-full text-sm font-medium">
                       Most Popular
-                    </div>
-                  </div>
-                )}
-
-                {isCurrentPlan && (
-                  <div className="absolute -top-3 right-4">
-                    <div className="bg-green-600 text-white px-3 py-1 rounded-full text-sm font-medium">
-                      Current Plan
-                    </div>
+                    </span>
                   </div>
                 )}
 
                 <CardHeader className="text-center pb-4">
-                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-indigo-100">
+                  <div className="flex items-center justify-center mb-4">
                     {getPlanIcon(plan.id)}
                   </div>
-                  <CardTitle className="text-xl">{plan.name}</CardTitle>
-                  <CardDescription className="text-sm">
-                    {plan.description}
-                  </CardDescription>
+                  <CardTitle className="text-2xl">{plan.name}</CardTitle>
                   <div className="mt-4">
-                    <div className="text-3xl font-bold">
+                    <span className="text-4xl font-bold">
                       {formatCurrency(monthlyEquivalent)}
-                    </div>
-                    <div className="text-gray-500 text-sm">
-                      per month{plan.interval === 'year' ? ', billed yearly' : ''}
-                    </div>
+                    </span>
+                    <span className="text-gray-500 ml-1">/month</span>
                     {plan.interval === 'year' && (
-                      <div className="text-green-600 text-sm font-medium mt-1">
-                        Save {getYearlyDiscount(
-                          plans.find(p => p.id === plan.id.replace('_yearly', ''))?.price_cents || 0,
-                          plan.price_cents
-                        )}% annually
+                      <div className="text-sm text-gray-500 mt-1">
+                        Billed annually ({formatCurrency(plan.price_cents)}/year)
                       </div>
                     )}
                   </div>
+                  <CardDescription className="mt-2">
+                    {plan.description}
+                  </CardDescription>
                 </CardHeader>
 
-                <CardContent>
-                  <ul className="space-y-3 mb-6">
-                    {getPlanFeatures(plan).map((feature, index) => (
-                      <li key={index} className="flex items-center text-sm">
-                        <Check className="h-4 w-4 text-green-500 mr-3 flex-shrink-0" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-
+                <CardContent className="pt-0">
                   <Button
-                    onClick={() => handleCheckout(plan.id)}
-                    disabled={isCurrentPlan || checkoutLoading === plan.id}
-                    className="w-full"
+                    className="w-full mb-6"
                     variant={plan.is_popular ? 'default' : 'outline'}
+                    disabled={isCurrentPlan || checkoutLoading === plan.id}
+                    onClick={() => handleCheckout(plan.id)}
                   >
                     {checkoutLoading === plan.id ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                      <div className="flex items-center">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                         Processing...
-                      </>
+                      </div>
                     ) : isCurrentPlan ? (
                       'Current Plan'
                     ) : (
@@ -278,17 +279,46 @@ export default function PricingPage() {
                       </>
                     )}
                   </Button>
+
+                  <div className="space-y-3">
+                    {getPlanFeatures(plan).map((feature, index) => (
+                      <div key={index} className="flex items-center">
+                        <Check className="h-4 w-4 mr-3 text-green-500 flex-shrink-0" />
+                        <span className="text-sm text-gray-600">{feature}</span>
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
             )
           })}
         </div>
 
-        <div className="text-center mt-12">
-          <p className="text-gray-600 mb-4">
-            All plans include a 14-day free trial. Cancel anytime.
-          </p>
-          <div className="flex items-center justify-center space-x-6 text-sm text-gray-500">
+        {/* Feature comparison */}
+        <div className="mt-16 max-w-4xl mx-auto">
+          <div className="text-center mb-8">
+            <h3 className="text-2xl font-bold text-gray-900 mb-4">
+              All plans include
+            </h3>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-6 text-center">
+            <div className="flex items-center">
+              <Check className="h-4 w-4 mr-1" />
+              Real-time analytics
+            </div>
+            <div className="flex items-center">
+              <Check className="h-4 w-4 mr-1" />
+              Custom dashboards
+            </div>
+            <div className="flex items-center">
+              <Check className="h-4 w-4 mr-1" />
+              Data export
+            </div>
+            <div className="flex items-center">
+              <Check className="h-4 w-4 mr-1" />
+              API access
+            </div>
             <div className="flex items-center">
               <Check className="h-4 w-4 mr-1" />
               No setup fees
