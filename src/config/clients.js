@@ -1,6 +1,6 @@
-import dotenv from 'dotenv';
-dotenv.config(); // Add this line at the top
-console.log('🔴 Loading clients.js from ROOT directory');
+//import dotenv from 'dotenv';
+//dotenv.config(); // Add this line at the top
+console.log('🔴 Loading clients.js from WEB directory');
 
 // src/config/clients.js
 export const CLIENTS = [
