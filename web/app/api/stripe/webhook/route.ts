@@ -1,18 +1,23 @@
 import { createServiceClient } from '@/lib/supabase/server'
-import { stripe, getPlanIdFromStripePrice } from '@/lib/stripe'
+import { getStripe, getPlanIdFromStripePrice } from '@/lib/stripe'
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
 
 export async function POST(request: NextRequest) {
+  // Check if Stripe is available
+  if (!process.env.STRIPE_SECRET_KEY) {
+    return NextResponse.json({ error: 'Stripe not configured' }, { status: 503 })
+  }
+
   const body = await request.text()
   const signature = request.headers.get('stripe-signature')!
 
   let event: Stripe.Event
 
   try {
-    event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
+    event = getStripe().webhooks.constructEvent(body, signature, webhookSecret)
   } catch (err: any) {
     console.error('Webhook signature verification failed:', err.message)
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
@@ -32,7 +37,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Get the subscription
-        const subscription = await stripe.subscriptions.retrieve(
+        const subscription = await getStripe().subscriptions.retrieve(
           session.subscription as string
         )
 
