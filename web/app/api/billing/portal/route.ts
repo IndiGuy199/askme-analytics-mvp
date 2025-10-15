@@ -1,9 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
-import { stripe } from '@/lib/stripe'
+import { getStripe } from '@/lib/stripe'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if Stripe is available
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return NextResponse.json({ error: 'Billing not configured' }, { status: 503 })
+    }
+
     const supabase = await createClient()
     
     // Get current user and company
@@ -41,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create billing portal session
-    const session = await stripe.billingPortal.sessions.create({
+    const session = await getStripe().billingPortal.sessions.create({
       customer: company.stripe_customer_id,
       return_url: `${process.env.NEXT_PUBLIC_SITE_URL}/settings/billing`,
     })

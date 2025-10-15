@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { stripe, getStripePriceId } from '@/lib/stripe'
+import { getStripe, getStripePriceId } from '@/lib/stripe'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
@@ -10,6 +10,11 @@ const checkoutSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if Stripe is available
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return NextResponse.json({ error: 'Billing not configured' }, { status: 503 })
+    }
+
     const body = await request.json()
     const { planId, interval = 'month' } = checkoutSchema.parse(body)
 
@@ -43,7 +48,7 @@ export async function POST(request: NextRequest) {
       customerId = company.stripe_customer_id
     } else {
       // Create new customer
-      const customer = await stripe.customers.create({
+      const customer = await getStripe().customers.create({
         email: company.billing_email || user.email!,
         name: company.name,
         metadata: {
@@ -60,7 +65,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create checkout session
-    const session = await stripe.checkout.sessions.create({
+    const session = await getStripe().checkout.sessions.create({
       customer: customerId,
       payment_method_types: ['card'],
       line_items: [
