@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     const company = userData.companies as any
     
     // Check plan limits for team size
-    const { data: teamCount } = await supabase
+    const { count: teamCount } = await supabase
       .from('users')
       .select('id', { count: 'exact' })
       .eq('company_id', userData.company_id)

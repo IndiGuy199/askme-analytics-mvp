@@ -8,15 +8,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Check, Sparkles, Zap, Crown, ArrowRight } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
-import { Plan, User } from '@/types'
+import { Plan, User } from '@/src/types'
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
-interface PricingPageProps {
-  searchParams?: { [key: string]: string | string[] | undefined }
-}
-
-export default function PricingPage({ searchParams }: PricingPageProps) {
+export default function PricingPage() {
   const router = useRouter()
   const [plans, setPlans] = useState<Plan[]>([])
   const [currentUser, setCurrentUser] = useState<User | null>(null)

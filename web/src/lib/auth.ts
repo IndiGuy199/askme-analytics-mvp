@@ -1,10 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
-import { User, UserWithCompany } from '@/types'
+import { User, UserWithCompany } from '@/src/types'
 import { redirect } from 'next/navigation'
 
 export async function getCurrentUser(): Promise<User | null> {
-  const supabase = createClient()
-  
+  const supabase = await createClient()
+
   const { data: { user: authUser }, error } = await supabase.auth.getUser()
   if (error || !authUser) {
     return null
@@ -20,7 +20,7 @@ export async function getCurrentUser(): Promise<User | null> {
 }
 
 export async function getCurrentUserWithCompany(): Promise<UserWithCompany | null> {
-  const supabase = createClient()
+  const supabase = await createClient()
   
   const { data: { user: authUser }, error } = await supabase.auth.getUser()
   if (error || !authUser) {
@@ -61,7 +61,7 @@ export async function requireCompany(): Promise<UserWithCompany> {
 export async function requireActiveSubscription(): Promise<UserWithCompany> {
   const user = await requireCompany()
   
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: subscription } = await supabase
     .from('subscriptions')
     .select('status')

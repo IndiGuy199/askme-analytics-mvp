@@ -622,9 +622,9 @@ export default function WeeklyAnalyticsCard({
                 // Show chart even if values are 0, but with special handling
                 const chartData = Object.entries(deviceData).map(([device, count], index) => ({
                   name: device,
-                  value: Math.max(count, 0.1), // Ensure minimum value for visibility
-                  actualValue: count,
-                  count: count
+                  value: Math.max(count as number, 0.1), // Ensure minimum value for visibility
+                  actualValue: count as number,
+                  count: count as number
                 }));
                 
                 return (
@@ -644,7 +644,7 @@ export default function WeeklyAnalyticsCard({
                         ))}
                       </Pie>
                       <Tooltip
-                        formatter={(value, name, props) => [props.payload.actualValue, 'Users']}
+                        formatter={(value: any, name: any, props: any) => [props.payload.actualValue, 'Users']}
                         contentStyle={{
                           backgroundColor: 'white',
                           border: '1px solid #E5E7EB',
@@ -770,8 +770,8 @@ export default function WeeklyAnalyticsCard({
                           borderRadius: '8px',
                           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
                         }}
-                        formatter={(value, name) => [
-                          name === 'percentage' ? `${value.toFixed(1)}%` : value,
+                        formatter={(value: any, name: any) => [
+                          name === 'percentage' ? `${(value as number).toFixed(1)}%` : value,
                           name === 'percentage' ? 'Retention' : 'Users'
                         ]}
                         labelFormatter={(day) => `Day ${day}`}
@@ -808,7 +808,7 @@ export default function WeeklyAnalyticsCard({
           <ul className="text-yellow-700 text-sm space-y-1">
             {Object.entries(safeKpis.meta?.errors || {}).map(([metric, error]) => (
               <li key={metric}>
-                <strong>{metric}:</strong> {error}
+                <strong>{metric}:</strong> {String(error)}
               </li>
             ))}
           </ul>

@@ -34,7 +34,7 @@ export default function AnalyticsPage() {
         .select(`
           id,
           company_id,
-          companies (
+          companies!inner (
             id,
             name,
             posthog_client_id,
@@ -50,13 +50,14 @@ export default function AnalyticsPage() {
         return;
       }
 
-      if (!userData?.companies?.posthog_client_id) {
+      const company = userData?.companies as any;
+      if (!company?.posthog_client_id) {
         console.error('User company has no PostHog client ID configured');
         setLoading(false);
         return;
       }
 
-      setUserCompany(userData.companies);
+      setUserCompany(company);
       console.log('User company loaded:', userData.companies);
     } catch (error) {
       console.error('Error fetching user company:', error);
