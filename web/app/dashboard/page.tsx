@@ -48,7 +48,7 @@ export default function DashboardPage() {
           .single()
 
         if (userData?.companies) {
-          setCompany(userData.companies as Company)
+          setCompany(userData.companies as unknown as Company)
         }
 
       } catch (error) {

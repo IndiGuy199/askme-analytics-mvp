@@ -29,10 +29,12 @@ export default function InvitePage() {
   const [user, setUser] = useState<any>(null)
 
   const supabase = createClient()
-  const token = params.token as string
+  const token = params?.token as string
 
   useEffect(() => {
-    checkAuthAndLoadInvite()
+    if (token) {
+      checkAuthAndLoadInvite()
+    }
   }, [token])
 
   const checkAuthAndLoadInvite = async () => {

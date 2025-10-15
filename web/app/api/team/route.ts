@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get pending invites (only for admins/owners)
-    let pendingInvites = []
+    let pendingInvites: any[] = []
     if (['owner', 'admin'].includes(userData.role)) {
       const { data: invites } = await supabase
         .from('invites')
