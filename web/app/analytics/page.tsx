@@ -9,6 +9,7 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [userCompany, setUserCompany] = useState<any>(null);
   const [selectedDateRange, setSelectedDateRange] = useState('30d');
+  const [comparisonMode, setComparisonMode] = useState('none'); // 🆕 NEW: Comparison state
 
   useEffect(() => {
     setMounted(true);
@@ -98,7 +99,7 @@ export default function AnalyticsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header with client name and date range selector */}
+      {/* Header with client name and controls */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div>
@@ -106,24 +107,44 @@ export default function AnalyticsPage() {
             <p className="text-sm text-gray-500">Client ID: {userCompany.posthog_client_id}</p>
           </div>
           
+          {/* 🆕 NEW: Combined Controls */}
           <div className="flex items-center gap-4">
-            <label className="text-sm font-medium text-gray-700">Date Range:</label>
-            <select
-              value={selectedDateRange}
-              onChange={(e) => setSelectedDateRange(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md bg-white text-sm"
-            >
-              <option value="7d">Last 7 days</option>
-              <option value="30d">Last 30 days</option>
-            </select>
+            {/* Date Range Selector */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">Date Range:</label>
+              <select
+                value={selectedDateRange}
+                onChange={(e) => setSelectedDateRange(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="24h">Last 24 hours</option>
+                <option value="7d">Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+                <option value="90d">Last 90 days</option>
+              </select>
+            </div>
+
+            {/* 🆕 NEW: Comparison Mode Selector */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">Compare:</label>
+              <select
+                value={comparisonMode}
+                onChange={(e) => setComparisonMode(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="none">No comparison</option>
+                <option value="previous">Previous period</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
 
+      {/* Analytics Dashboard */}
       <SimpleAnalyticsCard
-        clientId={userCompany.posthog_client_id} // ← Dynamic based on user's company
-        dateRange={selectedDateRange}            // ← Dynamic based on user selection
-        comparisonMode="none"
+        clientId={userCompany.posthog_client_id}
+        dateRange={selectedDateRange}
+        comparisonMode={comparisonMode} // 🆕 Pass comparison mode
       />
     </div>
   );

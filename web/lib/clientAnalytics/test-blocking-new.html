@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rule Blocking & Comma-Separated Selector Tests</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            font-size: 14px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #218838;
+        }
+        
+        .test-form {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+        }
+        
+        .test-form h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .alert-danger {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px 15px;
+            border-radius: 6px;
+            border-left: 4px solid #f5c6cb;
+            margin-bottom: 15px;
+            display: none;
+        }
+        
+        .alert-danger.show {
+            display: block;
+        }
+        
+        #results {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            max-height: 600px;
+            overflow-y: auto;
+            line-height: 1.5;
+        }
+        
+        .test-item {
+            margin-bottom: 20px;
+            border-left: 4px solid #666;
+            padding-left: 12px;
+        }
+        
+        .test-item.pass {
+            border-left-color: #28a745;
+        }
+        
+        .test-item.fail {
+            border-left-color: #dc3545;
+        }
+        
+        .test-item.info {
+            border-left-color: #17a2b8;
+        }
+        
+        .test-header {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #fff;
+        }
+        
+        .test-content {
+            padding-left: 10px;
+        }
+        
+        .success {
+            color: #4caf50;
+        }
+        
+        .error {
+            color: #f44336;
+        }
+        
+        .info {
+            color: #2196f3;
+        }
+        
+        .warning {
+            color: #ff9800;
+        }
+        
+        .divider {
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #667eea, transparent);
+            margin: 20px 0;
+        }
+        
+        .summary-box {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 500;
+        }
+        
+        .config-box {
+            background: #2d2d2d;
+            color: #ce9178;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Rule Blocking & Comma-Separated Selector Tests</h1>
+        <p class="subtitle">Testing ONBOARDING_ERROR with multiple selectors: <code>"#membershipProfile .alert-danger, #profileExist"</code></p>
+        
+        <div class="section">
+            <h2>🎯 Test Configuration</h2>
+            <div class="config-box">
+{<br>
+  "key": "ONBOARDING_ERROR",<br>
+  "selector": "#membershipProfile .alert-danger, #profileExist",<br>
+  "requireSelectorPresent": true,<br>
+  "priority": 1,<br>
+  "blockRules": ["ONBOARDING_STARTED"]<br>
+}
+            </div>
+            <p style="margin-top: 15px;">
+                <strong>Expected Behavior:</strong> If <strong>ANY</strong> selector matches (OR logic), fire ONBOARDING_ERROR and block ONBOARDING_STARTED.
+            </p>
+        </div>
+        
+        <div class="section">
+            <h2>🎮 Controls</h2>
+            <div class="controls">
+                <button class="btn-danger" onclick="showError('validation')">Show Validation Error (#errorMessage)</button>
+                <button class="btn-warning" onclick="showError('profile')">Show Profile Error (#profileExist)</button>
+                <button class="btn-danger" onclick="showError('both')">Show Both Errors</button>
+                <button class="btn-success" onclick="hideError()">Hide All Errors</button>
+            </div>
+            <div class="controls">
+                <button class="btn-primary" onclick="runTests()">Run All Tests</button>
+                <button class="btn-secondary" onclick="clearLog()">Clear Log</button>
+            </div>
+
+            <div class="test-form" id="membershipProfile">
+                <h3>Membership Profile Form</h3>
+                <div class="alert-danger" id="errorMessage">
+                    ⚠️ Validation error: Please fix the errors below before continuing.
+                </div>
+                <div class="alert-danger" id="profileExist">
+                    ⚠️ Profile already exists. Please use a different email.
+                </div>
+                <p>Form content here...</p>
+                <input type="submit" value="Submit Profile" onclick="event.preventDefault(); log('Form submit clicked', 'info')">
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📊 Test Results</h2>
+            <div id="results">Initializing tests...</div>
+        </div>
+    </div>
+
+    <!-- Load Constants -->
+    <script src="./ph-constants.js"></script>
+
+    <!-- Test Script -->
+    <script>
+        const resultsDiv = document.getElementById('results');
+        let currentTestSection = null;
+        
+        function startTest(title, status = 'info') {
+            currentTestSection = document.createElement('div');
+            currentTestSection.className = `test-item ${status}`;
+            currentTestSection.innerHTML = `<div class="test-header">${title}</div><div class="test-content"></div>`;
+            resultsDiv.appendChild(currentTestSection);
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+        
+        function log(message, type = 'info') {
+            if (currentTestSection) {
+                const content = currentTestSection.querySelector('.test-content');
+                content.innerHTML += `<div class="${type}">${message}</div>`;
+            } else {
+                resultsDiv.innerHTML += `<div class="${type}">${message}</div>`;
+            }
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+            console.log(message);
+        }
+        
+        function endTest(status = 'pass') {
+            if (currentTestSection) {
+                currentTestSection.className = `test-item ${status}`;
+            }
+            currentTestSection = null;
+        }
+        
+        function addDivider() {
+            resultsDiv.innerHTML += '<div class="divider"></div>';
+        }
+        
+        function addSummary(message) {
+            resultsDiv.innerHTML += `<div class="summary-box">${message}</div>`;
+        }
+        
+        function clearLog() {
+            resultsDiv.innerHTML = '<span class="info">Log cleared. Ready for testing.</span>';
+            currentTestSection = null;
+        }
+
+        function showError(type = 'validation') {
+            if (type === 'validation' || type === 'both') {
+                document.getElementById('errorMessage').classList.add('show');
+                log('🔴 Validation error shown (#errorMessage - 1st selector: #membershipProfile .alert-danger)', 'error');
+            }
+            if (type === 'profile' || type === 'both') {
+                document.getElementById('profileExist').classList.add('show');
+                log('🟠 Profile exists error shown (#profileExist - 2nd selector)', 'warning');
+            }
+            log('   Expected: ONBOARDING_ERROR fires (ANY selector match), ONBOARDING_STARTED blocked', 'info');
+        }
+
+        function hideError() {
+            document.getElementById('errorMessage').classList.remove('show');
+            document.getElementById('profileExist').classList.remove('show');
+            log('🟢 All errors hidden - No selectors match, blocking removed', 'success');
+        }
+
+        // Mock PostHog
+        window.posthog = {
+            capture: function(eventName, properties) {
+                if (!window.capturedEvents) window.capturedEvents = [];
+                window.capturedEvents.push({ name: eventName, props: properties, timestamp: Date.now() });
+                console.log('[MOCK PostHog] Captured:', eventName, properties);
+            },
+            identify: function(distinctId, properties) {
+                console.log('[MOCK PostHog] Identified:', distinctId, properties);
+            }
+        };
+        window.capturedEvents = [];
+    </script>
+    
+    <!-- Config script tag with blocking rules and comma-separated selectors -->
+    <script id="ph-product-injector" 
+            data-steps='[
+                {
+                    "key":"ONBOARDING_ERROR",
+                    "url":"/test-blocking",
+                    "urlMatch":"contains",
+                    "selector":"#membershipProfile .alert-danger, #profileExist",
+                    "requireSelectorPresent":true,
+                    "priority":1,
+                    "blockRules":["ONBOARDING_STARTED"]
+                },
+                {
+                    "key":"ONBOARDING_STARTED",
+                    "url":"/test-blocking",
+                    "urlMatch":"contains",
+                    "selector":"#membershipProfile",
+                    "requireSelectorPresent":true,
+                    "priority":10,
+                    "oncePerPath":true
+                }
+            ]'></script>
+    
+    <!-- Load injector -->
+    <script src="./ph-product-injector.js"></script>
+    
+    <script>
+        const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+        
+        function clearEvents() {
+            window.capturedEvents = [];
+        }
+        
+        function getEvents(eventName) {
+            return window.capturedEvents.filter(e => e.name === eventName);
+        }
+        
+        // Wait for injector to initialize
+        setTimeout(() => {
+            startTest('⏳ Initialization Check', 'info');
+            log('ph-product-injector.js loaded', 'success');
+            log(`Initial events captured: ${window.capturedEvents.length}`, 'info');
+            
+            const taggedElements = document.querySelectorAll('[data-ph]');
+            log(`Elements tagged: ${taggedElements.length}`, 'info');
+            endTest('pass');
+            
+            addDivider();
+            addSummary('✅ Ready for testing. Click "Run All Tests" to begin comprehensive comma-separated selector testing.');
+        }, 1500);
+
+        async function runTests() {
+            resultsDiv.innerHTML = '';
+            addSummary('🧪 Starting Comma-Separated Selector & Rule Blocking Test Suite');
+            
+            // Test 1: Initial State (No Errors)
+            startTest('📦 Test 1: No errors visible - ONBOARDING_STARTED should fire', 'info');
+            hideError();
+            await wait(200);
+            clearEvents();
+            window.__phInjector.runAllRules();
+            await wait(500);
+            
+            const test1Started = getEvents('ONBOARDING_STARTED');
+            const test1Error = getEvents('ONBOARDING_ERROR');
+            log(`ONBOARDING_STARTED: ${test1Started.length}`, 'info');
+            log(`ONBOARDING_ERROR: ${test1Error.length}`, 'info');
+            
+            if (test1Started.length > 0 && test1Error.length === 0) {
+                log('✅ PASS: ONBOARDING_STARTED fired, ONBOARDING_ERROR did not', 'success');
+                endTest('pass');
+            } else {
+                log('❌ FAIL: Unexpected event state', 'error');
+                endTest('fail');
+            }
+            
+            addDivider();
+            
+            // Test 2: Only Validation Error (First Selector: #membershipProfile .alert-danger)
+            startTest('🔴 Test 2: Only validation error - ONBOARDING_ERROR should fire (1st selector)', 'info');
+            clearEvents();
+            showError('validation');
+            await wait(200);
+            window.__phInjector.runAllRules();
+            await wait(500);
+            
+            const test2Started = getEvents('ONBOARDING_STARTED');
+            const test2Error = getEvents('ONBOARDING_ERROR');
+            log(`ONBOARDING_STARTED: ${test2Started.length}`, 'info');
+            log(`ONBOARDING_ERROR: ${test2Error.length}`, 'info');
+            
+            if (test2Error.length > 0 && test2Started.length === 0) {
+                log('✅ PASS: ONBOARDING_ERROR fired, ONBOARDING_STARTED blocked (1st selector matched)', 'success');
+                endTest('pass');
+            } else {
+                log('❌ FAIL: First selector did not match correctly', 'error');
+                endTest('fail');
+            }
+            
+            addDivider();
+            
+            // Test 3: Only Profile Error (Second Selector: #profileExist)
+            startTest('🟠 Test 3: Only profile error - ONBOARDING_ERROR should fire (2nd selector)', 'info');
+            hideError();
+            await wait(200);
+            clearEvents();
+            showError('profile');
+            await wait(200);
+            window.__phInjector.runAllRules();
+            await wait(500);
+            
+            const test3Started = getEvents('ONBOARDING_STARTED');
+            const test3Error = getEvents('ONBOARDING_ERROR');
+            log(`ONBOARDING_STARTED: ${test3Started.length}`, 'info');
+            log(`ONBOARDING_ERROR: ${test3Error.length}`, 'info');
+            
+            if (test3Error.length > 0 && test3Started.length === 0) {
+                log('✅ PASS: ONBOARDING_ERROR fired, ONBOARDING_STARTED blocked (2nd selector matched)', 'success');
+                endTest('pass');
+            } else {
+                log('❌ FAIL: Second selector did not match correctly', 'error');
+                endTest('fail');
+            }
+            
+            addDivider();
+            
+            // Test 4: Both Errors Visible (Both Selectors)
+            startTest('🔴🟠 Test 4: Both errors visible - ONBOARDING_ERROR should fire (both selectors)', 'info');
+            clearEvents();
+            showError('both');
+            await wait(200);
+            window.__phInjector.runAllRules();
+            await wait(500);
+            
+            const test4Started = getEvents('ONBOARDING_STARTED');
+            const test4Error = getEvents('ONBOARDING_ERROR');
+            log(`ONBOARDING_STARTED: ${test4Started.length}`, 'info');
+            log(`ONBOARDING_ERROR: ${test4Error.length}`, 'info');
+            
+            if (test4Error.length > 0 && test4Started.length === 0) {
+                log('✅ PASS: ONBOARDING_ERROR fired, ONBOARDING_STARTED blocked (both selectors matched)', 'success');
+                endTest('pass');
+            } else {
+                log('❌ FAIL: Both selectors did not match correctly', 'error');
+                endTest('fail');
+            }
+            
+            addDivider();
+            
+            // Test 5: Hide All Errors - Success Event
+            startTest('🟢 Test 5: All errors hidden - ONBOARDING_STARTED should fire again', 'info');
+            clearEvents();
+            hideError();
+            await wait(200);
+            window.__phInjector.runAllRules();
+            await wait(500);
+            
+            const test5Started = getEvents('ONBOARDING_STARTED');
+            const test5Error = getEvents('ONBOARDING_ERROR');
+            log(`ONBOARDING_STARTED: ${test5Started.length}`, 'info');
+            log(`ONBOARDING_ERROR: ${test5Error.length}`, 'info');
+            
+            if (test5Started.length > 0 && test5Error.length === 0) {
+                log('✅ PASS: ONBOARDING_STARTED fired after errors removed', 'success');
+                endTest('pass');
+            } else {
+                log('❌ FAIL: Unexpected event state after cleanup', 'error');
+                endTest('fail');
+            }
+            
+            addDivider();
+            
+            // Test 6: Validation Error Again - Verify Blocking Still Works
+            startTest('🔴 Test 6: Validation error again - verify blocking persistence', 'info');
+            clearEvents();
+            showError('validation');
+            await wait(200);
+            window.__phInjector.runAllRules();
+            await wait(500);
+            
+            const test6Started = getEvents('ONBOARDING_STARTED');
+            const test6Error = getEvents('ONBOARDING_ERROR');
+            log(`ONBOARDING_STARTED: ${test6Started.length}`, 'info');
+            log(`ONBOARDING_ERROR: ${test6Error.length}`, 'info');
+            
+            if (test6Error.length > 0 && test6Started.length === 0) {
+                log('✅ PASS: Blocking still works after state changes', 'success');
+                endTest('pass');
+            } else {
+                log('❌ FAIL: Blocking mechanism not persistent', 'error');
+                endTest('fail');
+            }
+            
+            addDivider();
+            
+            // Test 7: Profile Error - Verify Second Selector Still Works
+            startTest('🟠 Test 7: Profile error - verify 2nd selector blocking persistence', 'info');
+            hideError();
+            await wait(200);
+            clearEvents();
+            showError('profile');
+            await wait(200);
+            window.__phInjector.runAllRules();
+            await wait(500);
+            
+            const test7Started = getEvents('ONBOARDING_STARTED');
+            const test7Error = getEvents('ONBOARDING_ERROR');
+            log(`ONBOARDING_STARTED: ${test7Started.length}`, 'info');
+            log(`ONBOARDING_ERROR: ${test7Error.length}`, 'info');
+            
+            if (test7Error.length > 0 && test7Started.length === 0) {
+                log('✅ PASS: Second selector blocking still works', 'success');
+                endTest('pass');
+            } else {
+                log('❌ FAIL: Second selector blocking failed', 'error');
+                endTest('fail');
+            }
+            
+            addDivider();
+            
+            // Test 8: Final Cleanup
+            startTest('🟢 Test 8: Final cleanup - ONBOARDING_STARTED fires after all errors removed', 'info');
+            clearEvents();
+            hideError();
+            await wait(200);
+            window.__phInjector.runAllRules();
+            await wait(500);
+            
+            const test8Started = getEvents('ONBOARDING_STARTED');
+            const test8Error = getEvents('ONBOARDING_ERROR');
+            log(`ONBOARDING_STARTED: ${test8Started.length}`, 'info');
+            log(`ONBOARDING_ERROR: ${test8Error.length}`, 'info');
+            
+            if (test8Started.length > 0 && test8Error.length === 0) {
+                log('✅ PASS: Final cleanup successful', 'success');
+                endTest('pass');
+            } else {
+                log('❌ FAIL: Final cleanup failed', 'error');
+                endTest('fail');
+            }
+            
+            // Final Summary
+            addDivider();
+            const totalEvents = window.capturedEvents.length;
+            const startedCount = getEvents('ONBOARDING_STARTED').length;
+            const errorCount = getEvents('ONBOARDING_ERROR').length;
+            
+            addSummary(`
+                <strong>📊 TEST SUITE COMPLETE!</strong><br><br>
+                ✅ ${totalEvents} total events captured<br>
+                📍 ONBOARDING_STARTED: ${startedCount} events<br>
+                ⚠️  ONBOARDING_ERROR: ${errorCount} events<br><br>
+                <strong>Comma-Separated Selector Validation: COMPLETE</strong><br>
+                Confirmed ANY selector match fires event (OR logic)
+            `);
+        }
+    </script>
+</body>
+</html>

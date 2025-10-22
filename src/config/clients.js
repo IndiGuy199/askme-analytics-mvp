@@ -349,137 +349,63 @@ export const CLIENTS = [
       },
       funnel: {
         query: {
-          kind: 'FunnelsQuery',
-          series: [
-            {
-              kind: "EventsNode",
-              name: "All events",
-              event: null,
-              properties: [
-                {
-                  key: "$current_url",
-                  type: "event",
-                  value: "/app/profile/createProfile",
-                  operator: "icontains"
-                },
-                {
-                  key: "client_id",
-                  type: "event",
-                  value: [
-                    "ask-me-ltp"
-                  ],
-                  operator: "exact"
-                }
-              ],
-              custom_name: "Profile Creation Start View"
-            },
-            {
-              kind: "EventsNode",
-              name: "All events",
-              event: null,
-              properties: [
-                {
-                  key: "$event_type",
-                  type: "event",
-                  value: [
-                    "submit"
-                  ],
-                  operator: "exact"
-                },
-                {
-                  key: "selector",
-                  type: "element",
-                  value: [
-                    "#membershipProfile"
-                  ],
-                  operator: "exact"
-                }
-              ],
-              custom_name: "Step 1 completed"
-            },
-            {
-              kind: "EventsNode",
-              name: "All events",
-              event: null,
-              properties: [
-                {
-                  key: "$event_type",
-                  type: "event",
-                  value: [
-                    "submit"
-                  ],
-                  operator: "exact"
-                },
-                {
-                  key: "selector",
-                  type: "element",
-                  value: [
-                    "#contactForm"
-                  ],
-                  operator: "exact"
-                }
-              ],
-              custom_name: "Step 2 Completed"
-            },
-            {
-              kind: "EventsNode",
-              name: "All events",
-              event: null,
-              properties: [
-                {
-                  key: "$event_type",
-                  type: "event",
-                  value: [
-                    "submit"
-                  ],
-                  operator: "exact"
-                },
-                {
-                  key: "selector",
-                  type: "element",
-                  value: [
-                    "#createProfileStep3Form"
-                  ],
-                  operator: "exact"
-                }
-              ],
-              custom_name: "Security Q&A Completed"
-            },
-            {
-              kind: "EventsNode",
-              name: "$autocapture",
-              event: "$autocapture",
-              properties: [
-                {
-                  key: "text",
-                  type: "element",
-                  value: "I CONSENT",
-                  operator: "icontains"
-                }
-              ],
-              custom_name: "Consent Provided"
-            },
-            {
-              kind: "EventsNode",
-              name: "All events",
-              event: null,
-              properties: [
-                {
-                  key: "$current_url",
-                  type: "event",
-                  value: "/auth/dashboard",
-                  operator: "icontains"
-                }
-              ],
-              custom_name: "Profile Completed"
+          kind: "InsightVizNode",
+          source: {
+            kind: "FunnelsQuery",
+            series: [
+              {
+                kind: "ActionsNode",
+                id: "205944",
+                name: "ONBOARDING_STARTED",
+                custom_name: "Profile Creation Start View New",
+                properties: [
+                  {
+                    key: "client_id",
+                    value: ["ask-me-ltp"],
+                    operator: "exact",
+                    type: "event"
+                  }
+                ]
+              },
+              {
+                kind: "ActionsNode",
+                id: "206352",
+                name: "ONBOARDING_STEP1_COMPLETED",
+                custom_name: "Step 1 completed"
+              },
+              {
+                kind: "ActionsNode",
+                id: "206353",
+                name: "ONBOARDING_STEP2_COMPLETED",
+                custom_name: "Step 2 Completed"
+              },
+              {
+                kind: "ActionsNode",
+                id: "208791",
+                name: "ONBOARDING_STEP3_COMPLETED",
+                custom_name: "Security Q&A Completed"
+              },
+              {
+                kind: "ActionsNode",
+                id: "209319",
+                name: "CONSENT_PROVIDED",
+                custom_name: "Consent Provided"
+              },
+              {
+                kind: "ActionsNode",
+                id: "206354",
+                name: "SIGNUP_COMPLETED",
+                custom_name: "Profile Completed"
+              }
+            ],
+            interval: "day",
+            funnelsFilter: {
+              layout: "vertical",
+              funnelVizType: "steps"
             }
-          ],
-          interval: "hour",
-          funnelsFilter: {
-            layout: "vertical",
-            funnelVizType: "steps"
-          }
-        },
+          },
+          full: true
+        }
       },
       renewalFunnel: {
         query: {

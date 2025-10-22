@@ -7,6 +7,8 @@
 *  - requireSelectorPresent: fire once on load if selector exists (plus tag)
 *  - autoFire: fire once on load when URL matches (selector not required)
 *  - oncePerPath: dedupe per route (default true; can be disabled per rule)
+*  - blockRules: conditional rule blocking (error states prevent success states)
+*  - priority: rule evaluation order (lower number = higher priority)
 *  - Product metadata annotation (data-product, data-price, data-currency)
 *  - Step-clicks include product props (Option A)
 *  - Custom product event via data-event-name (or default from constants)
@@ -123,10 +125,22 @@
     }
 
     /* ---------- 2) PostHog queue + dedupe -------------------------------- */
-    const sentOncePath = window.__phFiredOnce || (window.__phFiredOnce = new Set()); // key::path
+    // 🆕 Enhanced: Load from sessionStorage for persistence across quick reloads
+    const sentOncePath = (() => {
+        if (window.__phFiredOnce) return window.__phFiredOnce;
+        
+        try {
+            const stored = sessionStorage.getItem('__phFiredOnce');
+            return window.__phFiredOnce = stored ? new Set(JSON.parse(stored)) : new Set();
+        } catch {
+            return window.__phFiredOnce = new Set();
+        }
+    })();
+    
     const sentButtons  = new WeakSet();   // submit/product elements
     const sentStepEls  = new WeakSet();   // data-ph elements
     const identifiedEmails = new Set();  // ✅ Track identified emails to prevent duplicates
+    const blockedRules = new Set();      // 🆕 Track which rules are currently blocked
     const queue = [];
     let phReady = false;
 
@@ -150,7 +164,15 @@
         if (!isNonEmptyStr(name)) return;
         const key = scopePath ? `${name}::${location.pathname}` : name;
         if (scopePath && sentOncePath.has(key)) return;
-        if (scopePath) sentOncePath.add(key);
+        if (scopePath) {
+            sentOncePath.add(key);
+            // 🆕 Persist to sessionStorage to survive quick reloads
+            try {
+                sessionStorage.setItem('__phFiredOnce', JSON.stringify([...sentOncePath]));
+            } catch (e) {
+                // Silent fail if sessionStorage is not available
+            }
+        }
 
         if (phReady) {
             try { window.posthog.capture(name, props); } catch (e) { console.warn('[ph-injector] capture failed', e); }
@@ -193,7 +215,11 @@
         priceClass    : SCRIPT.getAttribute(K.PRICE_CLASS),
         priceAttr     : SCRIPT.getAttribute(K.PRICE_ATTR),
         currencyClass : SCRIPT.getAttribute(K.CURRENCY_CLASS),
-        stepsRaw      : SCRIPT.getAttribute(K.STEPS)
+        stepsRaw      : SCRIPT.getAttribute(K.STEPS),
+        // 🆕 NEW: Configurable selectors for dynamic elements
+        priceWatchSelectors : SCRIPT.getAttribute(K.PRICE_WATCH_SELECTORS),
+        emailSelectors      : SCRIPT.getAttribute(K.EMAIL_SELECTORS),
+        buttonSelectors     : SCRIPT.getAttribute(K.BUTTON_SELECTORS)
     };
 
     /* ---------- 4) Page gating -------------------------------------------- */
@@ -217,12 +243,18 @@
         isNonEmptyStr(DS.currencyClass);
 
     function guessContainer(btn) {
-        // optional panel class(es)
+        // 🆕 Priority 1: Try closest pricing container with specific markers
+        // NOTE: Don't include [data-product] or [data-price] as those are attributes WE set on buttons
+        const directContainer = btn.closest('.price-card, .pricing-card, .pricing-tier, .plan-card, .product-card');
+        if (directContainer) return directContainer;
+        
+        // Priority 2: optional panel class(es) from configuration
         const panelSelCsv = classToSelectorCsv(DS.panelClass);
         if (panelSelCsv) {
             try { const c = btn.closest(panelSelCsv); if (c) return c; } catch {}
         }
-        // heuristic scan upward
+        
+        // Priority 3: heuristic scan upward
         let p = btn.parentElement, hops = 0;
         const nearPriceSel = [
             DS.priceAttr ? `[${DS.priceAttr}]` : '',
@@ -239,9 +271,50 @@
     }
 
     function text(el) { return norm(el?.textContent || ''); }
+    
     function parseNum(s) {
-        const m = norm(s).replace(/,/g, '').match(/-?\d+(\.\d+)?/);
-        return m ? m[0] : null;
+        const cleaned = norm(s).toLowerCase();
+        
+        // Check for "free" or "$0"
+        if (cleaned.includes('free') || cleaned.includes('trial')) {
+            return '0.00';
+        }
+        
+        // Detect format by checking structure
+        // European: 1.234,56 or 1234,56 (comma as decimal separator)
+        // US: 1,234.56 or 1234.56 (dot as decimal separator)
+        const hasCommaDecimal = /\d+[.,]\d+,\d{2}/.test(cleaned) || /^\D*\d{1,3}\.\d{3},\d{2}/.test(cleaned);
+        
+        if (hasCommaDecimal) {
+            // European format: 1.234,56 → 1234.56
+            // Remove everything except digits and comma, then replace comma with dot
+            const converted = cleaned.replace(/[^\d,]/g, '').replace(/\./g, '').replace(',', '.');
+            const m = converted.match(/-?\d+(\.\d+)?/);
+            return m ? m[0] : null;
+        } else if (/\d+[.,]\d+\.\d{2}/.test(cleaned) || /^\D*\d{1,3},\d{3}\.\d{2}/.test(cleaned)) {
+            // US format: 1,234.56 → 1234.56
+            // Remove everything except digits and dot
+            const converted = cleaned.replace(/[^\d.]/g, '');
+            const m = converted.match(/-?\d+(\.\d+)?/);
+            return m ? m[0] : null;
+        }
+        
+        // Fallback: detect by last separator
+        // If last separator is comma, it's European; if dot, it's US
+        const lastComma = cleaned.lastIndexOf(',');
+        const lastDot = cleaned.lastIndexOf('.');
+        
+        if (lastComma > lastDot && lastComma > 0) {
+            // European: comma is decimal separator
+            const converted = cleaned.replace(/[^\d,]/g, '').replace(/,/g, '.');
+            const m = converted.match(/-?\d+(\.\d+)?/);
+            return m ? m[0] : null;
+        } else {
+            // US or simple number: dot is decimal separator
+            const converted = cleaned.replace(/[^\d.]/g, '');
+            const m = converted.match(/-?\d+(\.\d+)?/);
+            return m ? m[0] : null;
+        }
     }
 
     function extractFrom(container) {
@@ -254,8 +327,8 @@
         }
         if (!product) {
             const titleCsv = classToSelectorCsv(DS.titleClass);
-            const guessTitleSel = (titleCsv ? `${titleCsv} h3,` : '') + `[${DS.titleAttr || 'data-title'}]`;
-            const tn = first(container, guessTitleSel) || first(container, 'h3,[data-title]');
+            const guessTitleSel = (titleCsv ? `${titleCsv},h3,` : 'h3,') + `[${DS.titleAttr || 'data-title'}]`;
+            const tn = first(container, guessTitleSel);
             if (tn) product = tn.getAttribute('data-title') || text(tn);
         }
 
@@ -279,6 +352,22 @@
         if (cn) {
             const raw = text(cn).replace('$', '').trim();
             currency = /^us$/i.test(raw) ? 'USD' : (raw || 'USD').toUpperCase();
+        } else {
+            // 🆕 Fallback: Extract currency from price text itself
+            const priceText = pn ? text(pn) : '';
+            const currencyMap = {
+                '€': 'EUR', '£': 'GBP', '¥': 'JPY', '₹': 'INR', 
+                'C$': 'CAD', 'A$': 'AUD', '$': 'USD',
+                'eur': 'EUR', 'gbp': 'GBP', 'jpy': 'JPY', 'inr': 'INR',
+                'cad': 'CAD', 'aud': 'AUD', 'usd': 'USD'
+            };
+            
+            for (const [symbol, code] of Object.entries(currencyMap)) {
+                if (priceText.toLowerCase().includes(symbol.toLowerCase())) {
+                    currency = code;
+                    break;
+                }
+            }
         }
 
         const prodNorm = (product ? product.toLowerCase().replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_') : 'unknown_product');
@@ -286,18 +375,73 @@
     }
 
     function annotateSubmit(btn) {
-        if (!btn || sentButtons.has(btn)) return;
+        if (!btn) return;
+        
+        // Always re-extract to get latest prices (for dynamic changes)
         const props = extractFrom(guessContainer(btn));
         if (!props) return;
-        if (!btn.hasAttribute(DOM.PRODUCT))  btn.setAttribute(DOM.PRODUCT,  props[P.PRODUCT]);
-        if (!btn.hasAttribute(DOM.PRICE))    btn.setAttribute(DOM.PRICE,    String(props[P.PRICE]));
-        if (!btn.hasAttribute(DOM.CURRENCY)) btn.setAttribute(DOM.CURRENCY, props[P.CURRENCY]);
+        
+        // Update or set attributes (always update for dynamic prices)
+        btn.setAttribute(DOM.PRODUCT,  props[P.PRODUCT]);
+        btn.setAttribute(DOM.PRICE,    String(props[P.PRICE]));
+        btn.setAttribute(DOM.CURRENCY, props[P.CURRENCY]);
+        
         sentButtons.add(btn);
     }
 
     function scanAndAnnotate() {
         if (!hasAnyProductHint) return;
         document.querySelectorAll('input[type="submit"], button[type="submit"]').forEach(annotateSubmit);
+    }
+
+    // 🆕 UPDATED: Configurable price change listeners - no hardcoding
+    function bindPriceChangeListeners() {
+        // If no configuration provided, use intelligent defaults
+        let selectorString = DS.priceWatchSelectors;
+        
+        if (!isNonEmptyStr(selectorString)) {
+            // Fallback: Build selectors dynamically based on common patterns
+            const defaultSelectors = [
+                'select[id*="plan" i]',
+                'select[name*="plan" i]',
+                'select[id*="interval" i]',
+                'select[name*="interval" i]',
+                'select[id*="price" i]',
+                'select[name*="price" i]',
+                'input[type="radio"][name*="plan" i]',
+                'input[type="radio"][name*="interval" i]',
+                'input[type="radio"][name*="billing" i]',
+                'input[type="radio"][name*="price" i]'
+            ];
+            
+            // If client provided priceClass, add those as watch targets
+            if (isNonEmptyStr(DS.priceClass)) {
+                const priceClasses = parseMaybeJSONList(DS.priceClass);
+                priceClasses.forEach(cls => {
+                    defaultSelectors.push(`.${cls} select`);
+                    defaultSelectors.push(`.${cls} input[type="radio"]`);
+                });
+            }
+            
+            selectorString = defaultSelectors.join(', ');
+        }
+        
+        try {
+            const priceInputs = document.querySelectorAll(selectorString);
+            
+            priceInputs.forEach(input => {
+                if (input.hasAttribute('data-ph-price-watcher')) return;
+                input.setAttribute('data-ph-price-watcher', 'true');
+                
+                input.addEventListener('change', () => {
+                    setTimeout(() => {
+                        scanAndAnnotate();
+                    }, 100);
+                });
+            });
+        } catch (e) {
+            console.warn('[ph-injector] Invalid price watch selectors:', selectorString, e);
+        }
     }
 
     /* ---------- 6) Steps parsing (enhanced + selector fallback) ----------- */
@@ -326,6 +470,7 @@
                     requireSelectorPresent: !!r.requireSelectorPresent,
                     autoFire: !!r.autoFire,
                     oncePerPath: (r.oncePerPath === false) ? false : true,
+                    blockRules: Array.isArray(r.blockRules) ? r.blockRules : [],  // 🆕 NEW: Rules to block if this fires
                     metadata: (r.metadata && typeof r.metadata === 'object') ? r.metadata : {}
                 };
             })
@@ -347,6 +492,12 @@
     function tagElementsForRule(rule) {
         if (!rule || !rule.key) return;
         if (!urlMatches(rule)) return;
+
+        // 🆕 CHECK: Skip if this rule is blocked by another rule
+        if (blockedRules.has(rule.key)) {
+            console.log(`[DEBUG] Rule "${rule.key}" is blocked by another rule`);
+            return;
+        }
 
         // autoFire independent of selector
         if (rule.autoFire) {
@@ -379,24 +530,64 @@
 
         console.log(`[DEBUG] Rule "${rule.key}" tagged ${Array.from(bucket).length} visible elements`);
 
-// 2) textRegex fallback (only if no visible matches found)
+        // 2) 🆕 UPDATED: Configurable textRegex fallback - no hardcoding
         if (!bucket.size && isNonEmptyStr(rule.textRegex)) {
             const rx = ciRegex(rule.textRegex);
             if (rx) {
-                Array.from(document.querySelectorAll('button, a, input[type="submit"]'))
-                    .filter(isVisible)
-                    .forEach(el => {
-                        const txt = el.tagName === 'INPUT'
-                            ? (el.getAttribute('value') || '')
-                            : (el.textContent || '');
-                        if (rx.test(norm(txt))) bucket.add(el);
-                    });
+                // Use client-provided button selectors, or fall back to intelligent defaults
+                const buttonSelector = DS.buttonSelectors || 
+                    'button, a, input[type="submit"], input[type="button"], [role="button"]';
+                
+                try {
+                    Array.from(document.querySelectorAll(buttonSelector))
+                        .filter(isVisible)
+                        .forEach(el => {
+                            const txt = el.tagName === 'INPUT'
+                                ? (el.getAttribute('value') || '')
+                                : (el.textContent || '');
+                            if (rx.test(norm(txt))) bucket.add(el);
+                        });
+                } catch (e) {
+                    console.warn('[ph-injector] Invalid button selectors:', buttonSelector, e);
+                }
             }
         }
 
         const targets = Array.from(bucket);
 
-// --- Tag all visible elements safely (no overwrites of different keys) ---
+        // 🆕 NEW: If this rule found elements and has blockRules, block those rules
+        if (targets.length && rule.blockRules && rule.blockRules.length) {
+            rule.blockRules.forEach(blockedKey => {
+                blockedRules.add(blockedKey);
+                console.log(`[DEBUG] Rule "${rule.key}" is blocking "${blockedKey}"`);
+            });
+        }
+
+// --- NEW: Handle requireSelectorPresent differently ---
+        if (rule.requireSelectorPresent) {
+            // For requireSelectorPresent, we only check if visible elements exist
+            // We DON'T tag them, but we DO fire the event and create a hidden element
+            if (targets.length) {
+                // Check if hidden element already exists
+                const hiddenSel = `input[type="hidden"][data-ph="${rule.key}"]`;
+                if (!document.querySelector(hiddenSel)) {
+                    // Create hidden element
+                    const hidden = document.createElement('input');
+                    hidden.type = 'hidden';
+                    hidden.setAttribute('data-ph', rule.key);
+                    hidden.setAttribute('data-ph-tagged-dyn', '1');
+                    document.body.appendChild(hidden);
+
+                    // Fire the event once
+                    const props = { [P.PATH]: location.pathname, matched: 'selector', ...rule.metadata };
+                    captureOnce(rule.key, props, { scopePath: rule.oncePerPath });
+                    console.log(`[DEBUG] Rule "${rule.key}" created hidden element (requireSelectorPresent)`);
+                }
+            }
+            return; // Exit early - don't tag visible elements
+        }
+
+// --- Tag all visible elements safely (only if NOT requireSelectorPresent) ---
         if (targets.length) {
             targets.forEach((el) => {
                 const existing = el.getAttribute('data-ph');
@@ -405,11 +596,6 @@
                 // Always set the current rule key (handles both new elements and re-tagging)
                 el.setAttribute('data-ph', rule.key);
             });
-
-            if (rule.requireSelectorPresent) {
-                const props = { [P.PATH]: location.pathname, matched: 'selector', ...rule.metadata };
-                captureOnce(rule.key, props, { scopePath: rule.oncePerPath });
-            }
             return;
         }
 
@@ -440,6 +626,14 @@
         const rules = parseSteps();
         if (!Array.isArray(rules) || !rules.length) return;
 
+        // 🛡️ Disconnect MutationObserver to prevent infinite loop
+        if (window.__phMutationObserver) {
+            window.__phMutationObserver.disconnect();
+        }
+
+        // 🆕 Clear blocked rules for fresh evaluation on each run
+        blockedRules.clear();
+
         // 🧹 Clean up previously injected dynamic tags that no longer match
         document.querySelectorAll('[data-ph-tagged-dyn]').forEach(el => el.remove());
         // Optional: clear stale data-ph on elements when URL no longer matches any rule
@@ -451,6 +645,11 @@
 
 
         rules.forEach(tagElementsForRule);
+
+        // 🛡️ Reconnect MutationObserver after DOM modifications are complete
+        if (window.__phMutationObserver) {
+            window.__phMutationObserver.observe(document.documentElement, { childList: true, subtree: true });
+        }
     }
 
     /* ---------- 8) Product props from any element (for step clicks) ------- */
@@ -570,10 +769,18 @@
         }
     }
 
+    // 🆕 UPDATED: Configurable email input scanning - no hardcoding
     function scanForEmailInputs() {
-        // Find all email inputs on the page
-        const emailInputs = document.querySelectorAll('input[type="email"], input[name*="email" i], input[placeholder*="email" i]');
-        emailInputs.forEach(tryIdentifyFromEmail);
+        // Use client-provided selectors, or fall back to intelligent defaults
+        const emailSelector = DS.emailSelectors || 
+            'input[type="email"], input[name*="email" i], input[placeholder*="email" i], input[id*="email" i]';
+        
+        try {
+            const emailInputs = document.querySelectorAll(emailSelector);
+            emailInputs.forEach(tryIdentifyFromEmail);
+        } catch (e) {
+            console.warn('[ph-injector] Invalid email selectors:', emailSelector, e);
+        }
     }
 
     /* ---------- 10) SPA hooks + observers -------------------------------- */
@@ -592,14 +799,20 @@
 
     function onRoute() {
         applyAllRules();
-        if (pageMatches(DS.pageMatch)) scanAndAnnotate();
+        if (pageMatches(DS.pageMatch)) {
+            scanAndAnnotate();
+            bindPriceChangeListeners(); // 🆕 Bind listeners on route change
+        }
         scanForEmailInputs(); // ✅ Scan for email inputs on route change
     }
 
     function onMutations(muts) {
        if (muts.some(m => m.addedNodes && m.addedNodes.length)) {
             applyAllRules();
-           if (pageMatches(DS.pageMatch)) scanAndAnnotate();
+           if (pageMatches(DS.pageMatch)) {
+               scanAndAnnotate();
+               bindPriceChangeListeners(); // 🆕 Bind listeners when DOM changes
+           }
            scanForEmailInputs(); // ✅ Scan for email inputs when DOM changes
         }
     }
@@ -607,7 +820,10 @@
     /* ---------- 11) Boot -------------------------------------------------- */
     function boot() {
         applyAllRules();
-        if (pageMatches(DS.pageMatch)) scanAndAnnotate();
+        if (pageMatches(DS.pageMatch)) {
+            scanAndAnnotate();
+            bindPriceChangeListeners(); // 🆕 Initial binding of price change listeners
+        }
         bindGlobalClick();
         scanForEmailInputs(); // ✅ Initial scan for email inputs
 
@@ -629,6 +845,7 @@
 
     hookSPA();
     const mo = new MutationObserver(onMutations);
+    window.__phMutationObserver = mo; // Store reference globally for disconnect/reconnect
     mo.observe(document.documentElement, { childList: true, subtree: true });
     window.addEventListener('ph:routechange', () => setTimeout(onRoute, 0));
 })();

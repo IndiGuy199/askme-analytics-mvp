@@ -21,7 +21,11 @@ window.PH_DATA_KEYS = Object.freeze({
     PRICE_CLASS: 'data-price-class',
     PRICE_ATTR: 'data-price-attr',
     CURRENCY_CLASS: 'data-currency-class',
-    STEPS: 'data-steps'
+    STEPS: 'data-steps',
+    // 🆕 NEW: Configurable selectors for dynamic elements
+    PRICE_WATCH_SELECTORS: 'data-price-watch-selectors',
+    EMAIL_SELECTORS: 'data-email-selectors',
+    BUTTON_SELECTORS: 'data-button-selectors'
 });
 
 
@@ -35,8 +39,9 @@ window.PH_KEYS = Object.freeze({
     SIGNUP_CTA_CLICKED : 'SIGNUP_CTA_CLICKED',
     ONBOARDING_STARTED : 'ONBOARDING_STARTED',
     ONBOARDING_STEP1_COMPLETED : 'ONBOARDING_STEP1_COMPLETED',
-    ONBOARDING_STEP2_COMPLETED : 'ONBOARDING_STEP1_COMPLETED',
-    ONBOARDING_STEP3_COMPLETED : 'ONBOARDING_STEP1_COMPLETED',
+    ONBOARDING_STEP2_COMPLETED : 'ONBOARDING_STEP2_COMPLETED',
+    ONBOARDING_STEP3_COMPLETED : 'ONBOARDING_STEP3_COMPLETED',
+    ONBOARDING_ERROR   : 'ONBOARDING_ERROR',  // 🆕 NEW: Error state during onboarding
     SIGNUP_COMPLETED   : 'SIGNUP_COMPLETED',
     CONSENT_PROVIDED   : 'CONSENT_PROVIDED',
 
