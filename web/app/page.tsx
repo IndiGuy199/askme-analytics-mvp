@@ -77,7 +77,7 @@ export default async function HomePage() {
             </div>
 
             <p className="text-sm text-gray-500">
-              14-day free trial • No credit card required • Setup in 2 minutes
+              30-day free trial • No credit card required • Setup in 2 minutes
             </p>
           </div>
         </div>

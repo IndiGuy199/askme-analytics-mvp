@@ -32,6 +32,12 @@ interface User {
   role?: string
 }
 
+interface Company {
+  id: string
+  name: string
+  slug: string
+}
+
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
 // Remove any PricingPageProps interface - not needed for client components
@@ -39,7 +45,9 @@ export default function PricingPage() {
   const router = useRouter()
   const [plans, setPlans] = useState<Plan[]>([])
   const [currentUser, setCurrentUser] = useState<User | null>(null)
+  const [company, setCompany] = useState<Company | null>(null)
   const [currentPlan, setCurrentPlan] = useState<string | null>(null)
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [selectedInterval, setSelectedInterval] = useState<'month' | 'year'>('month')
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
@@ -61,6 +69,9 @@ export default function PricingPage() {
         .select(`
           *,
           companies!inner(
+            id,
+            name,
+            slug,
             subscriptions(plan_id, status)
           )
         `)
@@ -69,11 +80,15 @@ export default function PricingPage() {
 
       if (userData) {
         setCurrentUser(userData as User)
+        if (userData.companies) {
+          setCompany(userData.companies as unknown as Company)
+        }
         const activeSubscription = userData.companies?.subscriptions?.find(
-          (sub: any) => sub.status === 'active'
+          (sub: any) => sub.status === 'active' || sub.status === 'trialing'
         )
         if (activeSubscription) {
           setCurrentPlan(activeSubscription.plan_id)
+          setSubscriptionStatus(activeSubscription.status)
         }
       }
 
@@ -95,39 +110,41 @@ export default function PricingPage() {
   }, [router])
 
   const handleCheckout = async (planId: string) => {
+    if (!company) {
+      alert('Company information not found. Please try logging in again.')
+      return
+    }
+
     setCheckoutLoading(planId)
     
     try {
-      const response = await fetch('/api/billing/checkout', {
+      // Call our API to create Stripe Checkout Session
+      const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          planId: planId.replace('_yearly', ''),
-          interval: planId.includes('yearly') ? 'year' : 'month',
+          planId: planId,
+          companyId: company.id,
         }),
       })
 
-      const { sessionId, error } = await response.json()
+      const data = await response.json()
       
-      if (error) {
-        throw new Error(error)
+      if (!response.ok || data.error) {
+        throw new Error(data.error || 'Failed to create checkout session')
       }
 
-      const stripe = await stripePromise
-      if (!stripe) throw new Error('Stripe not loaded')
-
-      const { error: stripeError } = await stripe.redirectToCheckout({
-        sessionId,
-      })
-
-      if (stripeError) {
-        throw new Error(stripeError.message)
+      // Redirect to Stripe Checkout
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        throw new Error('No checkout URL returned')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Checkout error:', error)
-      alert('Something went wrong. Please try again.')
+      alert(error.message || 'Something went wrong. Please try again.')
     } finally {
       setCheckoutLoading(null)
     }
@@ -141,6 +158,37 @@ export default function PricingPage() {
   }
 
   const getPlanFeatures = (plan: Plan): string[] => {
+    const planId = plan.id.toLowerCase()
+    
+    // Basic Plan Features
+    if (planId.includes('basic')) {
+      return [
+        'Track 1 website/app',
+        'Add 1 team member (2 total)',
+        'Standard metric charts',
+        'AI-powered insights',
+        'Weekly email digest',
+        'Compare to previous periods',
+        'Date ranges: 7 & 30 days'
+      ]
+    }
+    
+    // Premium/Standard Plan Features (inherits from Basic + additional)
+    if (planId.includes('premium') || planId.includes('standard')) {
+      return [
+        'Track up to 3 websites/apps',
+        'Add up to 5 team members (6 total)',
+        'Standard metric charts',
+        'AI-powered insights',
+        'Weekly email digest',
+        'Compare to previous periods',
+        'Custom signup & revenue charts',
+        'Extended date ranges: 1, 7, 30 & 90 days',
+        'Priority support'
+      ]
+    }
+    
+    // Fallback for other plans
     const features = []
     
     if (plan.max_team_members === -1) {
@@ -169,8 +217,13 @@ export default function PricingPage() {
     )
   }
 
-  // Filter plans based on interval
+  // Filter plans based on interval and hide Enterprise
   const displayPlans = plans.filter(plan => {
+    // Hide Enterprise plan (not ready yet)
+    if (plan.id.toLowerCase().includes('enterprise')) {
+      return false
+    }
+    
     if (selectedInterval === 'year') {
       return plan.interval === 'year'
     } else {
@@ -181,12 +234,29 @@ export default function PricingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
       <div className="max-w-7xl mx-auto">
+        {/* Navigation Header */}
+        <div className="flex justify-between items-center mb-8">
+          <Button
+            variant="outline"
+            onClick={() => router.push('/dashboard')}
+            className="bg-white hover:bg-gray-50"
+          >
+            ← Back to Dashboard
+          </Button>
+          <div className="text-sm text-gray-600">
+            {currentUser?.email}
+          </div>
+        </div>
+
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
             Choose your plan
           </h1>
           <p className="text-xl text-gray-600 mb-8">
-            Start with a 14-day free trial. No credit card required.
+            {subscriptionStatus === 'trialing' 
+              ? 'Select a plan to continue after your trial ends'
+              : 'Start with a 30-day free trial. No credit card required.'
+            }
           </p>
 
           {/* Interval Toggle */}
@@ -217,7 +287,7 @@ export default function PricingPage() {
           </div>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+        <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
           {displayPlans.map((plan) => {
             const isCurrentPlan = currentPlan === plan.id
             const monthlyEquivalent = plan.interval === 'year' ? plan.price_cents / 12 : plan.price_cents
@@ -262,7 +332,7 @@ export default function PricingPage() {
                   <Button
                     className="w-full mb-6"
                     variant={plan.is_popular ? 'default' : 'outline'}
-                    disabled={isCurrentPlan || checkoutLoading === plan.id}
+                    disabled={(isCurrentPlan && subscriptionStatus === 'active') || checkoutLoading === plan.id}
                     onClick={() => handleCheckout(plan.id)}
                   >
                     {checkoutLoading === plan.id ? (
@@ -270,8 +340,18 @@ export default function PricingPage() {
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                         Processing...
                       </div>
-                    ) : isCurrentPlan ? (
+                    ) : isCurrentPlan && subscriptionStatus === 'trialing' ? (
+                      <>
+                        Subscribe Now
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </>
+                    ) : isCurrentPlan && subscriptionStatus === 'active' ? (
                       'Current Plan'
+                    ) : subscriptionStatus === 'trialing' ? (
+                      <>
+                        Subscribe Now
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </>
                     ) : (
                       <>
                         Start Free Trial

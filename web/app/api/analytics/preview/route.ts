@@ -433,15 +433,15 @@ function parseDeviceMix(json: any, hasComparison: boolean = false) {
                   result?.aggregated_value || 0;
     
     if (device && count > 0) {
-      device_mix[device] = count;
+      device_mix[device] = { count, percentage: 0 };
       total += count;
     }
   });
 
-  // Convert to percentages
+  // Calculate percentages while keeping counts
   if (total > 0) {
     Object.keys(device_mix).forEach(device => {
-      device_mix[device] = device_mix[device] / total;
+      device_mix[device].percentage = (device_mix[device].count / total) * 100;
     });
   }
   
@@ -457,15 +457,15 @@ function parseDeviceMix(json: any, hasComparison: boolean = false) {
                     result?.aggregated_value || 0;
       
       if (device && count > 0) {
-        previous_device_mix[device] = count;
+        previous_device_mix[device] = { count, percentage: 0 };
         previousTotal += count;
       }
     });
     
-    // Convert to percentages
+    // Calculate percentages while keeping counts
     if (previousTotal > 0) {
       Object.keys(previous_device_mix).forEach(device => {
-        previous_device_mix[device] = previous_device_mix[device] / previousTotal;
+        previous_device_mix[device].percentage = (previous_device_mix[device].count / previousTotal) * 100;
       });
     }
     

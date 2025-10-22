@@ -19,14 +19,56 @@ interface Company {
   id: string
   name: string
   slug: string
+  posthog_client_id?: string
+}
+
+interface Subscription {
+  id: string
+  status: string
+  trial_end: string | null
+  current_period_end: string
+  plan_id: string
+}
+
+interface AnalyticsData {
+  totalViews: number
+  activeUsers: number
 }
 
 export default function DashboardPage() {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [company, setCompany] = useState<Company | null>(null)
+  const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({ totalViews: 0, activeUsers: 0 })
+  const [analyticsLoading, setAnalyticsLoading] = useState(true)
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false)
   const supabase = createClient()
+
+  // Handle successful checkout callback
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    const success = searchParams.get('success')
+    const sessionId = searchParams.get('session_id')
+
+    if (success === 'true' && sessionId) {
+      console.log('✅ Payment successful! Session ID:', sessionId)
+      setShowSuccessMessage(true)
+      
+      // Clear URL parameters
+      window.history.replaceState({}, '', '/dashboard')
+      
+      // Hide success message after 5 seconds
+      setTimeout(() => setShowSuccessMessage(false), 5000)
+    }
+
+    const canceled = searchParams.get('canceled')
+    if (canceled === 'true') {
+      console.log('❌ Checkout canceled')
+      window.history.replaceState({}, '', '/dashboard')
+    }
+  }, [])
 
   useEffect(() => {
     const getUser = async () => {
@@ -40,7 +82,7 @@ export default function DashboardPage() {
 
         setUser(user)
 
-        // Get user's company
+        // Get user's company and subscription
         const { data: userData } = await supabase
           .from('users')
           .select('company_id, companies(*)')
@@ -48,7 +90,23 @@ export default function DashboardPage() {
           .single()
 
         if (userData?.companies) {
-          setCompany(userData.companies as unknown as Company)
+          const companyData = userData.companies as unknown as Company
+          setCompany(companyData)
+          
+          // Fetch subscription data
+          const { data: subData } = await supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('company_id', companyData.id)
+            .in('status', ['trialing', 'active', 'past_due'])
+            .single()
+          
+          if (subData) {
+            setSubscription(subData as Subscription)
+          }
+          
+          // Fetch analytics data
+          fetchAnalyticsData(companyData)
         }
 
       } catch (error) {
@@ -61,10 +119,53 @@ export default function DashboardPage() {
     getUser()
   }, [router, supabase])
 
+  const fetchAnalyticsData = async (companyData: Company) => {
+    try {
+      setAnalyticsLoading(true)
+      
+      // Use posthog_client_id if available, otherwise fall back to company slug
+      const clientId = companyData.posthog_client_id || companyData.slug || `company-${companyData.id}`
+      
+      // Fetch analytics from API (7 days)
+      const response = await fetch(`/api/analytics/preview?clientId=${clientId}&dateRange=7d`)
+      
+      if (response.ok) {
+        const data = await response.json()
+        
+        setAnalyticsData({
+          totalViews: data.kpis?.traffic?.pageviews || 0,
+          activeUsers: data.kpis?.traffic?.unique_users || 0
+        })
+      }
+    } catch (error) {
+      console.error('Error fetching analytics:', error)
+    } finally {
+      setAnalyticsLoading(false)
+    }
+  }
+
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     router.push('/')
   }
+
+  const getTrialInfo = () => {
+    if (!subscription || subscription.status !== 'trialing' || !subscription.trial_end) {
+      return null
+    }
+
+    const trialEnd = new Date(subscription.trial_end)
+    const now = new Date()
+    const daysLeft = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+
+    return {
+      daysLeft,
+      trialEnd,
+      isExpiringSoon: daysLeft <= 7
+    }
+  }
+
+  const trialInfo = getTrialInfo()
 
   if (loading) {
     return (
@@ -110,6 +211,91 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Trial Status Banner */}
+      {trialInfo && (
+        <div className={`${
+          trialInfo.isExpiringSoon 
+            ? 'bg-gradient-to-r from-orange-50 to-red-50 border-orange-200' 
+            : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200'
+        } border-b`}>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                  trialInfo.isExpiringSoon ? 'bg-orange-500' : 'bg-blue-500'
+                }`}>
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className={`text-sm font-semibold ${
+                    trialInfo.isExpiringSoon ? 'text-orange-900' : 'text-blue-900'
+                  }`}>
+                    {trialInfo.isExpiringSoon ? '⚠️ Trial Ending Soon' : '🎉 You\'re on a Free Trial'}
+                  </p>
+                  <p className={`text-xs ${
+                    trialInfo.isExpiringSoon ? 'text-orange-700' : 'text-blue-700'
+                  }`}>
+                    {trialInfo.daysLeft === 0 
+                      ? 'Your trial ends today' 
+                      : trialInfo.daysLeft === 1
+                      ? 'Your trial ends tomorrow'
+                      : `${trialInfo.daysLeft} days left in your trial`
+                    } • Trial ends on {trialInfo.trialEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={() => router.push('/pricing')}
+                size="sm"
+                className={`${
+                  trialInfo.isExpiringSoon
+                    ? 'bg-orange-600 hover:bg-orange-700'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                } text-white`}
+              >
+                <Zap className="h-4 w-4 mr-1" />
+                Upgrade Now
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Message Banner */}
+      {showSuccessMessage && (
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-green-900">
+                    🎉 Payment Successful!
+                  </p>
+                  <p className="text-xs text-green-700">
+                    Your subscription is now active. Welcome aboard!
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowSuccessMessage(false)}
+                className="text-green-600 hover:text-green-800"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {!company ? (
@@ -136,7 +322,7 @@ export default function DashboardPage() {
           // Company exists - show dashboard
           <div className="space-y-8">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Analytics Dashboard</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Quick Analytics Overview</h2>
               
               {/* Quick Stats */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -146,7 +332,14 @@ export default function DashboardPage() {
                       <BarChart3 className="h-8 w-8 text-blue-600" />
                       <div className="ml-4">
                         <p className="text-sm font-medium text-gray-600">Total Views</p>
-                        <p className="text-2xl font-bold text-gray-900">-</p>
+                        <p className="text-2xl font-bold text-gray-900">
+                          {analyticsLoading ? (
+                            <span className="text-gray-400">...</span>
+                          ) : (
+                            analyticsData.totalViews.toLocaleString()
+                          )}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">Last 7 days</p>
                       </div>
                     </div>
                   </CardContent>
@@ -158,7 +351,14 @@ export default function DashboardPage() {
                       <Users className="h-8 w-8 text-green-600" />
                       <div className="ml-4">
                         <p className="text-sm font-medium text-gray-600">Active Users</p>
-                        <p className="text-2xl font-bold text-gray-900">-</p>
+                        <p className="text-2xl font-bold text-gray-900">
+                          {analyticsLoading ? (
+                            <span className="text-gray-400">...</span>
+                          ) : (
+                            analyticsData.activeUsers.toLocaleString()
+                          )}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">Last 7 days</p>
                       </div>
                     </div>
                   </CardContent>
@@ -194,22 +394,64 @@ export default function DashboardPage() {
                 <div className="lg:col-span-2">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Weekly Analytics</CardTitle>
+                      <CardTitle>AI-Powered Insights</CardTitle>
                       <CardDescription>
-                        Your analytics data will appear here once connected to PostHog
+                        Smart analytics recommendations based on your data
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="h-64 flex items-center justify-center text-gray-500">
-                        <div className="text-center">
-                          <BarChart3 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                          <p>Connect PostHog to see your analytics</p>
+                      <div className="space-y-4">
+                        {/* AI Insight Cards */}
+                        <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+                          <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                              </svg>
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-gray-900 mb-1">Getting Started</h4>
+                              <p className="text-sm text-gray-600">
+                                Your AI insights will appear here once we gather enough data. Check back after your first analytics are collected!
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg">
+                          <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-gray-900 mb-1">Ready to Explore</h4>
+                              <p className="text-sm text-gray-600">
+                                View standard web analytics and custom product funnels for detailed insights.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* CTA Button */}
+                        <div className="pt-2">
+                          <Button 
+                            variant="default" 
+                            size="lg"
+                            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                            onClick={() => router.push('/analytics')}
+                          >
+                            <BarChart3 className="mr-2 h-5 w-5" />
+                            View Standard Web Analytics
+                          </Button>
                           <Button 
                             variant="outline" 
-                            className="mt-4"
-                            onClick={() => router.push('/onboarding/posthog')}
+                            size="lg"
+                            className="w-full mt-3"
+                            onClick={() => router.push('/custom-analytics')}
                           >
-                            Connect PostHog
+                            View Custom Product Analytics
                           </Button>
                         </div>
                       </div>
@@ -234,10 +476,18 @@ export default function DashboardPage() {
                       <Button 
                         variant="outline" 
                         className="w-full justify-start"
-                        onClick={() => router.push('/onboarding/posthog')}
+                        onClick={() => router.push('/analytics')}
                       >
                         <BarChart3 className="mr-2 h-4 w-4" />
-                        Configure PostHog
+                        Standard Web Analytics
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        className="w-full justify-start"
+                        onClick={() => router.push('/custom-analytics')}
+                      >
+                        <BarChart3 className="mr-2 h-4 w-4" />
+                        Custom Product Analytics
                       </Button>
                       <Button 
                         variant="outline" 
