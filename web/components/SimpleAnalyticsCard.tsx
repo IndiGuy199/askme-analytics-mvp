@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, CartesianGrid } from 'recharts';
+import { Info } from 'lucide-react';
 
 // Chart color palette
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#84CC16', '#F97316'];
@@ -22,7 +24,6 @@ export default function SimpleAnalyticsCard({
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [geographyView, setGeographyView] = useState<'countries' | 'cities'>('countries');
-  const [funnelView, setFunnelView] = useState<'profile' | 'renewal'>('profile');
   const [trafficView, setTrafficView] = useState<'visitors' | 'pageviews'>('visitors');
   const [retentionView, setRetentionView] = useState<'daily' | 'cumulative'>('daily');
 
@@ -203,11 +204,27 @@ export default function SimpleAnalyticsCard({
     originalDevice: kpis.device?.device_mix
   });
 
+  // Metric explanations for tooltip or info
+  const metricExplanations = {
+    visitors: "Unique individuals who visited your site",
+    pageViews: "Total number of pages loaded by all visitors",
+    visits: "Number of browsing sessions. A session ends after 30 minutes of inactivity",
+    visitDuration: "Average time users spend on your site per session",
+    quickExits: "Percentage of visitors who left after viewing only one page"
+  }
+
   return (
     <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-2xl font-bold text-gray-900">Analytics Dashboard</h2>
+        <Link href="/dashboard" className="group">
+          <h2 className="text-2xl font-bold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer flex items-center gap-2 underline decoration-2 underline-offset-4 decoration-blue-400 hover:decoration-blue-600">
+            Analytics Dashboard
+            <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </h2>
+        </Link>
       </div>
 
       {/* Mini Summary - Narrative-driven insight */}
@@ -270,7 +287,18 @@ export default function SimpleAnalyticsCard({
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
         {/* Total Visitors */}
         <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-sm font-medium text-gray-500 uppercase">Visitors</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-gray-500 uppercase flex items-center gap-2">
+              Visitors
+              <div className="group relative">
+                <Info className="h-4 w-4 text-gray-400 cursor-help" />
+                <div className="absolute hidden group-hover:block bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap z-10">
+                  {metricExplanations.visitors}
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+                </div>
+              </div>
+            </h3>
+          </div>
           <p className="text-2xl font-bold text-gray-900">{kpis.traffic?.unique_users || 0}</p>
           
           {/* 🆕 Show comparison change */}
@@ -298,7 +326,18 @@ export default function SimpleAnalyticsCard({
         
         {/* Page Views */}
         <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-sm font-medium text-gray-500 uppercase">Page Views</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-gray-500 uppercase flex items-center gap-2">
+              Page Views
+              <div className="group relative">
+                <Info className="h-4 w-4 text-gray-400 cursor-help" />
+                <div className="absolute hidden group-hover:block bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap z-10">
+                  {metricExplanations.pageViews}
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+                </div>
+              </div>
+            </h3>
+          </div>
           <p className="text-2xl font-bold text-gray-900">{kpis.traffic?.pageviews || 0}</p>
           
           {/* 🆕 Show comparison change */}
@@ -326,7 +365,18 @@ export default function SimpleAnalyticsCard({
         
         {/* Visits (previously Sessions) */}
         <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-sm font-medium text-gray-500 uppercase">Visits</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-gray-500 uppercase flex items-center gap-2">
+              Visits
+              <div className="group relative">
+                <Info className="h-4 w-4 text-gray-400 cursor-help" />
+                <div className="absolute hidden group-hover:block bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap z-10">
+                  {metricExplanations.visits}
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+                </div>
+              </div>
+            </h3>
+          </div>
           <p className="text-2xl font-bold text-gray-900">{kpis.sessions || 0}</p>
           <p className="text-xs text-gray-400 mt-1">Website visits</p>
           
@@ -355,7 +405,18 @@ export default function SimpleAnalyticsCard({
         
         {/* Visit Duration (previously Session Duration) */}
         <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-sm font-medium text-gray-500 uppercase">Visit Duration</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-gray-500 uppercase flex items-center gap-2">
+              Visit Duration
+              <div className="group relative">
+                <Info className="h-4 w-4 text-gray-400 cursor-help" />
+                <div className="absolute hidden group-hover:block bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap z-10">
+                  {metricExplanations.visitDuration}
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+                </div>
+              </div>
+            </h3>
+          </div>
           <p className="text-2xl font-bold text-gray-900">
             {kpis.session_duration 
               ? `${Math.floor(kpis.session_duration / 60)}m ${Math.floor(kpis.session_duration % 60)}s`
@@ -405,7 +466,18 @@ export default function SimpleAnalyticsCard({
         
         {/* Quick Exits (previously Bounce Rate) */}
         <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-sm font-medium text-gray-500 uppercase">Quick Exits</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-gray-500 uppercase flex items-center gap-2">
+              Quick Exits
+              <div className="group relative">
+                <Info className="h-4 w-4 text-gray-400 cursor-help" />
+                <div className="absolute hidden group-hover:block bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap z-10">
+                  {metricExplanations.quickExits}
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+                </div>
+              </div>
+            </h3>
+          </div>
           <p className="text-2xl font-bold text-gray-900">
             {kpis.bounce_rate !== undefined 
               ? `${kpis.bounce_rate.toFixed(0)}%`
@@ -580,109 +652,6 @@ export default function SimpleAnalyticsCard({
                   )}
                 </AreaChart>
               </ResponsiveContainer>
-            ) : (
-              <div className="w-full h-full bg-gray-50 rounded-lg flex items-center justify-center">
-                <span className="text-gray-400 text-sm">Loading chart...</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Combined Funnel Analysis Chart with Toggle */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">
-              {funnelView === 'profile' ? 'Profile Creation Funnel' : 'Renewal Funnel'}
-            </h3>
-            <div className="flex items-center gap-4">
-              <div className="flex bg-gray-100 rounded-lg p-1">
-                <button
-                  onClick={() => setFunnelView('profile')}
-                  className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-                    funnelView === 'profile'
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  Profile
-                </button>
-                <button
-                  onClick={() => setFunnelView('renewal')}
-                  className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-                    funnelView === 'renewal'
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  Renewal
-                </button>
-              </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold text-gray-900">
-                  {funnelView === 'profile' 
-                    ? ((kpis.funnel?.conversion_rate || 0) * 100).toFixed(1)
-                    : ((kpis.renewalFunnel?.conversion_rate || 0) * 100).toFixed(1)
-                  }%
-                </div>
-                <div className="text-sm text-gray-500 font-medium">
-                  Conversion Rate
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="min-h-48 max-h-96 overflow-y-auto">
-            {mounted ? (
-              <div className="space-y-3">
-                {(() => {
-                  const currentFunnel = funnelView === 'profile' ? kpis.funnel : kpis.renewalFunnel;
-                  
-                  if (!currentFunnel?.steps || currentFunnel.steps.length === 0) {
-                    return (
-                      <div className="flex items-center justify-center h-full text-gray-500">
-                        <div className="text-center">
-                          <div className="text-lg font-medium">
-                            No {funnelView === 'profile' ? 'Profile' : 'Renewal'} Funnel Data
-                          </div>
-                          <div className="text-sm">
-                            {funnelView === 'profile' ? 'Profile creation' : 'Renewal'} funnel data not available
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-                  
-                  console.log(`🔍 ${funnelView} funnel steps data:`, currentFunnel.steps);
-                  console.log(`📊 Total ${funnelView} steps count:`, currentFunnel.steps.length);
-                  
-                  return currentFunnel.steps.map((step: any, index: number) => {
-                    const firstStepCount = currentFunnel.steps?.[0]?.count || 1;
-                    const stepConversionRate = (step.count / firstStepCount) * 100;
-                    console.log(`${funnelView} Step ${index + 1}: ${step.name} - ${step.count} users (${stepConversionRate.toFixed(1)}%)`);
-                    
-                    return (
-                      <div key={index} className="space-y-1">
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="font-medium text-gray-700 truncate pr-2" title={step.name}>
-                            {step.name || `Step ${index + 1}`}
-                          </span>
-                          <span className="font-medium whitespace-nowrap">
-                            {step.count} users ({stepConversionRate.toFixed(1)}%)
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-3">
-                          <div 
-                            className={`h-3 rounded-full transition-all duration-500 ease-out ${
-                              funnelView === 'profile' ? 'bg-blue-600' : 'bg-purple-600'
-                            }`}
-                            style={{ width: `${Math.max(stepConversionRate, 2)}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    );
-                  });
-                })()}
-              </div>
             ) : (
               <div className="w-full h-full bg-gray-50 rounded-lg flex items-center justify-center">
                 <span className="text-gray-400 text-sm">Loading chart...</span>
@@ -962,18 +931,21 @@ export default function SimpleAnalyticsCard({
           </div>
           <div className="h-48">
             {mounted ? (
-              <div className="flex gap-6">
+              <div className="flex gap-6 h-full">
                 {/* Current Period Pie Chart */}
-                <div className="flex-1">
-                  <ResponsiveContainer width="100%" height="100%">
+                <div className="flex-1 h-full">
+                  <ResponsiveContainer width="100%" height={192}>
                     <PieChart>
                       <Pie
-                        data={Object.entries(deviceMixData).map(([device, count], index) => ({
-                          name: device,
-                          value: Math.max(count as number, 0.1),
-                          actualValue: count,
-                          count: count
-                        }))}
+                        data={Object.entries(deviceMixData).map(([device, data], index) => {
+                          const deviceData = data as { count: number; percentage: number };
+                          return {
+                            name: device,
+                            value: Math.max(deviceData.percentage || 0, 0.1),
+                            count: deviceData.count || 0,
+                            percentage: deviceData.percentage || 0
+                          };
+                        })}
                         cx="50%"
                         cy="50%"
                         innerRadius={40}
@@ -987,7 +959,8 @@ export default function SimpleAnalyticsCard({
                       </Pie>
                       <Tooltip 
                         formatter={(value, name, props) => [
-                          props.payload.name === "No Data" ? "No data available" : `${props.payload.actualValue} Users`,
+                          props.payload.name === "No Data" ? "No data available" : 
+                            `${props.payload.percentage.toFixed(1)}% (${props.payload.count.toLocaleString()} Users)`,
                           'Current Period'
                         ]}
                         contentStyle={{
@@ -1003,16 +976,19 @@ export default function SimpleAnalyticsCard({
                 
                 {/* Previous Period Pie Chart (if comparison enabled) */}
                 {comparisonMode === 'previous' && Object.keys(previousDeviceMixData).length > 0 && (
-                  <div className="flex-1 opacity-60">
-                    <ResponsiveContainer width="100%" height="100%">
+                  <div className="flex-1 opacity-60 h-full">
+                    <ResponsiveContainer width="100%" height={192}>
                       <PieChart>
                         <Pie
-                          data={Object.entries(previousDeviceMixData).map(([device, count], index) => ({
-                            name: device,
-                            value: Math.max(count as number, 0.1),
-                            actualValue: count,
-                            count: count
-                          }))}
+                          data={Object.entries(previousDeviceMixData).map(([device, data], index) => {
+                            const deviceData = data as { count: number; percentage: number };
+                            return {
+                              name: device,
+                              value: Math.max(deviceData.percentage || 0, 0.1),
+                              count: deviceData.count || 0,
+                              percentage: deviceData.percentage || 0
+                            };
+                          })}
                           cx="50%"
                           cy="50%"
                           innerRadius={40}
@@ -1028,7 +1004,7 @@ export default function SimpleAnalyticsCard({
                         </Pie>
                         <Tooltip 
                           formatter={(value, name, props) => [
-                            `${props.payload.actualValue} Users`,
+                            `${props.payload.percentage.toFixed(1)}% (${props.payload.count.toLocaleString()} Users)`,
                             'Previous Period'
                           ]}
                           contentStyle={{
@@ -1052,15 +1028,19 @@ export default function SimpleAnalyticsCard({
           
           {/* Device legend with comparison */}
           <div className="mt-4 space-y-2">
-            {Object.entries(deviceMixData).map(([device, count], index) => {
-              const total = Object.values(deviceMixData).reduce((a: number, b: any) => a + (b as number), 0);
-              const percentage = total > 0 ? ((count as number) / total) * 100 : 0;
+            {Object.entries(deviceMixData).map(([device, data], index) => {
+              // Data is now an object with { count, percentage }
+              const deviceData = data as { count: number; percentage: number };
+              const count = deviceData.count || 0;
+              const percentage = deviceData.percentage || 0;
               
               // Get previous period data
-              const previousCount = previousDeviceMixData[device] || 0;
-              const previousTotal = Object.values(previousDeviceMixData).reduce((a: number, b: any) => a + (b as number), 0);
-              const previousPercentage = previousTotal > 0 ? (previousCount / previousTotal) * 100 : 0;
-              const change = previousCount > 0 ? (((count as number) - previousCount) / previousCount) * 100 : 0;
+              const previousData = previousDeviceMixData[device] as { count: number; percentage: number } || { count: 0, percentage: 0 };
+              const previousCount = previousData.count || 0;
+              const previousPercentage = previousData.percentage || 0;
+              // Calculate percentage point change (not relative change)
+              // e.g., 50% -> 60% = +10 percentage points, not +20%
+              const change = percentage - previousPercentage;
               
               return (
                 <div key={device} className="flex items-center justify-between text-sm">
@@ -1071,9 +1051,12 @@ export default function SimpleAnalyticsCard({
                     ></div>
                     <span className="text-gray-700">{device}</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-4">
                     <div className="font-medium">
-                      {device === "No Data" ? "No data" : `${count} (${percentage.toFixed(1)}%)`}
+                      {device === "No Data" ? "No data" : `${percentage.toFixed(1)}%`}
+                    </div>
+                    <div className="text-gray-500 text-xs">
+                      {count.toLocaleString()}
                     </div>
                     {comparisonMode === 'previous' && previousCount > 0 && (
                       <span className={`text-xs ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>

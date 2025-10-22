@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import SimpleAnalyticsCard from '../../components/SimpleAnalyticsCard';
+import Link from 'next/link';
 
 export default function AnalyticsPage() {
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [userCompany, setUserCompany] = useState<any>(null);
-  const [selectedDateRange, setSelectedDateRange] = useState('30d');
-  const [comparisonMode, setComparisonMode] = useState('none'); // 🆕 NEW: Comparison state
+  const [selectedDateRange, setSelectedDateRange] = useState('7d'); // 🔄 Changed: Default to 7 days
+  const [comparisonMode, setComparisonMode] = useState('none'); // No comparison by default
 
   useEffect(() => {
     setMounted(true);
@@ -38,6 +39,7 @@ export default function AnalyticsPage() {
           companies!inner (
             id,
             name,
+            slug,
             posthog_client_id,
             posthog_project_id
           )
@@ -52,10 +54,19 @@ export default function AnalyticsPage() {
       }
 
       const company = userData?.companies as any;
-      if (!company?.posthog_client_id) {
-        console.error('User company has no PostHog client ID configured');
+      
+      // With the new system, we can use the company's slug or ID as the client_id
+      // even if posthog_client_id is not explicitly configured
+      if (!company) {
+        console.error('User has no company associated');
         setLoading(false);
         return;
+      }
+
+      // Use posthog_client_id if available, otherwise fall back to company slug
+      if (!company.posthog_client_id) {
+        console.log('⚠️ No posthog_client_id configured, using company slug as client_id');
+        company.posthog_client_id = company.slug || `company-${company.id}`;
       }
 
       setUserCompany(company);
@@ -82,15 +93,15 @@ export default function AnalyticsPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center max-w-md">
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">PostHog Not Configured</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Company Not Found</h2>
           <p className="text-gray-600 mb-4">
-            Your company doesn't have PostHog analytics configured yet.
+            Your account is not associated with a company yet. Please contact support or complete onboarding.
           </p>
           <a
-            href="/onboarding/posthog"
+            href="/onboarding/company"
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
           >
-            Configure PostHog
+            Complete Onboarding
           </a>
         </div>
       </div>
@@ -103,8 +114,16 @@ export default function AnalyticsPage() {
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{userCompany.name} Analytics</h1>
-            <p className="text-sm text-gray-500">Client ID: {userCompany.posthog_client_id}</p>
+            <h1 className="text-2xl font-bold text-gray-900">Standard Web Analytics</h1>
+            <p className="text-sm text-gray-500">
+              {userCompany.name} • Client ID: {userCompany.posthog_client_id}
+            </p>
+            <Link 
+              href="/custom-analytics"
+              className="text-sm text-blue-600 hover:text-blue-800 mt-1 inline-flex items-center gap-1"
+            >
+              View Custom Product Analytics →
+            </Link>
           </div>
           
           {/* 🆕 NEW: Combined Controls */}

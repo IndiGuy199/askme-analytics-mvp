@@ -285,7 +285,7 @@ CREATE TRIGGER update_subscriptions_updated_at BEFORE UPDATE ON subscriptions FO
 CREATE OR REPLACE FUNCTION start_trial(
     p_company_id UUID,
     p_plan_id VARCHAR(50),
-    p_trial_days INTEGER DEFAULT 14
+    p_trial_days INTEGER DEFAULT 30
 )
 RETURNS UUID AS $$
 DECLARE
@@ -319,14 +319,14 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Insert three subscription plans
 INSERT INTO plans (id, name, description, price_cents, max_team_members, ai_insights, slack_integration, email_digest, priority_support, is_popular, sort_order) VALUES
-('basic', 'Basic', 'Essential analytics for growing teams', 2900, 3, true, false, true, false, false, 1),
-('premium', 'Premium', 'Advanced analytics with AI insights', 9900, 10, true, true, true, true, true, 2),
+('basic', 'Basic', 'Essential analytics for growing teams', 3900, 2, true, false, true, false, false, 1),
+('premium', 'Premium', 'Advanced analytics with AI insights', 7900, 6, true, true, true, true, true, 2),
 ('enterprise', 'Enterprise', 'Full-featured analytics for large organizations', 29900, -1, true, true, true, true, false, 3);
 
 -- Insert yearly variants (17% discount)
 INSERT INTO plans (id, name, description, price_cents, currency, interval, max_team_members, ai_insights, slack_integration, email_digest, priority_support, sort_order) VALUES
-('basic_yearly', 'Basic (Yearly)', 'Essential analytics - 2 months free', 29000, 'usd', 'year', 3, true, false, true, false, 4),
-('premium_yearly', 'Premium (Yearly)', 'Advanced analytics - 2 months free', 99000, 'usd', 'year', 10, true, true, true, true, 5),
+('basic_yearly', 'Basic (Yearly)', 'Essential analytics - 2 months free', 39000, 'usd', 'year', 2, true, false, true, false, 4),
+('premium_yearly', 'Premium (Yearly)', 'Advanced analytics - 2 months free', 79000, 'usd', 'year', 6, true, true, true, true, 5),
 ('enterprise_yearly', 'Enterprise (Yearly)', 'Full-featured analytics - 2 months free', 299000, 'usd', 'year', -1, true, true, true, true, 6);
 
 -- Company dashboard view
@@ -370,11 +370,11 @@ DECLARE
 BEGIN
     -- Create company with PostHog integration
     INSERT INTO companies (name, slug, billing_email, posthog_project_id, trial_ends_at)
-    VALUES ('AskMe AI', 'askme-ai', 'billing@askme-ai.com', 202299, CURRENT_TIMESTAMP + INTERVAL '14 days')
+    VALUES ('AskMe AI', 'askme-ai', 'billing@askme-ai.com', 202299, CURRENT_TIMESTAMP + INTERVAL '30 days')
     RETURNING id INTO askme_company_id;
     
     -- Start premium trial
-    PERFORM start_trial(askme_company_id, 'premium', 14);
+    PERFORM start_trial(askme_company_id, 'premium', 30);
     
     -- Add email recipients
     INSERT INTO email_recipients (company_id, email) VALUES

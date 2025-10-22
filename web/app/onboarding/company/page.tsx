@@ -1,7 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter }        p_company_id: companyId,
+        p_plan_id: 'premium',
+        p_trial_days: 30
+      });m 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -48,7 +51,7 @@ export default function CompanyOnboardingPage() {
           slug: formData.slug,
           domain: formData.domain || null,
           billing_email: formData.billing_email || user.email,
-          trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+          trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         })
         .select()
         .single()
@@ -119,7 +122,7 @@ export default function CompanyOnboardingPage() {
             </div>
             <CardTitle className="text-2xl">Create your company</CardTitle>
             <CardDescription>
-              Let's set up your analytics workspace. You'll get a 14-day Premium trial to explore all features.
+              Let's set up your analytics workspace. You'll get a 30-day Premium trial to explore all features.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -201,7 +204,7 @@ export default function CompanyOnboardingPage() {
               {/* Trial features preview */}
               <div className="bg-indigo-50 rounded-lg p-4">
                 <h4 className="text-sm font-medium text-indigo-900 mb-2">
-                  Your 14-day Premium trial includes:
+                  Your 30-day Premium trial includes:
                 </h4>
                 <div className="grid grid-cols-2 gap-2 text-sm text-indigo-700">
                   <div className="flex items-center">
