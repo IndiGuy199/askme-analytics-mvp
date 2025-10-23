@@ -1,14 +1,10 @@
-import dotenv from 'dotenv';
-dotenv.config(); // Add this line at the top
-
 // src/config/clients.js
 export const CLIENTS = [
   {
     // Make sure this matches your client id used by the web: <WeeklyAnalyticsCard clientId="askme-ai-app" />
     clientId: 'askme-ai-app',
     name: 'AskMe AI',
-    projectId: 202299,
-    apiKey: process.env.POSTHOG_API_KEY, // personal API key (phx_...)
+    // Note: projectId and apiKey are now fetched from the database, not hardcoded here
     queries: {
       traffic: {
         query: {
@@ -772,3 +768,16 @@ export const createQueryWithDateRange = (baseQuery, dateRange, enableComparison 
 export const getClientConfig = (clientId) => {
   return CLIENTS.find(client => client.clientId === clientId);
 };
+
+/**
+ * Check if a client has custom funnel configurations (beyond standard funnel)
+ * Returns true only for clients with renewalFunnel or other custom funnels
+ */
+export const hasCustomFunnels = (clientId) => {
+  const client = getClientConfig(clientId);
+  if (!client) return false;
+  
+  // Check if client has renewalFunnel (indicates custom funnel configuration)
+  return !!client.queries?.renewalFunnel;
+};
+

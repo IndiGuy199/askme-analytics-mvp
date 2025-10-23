@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,7 @@ import { BarChart3, ArrowRight, Eye, EyeOff, ExternalLink } from 'lucide-react'
 
 export default function PostHogOnboardingPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [formData, setFormData] = useState({
     posthog_project_id: '',
     posthog_api_key: '',
@@ -19,6 +20,8 @@ export default function PostHogOnboardingPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [companyId, setCompanyId] = useState<string | null>(null)
+  const [clientIdError, setClientIdError] = useState('')
+  const [isCheckingClientId, setIsCheckingClientId] = useState(false)
 
   useEffect(() => {
     const checkUser = async () => {
@@ -30,6 +33,29 @@ export default function PostHogOnboardingPage() {
         return
       }
 
+      // First check if company_id is in URL params (from step 1)
+      const urlCompanyId = searchParams.get('company_id')
+      if (urlCompanyId) {
+        setCompanyId(urlCompanyId)
+        
+        // Fetch existing company data to pre-fill the form
+        const { data: companyData } = await supabase
+          .from('companies')
+          .select('posthog_project_id, posthog_api_key_encrypted, posthog_client_id')
+          .eq('id', urlCompanyId)
+          .single()
+        
+        if (companyData) {
+          setFormData({
+            posthog_project_id: companyData.posthog_project_id?.toString() || '',
+            posthog_api_key: companyData.posthog_api_key_encrypted || '',
+            posthog_client_id: companyData.posthog_client_id || ''
+          })
+        }
+        return
+      }
+
+      // Otherwise fetch from database
       const { data: userData } = await supabase
         .from('users')
         .select('company_id')
@@ -42,14 +68,100 @@ export default function PostHogOnboardingPage() {
       }
 
       setCompanyId(userData.company_id)
+      
+      // Fetch existing company data to pre-fill the form
+      const { data: companyData } = await supabase
+        .from('companies')
+        .select('posthog_project_id, posthog_api_key_encrypted, posthog_client_id')
+        .eq('id', userData.company_id)
+        .single()
+      
+      if (companyData) {
+        setFormData({
+          posthog_project_id: companyData.posthog_project_id?.toString() || '',
+          posthog_api_key: companyData.posthog_api_key_encrypted || '',
+          posthog_client_id: companyData.posthog_client_id || ''
+        })
+      }
     }
 
     checkUser()
-  }, [router])
+  }, [router, searchParams])
+
+  const validateClientId = (clientId: string): boolean => {
+    // Check for spaces
+    if (/\s/.test(clientId)) {
+      setClientIdError('Client ID cannot contain spaces')
+      return false
+    }
+    
+    // Check for valid format (alphanumeric, hyphens, underscores only)
+    if (!/^[a-z0-9_-]+$/.test(clientId)) {
+      setClientIdError('Client ID can only contain lowercase letters, numbers, hyphens, and underscores')
+      return false
+    }
+    
+    // Check minimum length
+    if (clientId.length < 3) {
+      setClientIdError('Client ID must be at least 3 characters long')
+      return false
+    }
+    
+    setClientIdError('')
+    return true
+  }
+
+  const handleClientIdChange = async (value: string) => {
+    setFormData(prev => ({ ...prev, posthog_client_id: value.toLowerCase() }))
+    
+    if (!value) {
+      setClientIdError('Client ID is required')
+      return
+    }
+    
+    // Validate format first
+    if (!validateClientId(value)) {
+      return
+    }
+    
+    // Check if client ID is already taken
+    setIsCheckingClientId(true)
+    const supabase = createClient()
+    
+    const { data: existingCompany, error: checkError } = await supabase
+      .from('companies')
+      .select('id, name')
+      .eq('posthog_client_id', value.toLowerCase())
+      .neq('id', companyId || '')
+      .maybeSingle()
+    
+    setIsCheckingClientId(false)
+    
+    if (checkError) {
+      console.error('Error checking client ID:', checkError)
+      return
+    }
+    
+    if (existingCompany) {
+      setClientIdError(`This Client ID is already used by "${existingCompany.name}". Please choose a different one.`)
+    } else {
+      setClientIdError('')
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!companyId) return
+    
+    // Validate client ID before submission
+    if (!formData.posthog_client_id) {
+      setClientIdError('Client ID is required')
+      return
+    }
+    
+    if (clientIdError) {
+      return
+    }
 
     setIsLoading(true)
     setError('')
@@ -57,6 +169,10 @@ export default function PostHogOnboardingPage() {
     const supabase = createClient()
     
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Not authenticated')
+
       // Update company with PostHog details
       const { error: updateError } = await supabase
         .from('companies')
@@ -69,16 +185,29 @@ export default function PostHogOnboardingPage() {
 
       if (updateError) throw updateError
 
+      // Mark onboarding as complete and ensure company_id is set
+      const { error: userUpdateError } = await supabase
+        .from('users')
+        .update({ 
+          company_id: companyId,
+          onboarding_completed: true,
+          onboarding_step: 'completed'
+        })
+        .eq('id', user.id)
+
+      if (userUpdateError) {
+        console.warn('Failed to update user onboarding status:', userUpdateError)
+      }
+
+      // Small delay to ensure database changes propagate
+      await new Promise(resolve => setTimeout(resolve, 500))
+
       router.push('/analytics?welcome=true')
     } catch (err: any) {
       setError(err.message)
     } finally {
       setIsLoading(false)
     }
-  }
-
-  const handleSkip = () => {
-    router.push('/analytics?welcome=true')
   }
 
   return (
@@ -98,7 +227,7 @@ export default function PostHogOnboardingPage() {
               <div className="flex items-center justify-center w-8 h-8 bg-indigo-600 text-white rounded-full text-sm font-medium">
                 2
               </div>
-              <span className="ml-2 text-sm font-medium text-indigo-600">PostHog</span>
+              <span className="ml-2 text-sm font-medium text-indigo-600">Analytics</span>
             </div>
             <div className="w-16 h-px bg-gray-300"></div>
             <div className="flex items-center">
@@ -115,9 +244,9 @@ export default function PostHogOnboardingPage() {
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-indigo-100">
               <BarChart3 className="h-6 w-6 text-indigo-600" />
             </div>
-            <CardTitle className="text-2xl">Connect PostHog</CardTitle>
+            <CardTitle className="text-2xl">Connect Analytics</CardTitle>
             <CardDescription>
-              Connect your PostHog project to start receiving analytics insights and AI-powered recommendations.
+              Connect your analytics project to start receiving insights and AI-powered recommendations.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -125,67 +254,69 @@ export default function PostHogOnboardingPage() {
               <div className="space-y-4">
                 <div>
                   <label htmlFor="project_id" className="block text-sm font-medium text-gray-700 mb-2">
-                    PostHog Project ID
+                    Project ID *
                   </label>
                   <Input
                     id="project_id"
                     type="number"
                     placeholder="202299"
                     value={formData.posthog_project_id}
-                    onChange={(e) => setFormData(prev => ({ ...prev, posthog_project_id: e.target.value }))}
-                    disabled={isLoading}
+                    disabled={true}
+                    className="cursor-not-allowed bg-gray-100 text-gray-600"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Find this in your PostHog project settings
+                    This field is managed by your administrator
                   </p>
                 </div>
 
                 <div>
                   <label htmlFor="api_key" className="block text-sm font-medium text-gray-700 mb-2">
-                    PostHog Personal API Key
+                    Personal API Key *
                   </label>
                   <div className="relative">
                     <Input
                       id="api_key"
-                      type={showApiKey ? "text" : "password"}
+                      type="password"
                       placeholder="phx_..."
                       value={formData.posthog_api_key}
-                      onChange={(e) => setFormData(prev => ({ ...prev, posthog_api_key: e.target.value }))}
-                      disabled={isLoading}
-                      className="pr-10"
+                      disabled={true}
+                      autoComplete="off"
+                      className="cursor-not-allowed bg-gray-100 text-gray-600"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                    >
-                      {showApiKey ? (
-                        <EyeOff className="h-4 w-4 text-gray-400" />
-                      ) : (
-                        <Eye className="h-4 w-4 text-gray-400" />
-                      )}
-                    </button>
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    Create one in PostHog Settings → Personal API Keys
+                    This field is managed by your administrator
                   </p>
                 </div>
 
                 <div>
                   <label htmlFor="client_id" className="block text-sm font-medium text-gray-700 mb-2">
-                    Client ID (optional)
+                    Client ID *
                   </label>
                   <Input
                     id="client_id"
                     type="text"
-                    placeholder="askme-prod-v1"
+                    placeholder="my-company-prod"
                     value={formData.posthog_client_id}
-                    onChange={(e) => setFormData(prev => ({ ...prev, posthog_client_id: e.target.value }))}
+                    onChange={(e) => handleClientIdChange(e.target.value)}
                     disabled={isLoading}
+                    className={clientIdError ? 'border-red-500' : ''}
+                    required
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Leave blank if you use one PostHog project per company. Use this to filter analytics when multiple companies share the same PostHog project.
-                  </p>
+                  {isCheckingClientId && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Checking availability...
+                    </p>
+                  )}
+                  {clientIdError ? (
+                    <p className="text-xs text-red-600 mt-1">
+                      {clientIdError}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Use this to filter analytics when multiple companies share the same PostHog project. Only lowercase letters, numbers, hyphens, and underscores allowed.
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -195,41 +326,15 @@ export default function PostHogOnboardingPage() {
                 </div>
               )}
 
-              {/* Instructions */}
-              <div className="bg-blue-50 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-blue-900 mb-2">
-                  How to find your PostHog credentials:
-                </h4>
-                <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
-                  <li>Go to your PostHog dashboard</li>
-                  <li>Project ID: Settings → Project → Project ID</li>
-                  <li>API Key: Settings → Personal API Keys → Create new key</li>
-                  <li>Client ID: Use this if you share a PostHog project with other companies</li>
-                </ol>
-                <a 
-                  href="https://app.posthog.com/settings/project"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 mt-2"
-                >
-                  Open PostHog Settings
-                  <ExternalLink className="ml-1 h-3 w-3" />
-                </a>
-              </div>
-
-              <div className="flex gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleSkip}
-                  disabled={isLoading}
-                  className="w-full"
-                >
-                  Skip for now
-                </Button>
+              <div>
                 <Button
                   type="submit"
-                  disabled={isLoading || !formData.posthog_project_id || !formData.posthog_api_key}
+                  disabled={
+                    isLoading || 
+                    !formData.posthog_client_id || 
+                    !!clientIdError ||
+                    isCheckingClientId
+                  }
                   className="w-full"
                 >
                   {isLoading ? (

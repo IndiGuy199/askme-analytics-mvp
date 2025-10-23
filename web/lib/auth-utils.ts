@@ -1,21 +1,7 @@
 /**
- * Authentication utilities for the SaaS application
+ * Client-safe authentication utilities
+ * These can be imported in both client and server components
  */
-
-// Re-export client-safe utilities
-export {
-  canImpersonate,
-  isOwnerOrAdmin,
-  canManageBilling,
-  canManageTeam,
-  getRedirectUrl,
-  getAuthRedirectPath,
-  shouldShowOnboarding,
-  PROTECTED_ROUTES,
-  PUBLIC_ROUTES,
-  isProtectedRoute,
-  isPublicRoute
-} from './auth-utils'
 
 /**
  * Check if user has permission to impersonate
@@ -91,7 +77,8 @@ export const PROTECTED_ROUTES = [
   '/settings',
   '/onboarding',
   '/pricing',
-  '/invite'
+  '/invite',
+  '/admin'
 ]
 
 /**

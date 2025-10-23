@@ -1,15 +1,17 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
+import { hasCustomQueries } from '@/src/config/clients'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { BarChart3, Settings, Users, Zap, LogOut } from 'lucide-react'
+import { BarChart3, Settings, Users, Zap, LogOut, Shield } from 'lucide-react'
 
 interface User {
   id: string
   email?: string
+  is_super_admin?: boolean
   user_metadata?: {
     full_name?: string
   }
@@ -44,6 +46,8 @@ export default function DashboardPage() {
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({ totalViews: 0, activeUsers: 0 })
   const [analyticsLoading, setAnalyticsLoading] = useState(true)
   const [showSuccessMessage, setShowSuccessMessage] = useState(false)
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const [showCustomAnalyticsLink, setShowCustomAnalyticsLink] = useState(false)
   const supabase = createClient()
 
   // Handle successful checkout callback
@@ -85,13 +89,28 @@ export default function DashboardPage() {
         // Get user's company and subscription
         const { data: userData } = await supabase
           .from('users')
-          .select('company_id, companies(*)')
+          .select('company_id, is_super_admin, companies(*)')
           .eq('id', user.id)
           .single()
+
+        // Check if user is super admin
+        if (userData?.is_super_admin) {
+          setIsSuperAdmin(true)
+          
+          // If super admin has no company, redirect to admin dashboard
+          if (!userData?.company_id) {
+            router.push('/admin')
+            return
+          }
+        }
 
         if (userData?.companies) {
           const companyData = userData.companies as unknown as Company
           setCompany(companyData)
+          
+          // Check if this company has custom funnels
+          const clientId = companyData.posthog_client_id || companyData.slug || `company-${companyData.id}`;
+          setShowCustomAnalyticsLink(hasCustomQueries(clientId));
           
           // Fetch subscription data
           const { data: subData } = await supabase
@@ -194,6 +213,17 @@ export default function DashboardPage() {
             </div>
             
             <div className="flex items-center space-x-4">
+              {isSuperAdmin && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => router.push('/admin')}
+                  className="flex items-center gap-2 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700"
+                >
+                  <Shield className="h-4 w-4" />
+                  Super Admin
+                </Button>
+              )}
               <span className="text-sm text-gray-600">
                 {user?.user_metadata?.full_name || user?.email}
               </span>
@@ -445,14 +475,16 @@ export default function DashboardPage() {
                             <BarChart3 className="mr-2 h-5 w-5" />
                             View Standard Web Analytics
                           </Button>
-                          <Button 
-                            variant="outline" 
-                            size="lg"
-                            className="w-full mt-3"
-                            onClick={() => router.push('/custom-analytics')}
-                          >
-                            View Custom Product Analytics
-                          </Button>
+                          {showCustomAnalyticsLink && (
+                            <Button 
+                              variant="outline" 
+                              size="lg"
+                              className="w-full mt-3"
+                              onClick={() => router.push('/custom-analytics')}
+                            >
+                              View Custom Product Analytics
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </CardContent>
@@ -481,14 +513,16 @@ export default function DashboardPage() {
                         <BarChart3 className="mr-2 h-4 w-4" />
                         Standard Web Analytics
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        className="w-full justify-start"
-                        onClick={() => router.push('/custom-analytics')}
-                      >
-                        <BarChart3 className="mr-2 h-4 w-4" />
-                        Custom Product Analytics
-                      </Button>
+                      {showCustomAnalyticsLink && (
+                        <Button 
+                          variant="outline" 
+                          className="w-full justify-start"
+                          onClick={() => router.push('/custom-analytics')}
+                        >
+                          <BarChart3 className="mr-2 h-4 w-4" />
+                          Custom Product Analytics
+                        </Button>
+                      )}
                       <Button 
                         variant="outline" 
                         className="w-full justify-start"

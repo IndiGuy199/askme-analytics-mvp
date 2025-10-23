@@ -13,12 +13,13 @@ interface FunnelData {
 }
 
 interface FunnelChartProps {
-  clientId: string;
+  clientId?: string;
+  companyId?: string;
   dateRange: string;
   funnelType: 'profile' | 'renewal';
 }
 
-export default function FunnelChart({ clientId, dateRange, funnelType }: FunnelChartProps) {
+export default function FunnelChart({ clientId, companyId, dateRange, funnelType }: FunnelChartProps) {
   const [funnelData, setFunnelData] = useState<FunnelData | null>(null);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
@@ -30,14 +31,22 @@ export default function FunnelChart({ clientId, dateRange, funnelType }: FunnelC
   useEffect(() => {
     if (!mounted) return;
     fetchFunnelData();
-  }, [mounted, clientId, dateRange, funnelType]);
+  }, [mounted, clientId, companyId, dateRange, funnelType]);
 
   const fetchFunnelData = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `/api/analytics/preview?clientId=${encodeURIComponent(clientId)}&dateRange=${dateRange}`
-      );
+      
+      // Build query params - prefer companyId if provided (for impersonation)
+      const params = new URLSearchParams();
+      if (companyId) {
+        params.append('companyId', companyId);
+      } else if (clientId) {
+        params.append('clientId', clientId);
+      }
+      params.append('dateRange', dateRange);
+      
+      const response = await fetch(`/api/analytics/preview?${params.toString()}`);
 
       if (!response.ok) {
         throw new Error('Failed to fetch funnel data');

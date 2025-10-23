@@ -9,13 +9,15 @@ import { Info } from 'lucide-react';
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#84CC16', '#F97316'];
 
 interface SimpleAnalyticsCardProps {
-  clientId: string;
+  clientId?: string;
+  companyId?: string;
   dateRange?: string;
   comparisonMode?: string;
 }
 
 export default function SimpleAnalyticsCard({
   clientId,
+  companyId,
   dateRange = '30d',
   comparisonMode = 'none'
 }: SimpleAnalyticsCardProps) {
@@ -36,12 +38,19 @@ export default function SimpleAnalyticsCard({
       setLoading(true);
       setError(null);
 
-      // 🆕 Include comparison parameter
+      // 🆕 Use companyId if provided (for impersonation), otherwise use clientId
       const params = new URLSearchParams({
-        clientId,
         dateRange,
         compare: comparisonMode === 'previous' ? 'true' : 'false' // ✅ Convert to boolean
       });
+      
+      if (companyId) {
+        params.append('companyId', companyId);
+      } else if (clientId) {
+        params.append('clientId', clientId);
+      } else {
+        throw new Error('Either companyId or clientId is required');
+      }
 
       const response = await fetch(`/api/analytics/preview?${params}`);
       const data = await response.json();
@@ -69,7 +78,7 @@ export default function SimpleAnalyticsCard({
     if (mounted) {
       fetchAnalytics();
     }
-  }, [mounted, clientId, dateRange, comparisonMode]); // Remove funnelView from dependencies
+  }, [mounted, clientId, companyId, dateRange, comparisonMode]); // Add companyId to dependencies
 
   // Prepare chart data using the working patterns from the old code
   // Select the appropriate series based on trafficView

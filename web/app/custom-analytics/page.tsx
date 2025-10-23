@@ -2,15 +2,21 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { hasCustomQueries } from '@/src/config/clients';
 import FunnelChart from '@/components/FunnelChart';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function CustomAnalyticsPage() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [userCompany, setUserCompany] = useState<any>(null);
   const [selectedDateRange, setSelectedDateRange] = useState('7d');
   const [funnelView, setFunnelView] = useState<'profile' | 'renewal'>('profile');
+  const [isImpersonating, setIsImpersonating] = useState(false);
+  const [impersonatedCompanyName, setImpersonatedCompanyName] = useState('');
+  const [hasCustomAnalytics, setHasCustomAnalytics] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -29,32 +35,58 @@ export default function CustomAnalyticsPage() {
         return;
       }
 
-      const { data: userData, error: userDataError } = await supabase
-        .from('users')
-        .select(`
-          id,
-          company_id,
-          companies!inner (
+      // Check if super admin is impersonating
+      const impersonation = user.user_metadata?.impersonation;
+      let company = null;
+
+      if (impersonation?.target_company_id) {
+        // Super admin impersonating - fetch the target company directly
+        console.log('🎭 Super admin impersonating company:', impersonation.target_company_id);
+        
+        const { data: targetCompany, error: companyError } = await supabase
+          .from('companies')
+          .select('id, name, slug, posthog_client_id, posthog_project_id')
+          .eq('id', impersonation.target_company_id)
+          .single();
+
+        if (companyError) {
+          console.error('Error fetching target company:', companyError);
+          setLoading(false);
+          return;
+        }
+
+        company = targetCompany;
+        setIsImpersonating(true);
+        setImpersonatedCompanyName(impersonation.target_company_name || targetCompany.name);
+      } else {
+        // Regular user - fetch their company via user relationship
+        const { data: userData, error: userDataError } = await supabase
+          .from('users')
+          .select(`
             id,
-            name,
-            slug,
-            posthog_client_id,
-            posthog_project_id
-          )
-        `)
-        .eq('id', user.id)
-        .single();
+            company_id,
+            companies!inner (
+              id,
+              name,
+              slug,
+              posthog_client_id,
+              posthog_project_id
+            )
+          `)
+          .eq('id', user.id)
+          .single();
 
-      if (userDataError) {
-        console.error('Error fetching user data:', userDataError);
-        setLoading(false);
-        return;
+        if (userDataError) {
+          console.error('Error fetching user data:', userDataError);
+          setLoading(false);
+          return;
+        }
+
+        company = userData?.companies as any;
       }
-
-      const company = userData?.companies as any;
       
       if (!company) {
-        console.error('User has no company associated');
+        console.error('No company found');
         setLoading(false);
         return;
       }
@@ -64,8 +96,18 @@ export default function CustomAnalyticsPage() {
         company.posthog_client_id = company.slug || `company-${company.id}`;
       }
 
+      // Check if this company has custom funnels configured
+      const clientHasCustomFunnels = hasCustomQueries(company.posthog_client_id);
+      setHasCustomAnalytics(clientHasCustomFunnels);
+      
+      if (!clientHasCustomFunnels) {
+        console.log('⚠️ Company does not have custom funnels configured, redirecting to standard analytics');
+        router.push('/analytics');
+        return;
+      }
+
       setUserCompany(company);
-      console.log('[DEBUG] User company loaded:', userData.companies);
+      console.log('[DEBUG] User company loaded:', company);
     } catch (error) {
       console.error('Error fetching user company:', error);
     } finally {
@@ -105,6 +147,18 @@ export default function CustomAnalyticsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Impersonation Banner */}
+      {isImpersonating && (
+        <div className="bg-red-600 text-white px-6 py-3">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold">🎭 Super Admin Mode:</span>
+              <span>Viewing analytics for {impersonatedCompanyName}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -166,7 +220,8 @@ export default function CustomAnalyticsPage() {
 
           {/* Render FunnelChart Component */}
           <FunnelChart 
-            clientId={userCompany.posthog_client_id}
+            companyId={isImpersonating ? userCompany.id : undefined}
+            clientId={!isImpersonating ? userCompany.posthog_client_id : undefined}
             dateRange={selectedDateRange}
             funnelType={funnelView}
           />
