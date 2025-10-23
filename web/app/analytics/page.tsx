@@ -2,15 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { hasCustomQueries } from '@/src/config/clients';
 import SimpleAnalyticsCard from '../../components/SimpleAnalyticsCard';
 import Link from 'next/link';
+import { AlertCircle, X, Shield } from 'lucide-react';
 
 export default function AnalyticsPage() {
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [userCompany, setUserCompany] = useState<any>(null);
-  const [selectedDateRange, setSelectedDateRange] = useState('7d'); // 🔄 Changed: Default to 7 days
-  const [comparisonMode, setComparisonMode] = useState('none'); // No comparison by default
+  const [selectedDateRange, setSelectedDateRange] = useState('7d');
+  const [comparisonMode, setComparisonMode] = useState('none');
+  const [impersonationInfo, setImpersonationInfo] = useState<any>(null);
+  const [showCustomAnalyticsLink, setShowCustomAnalyticsLink] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -30,31 +34,62 @@ export default function AnalyticsPage() {
         return;
       }
 
-      // Get user's company information
-      const { data: userData, error: userDataError } = await supabase
-        .from('users')
-        .select(`
-          id,
-          company_id,
-          companies!inner (
-            id,
-            name,
-            slug,
-            posthog_client_id,
-            posthog_project_id
-          )
-        `)
-        .eq('id', user.id)
-        .single();
+      // 🆕 Check for impersonation
+      const impersonation = user.user_metadata?.impersonation;
+      
+      let company = null;
+      
+      if (impersonation?.target_company_id) {
+        // Super admin is impersonating - fetch target company directly
+        const targetCompanyId = impersonation.target_company_id;
+        
+        setImpersonationInfo({
+          isImpersonating: true,
+          targetCompanyId: impersonation.target_company_id,
+          startedAt: impersonation.started_at
+        });
 
-      if (userDataError) {
-        console.error('Error fetching user data:', userDataError);
-        setLoading(false);
-        return;
+        const { data: targetCompany, error: companyError } = await supabase
+          .from('companies')
+          .select('*')
+          .eq('id', targetCompanyId)
+          .single();
+        
+        if (companyError) {
+          console.error('Error fetching target company:', companyError);
+          setLoading(false);
+          return;
+        }
+        
+        company = targetCompany;
+      } else {
+        // Regular user - fetch their company
+        const { data: userData, error: userDataError } = await supabase
+          .from('users')
+          .select(`
+            id,
+            company_id,
+            is_super_admin,
+            companies (
+              id,
+              name,
+              slug,
+              posthog_client_id,
+              posthog_project_id
+            )
+          `)
+          .eq('id', user.id)
+          .single();
+
+        if (userDataError) {
+          console.error('Error fetching user data:', userDataError);
+          setLoading(false);
+          return;
+        }
+
+        company = userData?.companies as any;
       }
 
-      const company = userData?.companies as any;
-      
       // With the new system, we can use the company's slug or ID as the client_id
       // even if posthog_client_id is not explicitly configured
       if (!company) {
@@ -63,18 +98,37 @@ export default function AnalyticsPage() {
         return;
       }
 
-      // Use posthog_client_id if available, otherwise fall back to company slug
-      if (!company.posthog_client_id) {
-        console.log('⚠️ No posthog_client_id configured, using company slug as client_id');
-        company.posthog_client_id = company.slug || `company-${company.id}`;
-      }
+      console.log('📊 Company details:', {
+        id: company.id,
+        name: company.name,
+        slug: company.slug,
+        posthog_client_id: company.posthog_client_id,
+        isImpersonating: impersonationInfo?.isImpersonating
+      });
+
+      // Check if this company has custom funnels
+      const clientId = company.posthog_client_id || company.slug || `company-${company.id}`;
+      setShowCustomAnalyticsLink(hasCustomQueries(clientId));
 
       setUserCompany(company);
-      console.log('User company loaded:', userData.companies);
+      console.log('✅ User company loaded:', {
+        id: company.id,
+        name: company.name,
+        isImpersonating: impersonationInfo?.isImpersonating
+      });
     } catch (error) {
       console.error('Error fetching user company:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEndImpersonation = async () => {
+    try {
+      await fetch('/api/admin/impersonate', { method: 'DELETE' });
+      window.location.href = '/admin';
+    } catch (error) {
+      console.error('Error ending impersonation:', error);
     }
   };
 
@@ -110,6 +164,32 @@ export default function AnalyticsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* 🆕 Impersonation Banner */}
+      {impersonationInfo?.isImpersonating && (
+        <div className="bg-red-600 text-white px-6 py-3 sticky top-0 z-50 shadow-lg">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Shield className="h-5 w-5" />
+              <div>
+                <span className="font-semibold">
+                  Super Admin Mode: Viewing {userCompany.name} ({userCompany.slug})
+                </span>
+                <p className="text-xs opacity-90">
+                  Started at {new Date(impersonationInfo.startedAt).toLocaleTimeString()}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleEndImpersonation}
+              className="flex items-center gap-2 px-4 py-2 bg-white text-red-600 rounded-lg hover:bg-gray-100 font-medium transition-colors"
+            >
+              <X className="h-4 w-4" />
+              End Impersonation
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header with client name and controls */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -118,12 +198,14 @@ export default function AnalyticsPage() {
             <p className="text-sm text-gray-500">
               {userCompany.name} • Client ID: {userCompany.posthog_client_id}
             </p>
-            <Link 
-              href="/custom-analytics"
-              className="text-sm text-blue-600 hover:text-blue-800 mt-1 inline-flex items-center gap-1"
-            >
-              View Custom Product Analytics →
-            </Link>
+            {showCustomAnalyticsLink && (
+              <Link 
+                href="/custom-analytics"
+                className="text-sm text-blue-600 hover:text-blue-800 mt-1 inline-flex items-center gap-1"
+              >
+                View Custom Product Analytics →
+              </Link>
+            )}
           </div>
           
           {/* 🆕 NEW: Combined Controls */}
@@ -161,9 +243,10 @@ export default function AnalyticsPage() {
 
       {/* Analytics Dashboard */}
       <SimpleAnalyticsCard
-        clientId={userCompany.posthog_client_id}
+        companyId={impersonationInfo?.isImpersonating ? userCompany.id : undefined}
+        clientId={!impersonationInfo?.isImpersonating ? (userCompany.posthog_client_id || userCompany.slug) : undefined}
         dateRange={selectedDateRange}
-        comparisonMode={comparisonMode} // 🆕 Pass comparison mode
+        comparisonMode={comparisonMode}
       />
     </div>
   );

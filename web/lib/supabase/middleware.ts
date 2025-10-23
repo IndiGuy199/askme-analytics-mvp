@@ -63,8 +63,20 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  // Check if user is super admin
+  let isSuperAdmin = false
+  if (user) {
+    const { data: userData } = await supabase
+      .from('users')
+      .select('is_super_admin')
+      .eq('id', user.id)
+      .single()
+    
+    isSuperAdmin = userData?.is_super_admin === true
+  }
+
   // Protected routes that require authentication
-  const protectedPaths = ['/dashboard', '/settings', '/onboarding']
+  const protectedPaths = ['/dashboard', '/settings', '/onboarding', '/admin', '/analytics']
   const isProtectedPath = protectedPaths.some(path => 
     request.nextUrl.pathname.startsWith(path)
   )
@@ -82,14 +94,25 @@ export async function updateSession(request: NextRequest) {
 
   // If user is signed in, handle redirects based on their status
   if (user) {
-    // If accessing login page while authenticated, redirect to dashboard
+    // If accessing login page while authenticated, redirect appropriately
     if (request.nextUrl.pathname === '/login') {
+      if (isSuperAdmin) {
+        return NextResponse.redirect(new URL('/admin', request.url))
+      }
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
-    // If accessing root while authenticated, redirect to dashboard
+    // If accessing root while authenticated, redirect appropriately
     if (request.nextUrl.pathname === '/') {
+      if (isSuperAdmin) {
+        return NextResponse.redirect(new URL('/admin', request.url))
+      }
       return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+
+    // Super admins can access anything
+    if (isSuperAdmin) {
+      return response
     }
   }
 

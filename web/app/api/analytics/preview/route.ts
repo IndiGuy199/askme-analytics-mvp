@@ -1,7 +1,7 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 // Import from web/src/config/clients.js - the Next.js app configuration
-import { CLIENTS } from '@/src/config/clients.js'
+import { getClientConfig } from '@/src/config/clients.js'
 
 // Helper to convert dateRange string to PostHog format
 const getDateRangeFilter = (dateRange: string) => {
@@ -690,7 +690,15 @@ const callPostHogAPI = async (projectId: string, apiKey: string, queryName: stri
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServiceClient()
+    // Use authenticated client (not service client) - user must be authenticated
+    const supabase = await createClient()
+    
+    // Verify user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
     const { searchParams } = new URL(request.url)
     
     const companyId = searchParams.get('companyId')
@@ -701,34 +709,80 @@ export async function GET(request: NextRequest) {
 
     console.log('\n🔍 ========== ANALYTICS REQUEST START ==========');
     console.log('📋 Request Parameters:', { companyId, clientId, dateRange, compare, funnelType });
+    console.log('👤 Authenticated user:', user.email);
 
     let company
     let clientConfig = null
 
     // Find company and client configuration
     if (companyId) {
-      const { data } = await supabase
+      console.log(`🔍 Looking for company with companyId: ${companyId}`);
+      const { data, error } = await supabase
         .from('companies')
         .select('id, name, slug, posthog_project_id, posthog_api_key_encrypted, posthog_client_id')
         .eq('id', companyId)
         .single()
+      
+      if (error) {
+        console.error('❌ Database error fetching company by ID:', error);
+        return NextResponse.json({ error: 'Company not found' }, { status: 404 });
+      }
+      
       company = data
       
-      // Find client config by client ID
-      const effectiveClientId = company?.posthog_client_id || company?.slug
-      clientConfig = CLIENTS.find(c => c.clientId === effectiveClientId)
+      if (!company) {
+        console.error('❌ No company found with ID:', companyId);
+        return NextResponse.json({ error: 'Company not found' }, { status: 404 });
+      }
+      
+      console.log('✅ Company found:', {
+        id: company.id,
+        name: company.name,
+        slug: company.slug,
+        posthog_client_id: company.posthog_client_id
+      });
+      
+      // Get client config (will use standard queries if not explicitly configured)
+      // Use posthog_client_id, slug, or company ID as fallback
+      const effectiveClientId = company.posthog_client_id || company.slug || `company-${company.id}`
+      console.log('🆔 Using effectiveClientId:', effectiveClientId);
+      clientConfig = getClientConfig(effectiveClientId)
     } else if (clientId) {
       console.log(`🔍 Looking for company with clientId: ${clientId}`);
+      
+      // First, get the user's company_id from users table (respects RLS)
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('company_id')
+        .eq('id', user.id)
+        .single()
+      
+      if (userError || !userData?.company_id) {
+        console.error('❌ User has no company association:', userError);
+        return NextResponse.json({ error: 'User not associated with a company' }, { status: 403 });
+      }
+      
+      // Now fetch the company data using the user's company_id
       const { data, error } = await supabase
         .from('companies')
         .select('id, name, slug, posthog_project_id, posthog_api_key_encrypted, posthog_client_id')
-        .or(`posthog_client_id.eq.${clientId},slug.eq.${clientId}`)
+        .eq('id', userData.company_id)
         .single()
+      
+      if (error) {
+        console.error('❌ Database error:', error);
+        return NextResponse.json({ error: 'Company not found' }, { status: 404 });
+      }
+      
+      if (!data) {
+        console.log('❌ No company found with id:', userData.company_id);
+        return NextResponse.json({ error: 'Company not found' }, { status: 404 });
+      }
       
       company = data
       
-      // Find client config by client ID
-      clientConfig = CLIENTS.find(c => c.clientId === clientId)
+      // Get client config (will use standard queries if not explicitly configured)
+      clientConfig = getClientConfig(clientId)
     } else {
       return NextResponse.json({ error: 'clientId is required' }, { status: 400 })
     }
@@ -737,9 +791,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Company not found' }, { status: 404 });
     }
 
-    if (!clientConfig) {
-      return NextResponse.json({ error: `Client configuration not found for ${clientId}` }, { status: 404 });
-    }
+    // clientConfig is now always available from getClientConfig (either custom or standard queries)
 
     if (!company.posthog_project_id || !company.posthog_api_key_encrypted) {
       return NextResponse.json({ error: 'PostHog not configured for this company' }, { status: 400 })
@@ -747,12 +799,12 @@ export async function GET(request: NextRequest) {
 
     const apiKey = company.posthog_api_key_encrypted;
     const projectId = company.posthog_project_id.toString();
-    const effectiveClientId = company.posthog_client_id || company.slug;
+    const effectiveClientId = company.posthog_client_id || company.slug || `company-${company.id}`;
 
     console.log(`🏢 Company: ${company.name}`);
     console.log(`🔢 Project ID: ${projectId}`);
     console.log(`🆔 Client ID: ${effectiveClientId}`);
-    console.log(`⚙️ Using client config: ${clientConfig.name}`);
+    console.log(`⚙️ Using client config: ${clientConfig?.name || effectiveClientId}`);
 
     // Get date filter
     const dateFilter = getDateRangeFilter(dateRange);

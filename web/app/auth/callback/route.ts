@@ -13,24 +13,50 @@ export async function GET(request: NextRequest) {
     if (!error && data?.user) {
       const user = data.user
       
+      console.log('🔐 Auth callback - User authenticated:', user.email)
+      
       // Check if user exists in our users table
-      const { data: existingUser } = await supabase
+      const { data: existingUser, error: checkError } = await supabase
         .from('users')
         .select('*')
         .eq('id', user.id)
         .single()
 
+      console.log('👤 Existing user check:', { 
+        exists: !!existingUser, 
+        userId: user.id,
+        checkError: checkError?.message 
+      })
+
       if (!existingUser) {
-        // Create user record using service client
-        const serviceSupabase = createServiceClient()
-        await serviceSupabase
+        console.log('➕ Creating new user record...')
+        // Create user record using authenticated client (user is logged in now)
+        const { data: newUser, error: insertError } = await supabase
           .from('users')
           .insert({
             id: user.id,
             email: user.email!,
             name: user.user_metadata?.full_name || user.email?.split('@')[0] || null,
             role: 'owner', // First user becomes owner
+            onboarding_completed: false,
+            onboarding_step: 'company'
           })
+          .select()
+          .single()
+
+        if (insertError) {
+          console.error('❌ Failed to create user record:', {
+            error: insertError.message,
+            code: insertError.code,
+            details: insertError.details,
+            hint: insertError.hint
+          })
+          // Continue anyway - they can try again
+        } else {
+          console.log('✅ Created user record:', newUser)
+        }
+      } else {
+        console.log('✅ User already exists in database')
       }
 
       // Update last login
@@ -42,13 +68,16 @@ export async function GET(request: NextRequest) {
       // Determine redirect path
       const { data: userData } = await supabase
         .from('users')
-        .select('company_id')
+        .select('company_id, is_super_admin')
         .eq('id', user.id)
         .single()
 
       let redirectPath = next
 
-      if (!userData?.company_id) {
+      // Super admins go directly to admin dashboard
+      if (userData?.is_super_admin) {
+        redirectPath = '/admin'
+      } else if (!userData?.company_id) {
         redirectPath = '/onboarding/company'
       } else {
         // Check if company has active subscription

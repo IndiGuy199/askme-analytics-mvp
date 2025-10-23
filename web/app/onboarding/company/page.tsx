@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Building2, ArrowRight, Check } from 'lucide-react'
+import { Building2, ArrowRight, Check, AlertCircle } from 'lucide-react'
 import { generateSlug } from '@/lib/utils'
 
 export default function CompanyOnboardingPage() {
@@ -22,6 +22,10 @@ export default function CompanyOnboardingPage() {
   })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [validationErrors, setValidationErrors] = useState({
+    domain: '',
+    billing_email: ''
+  })
   
   const handleNameChange = (name: string) => {
     setFormData(prev => ({
@@ -29,6 +33,56 @@ export default function CompanyOnboardingPage() {
       name,
       slug: generateSlug(name)
     }))
+  }
+
+  const validateURL = (url: string): boolean => {
+    if (!url) return true // Optional field
+    
+    // Check if URL has protocol
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      try {
+        new URL(url)
+        return true
+      } catch {
+        return false
+      }
+    }
+    
+    // Check if it's a valid domain pattern without protocol
+    const domainPattern = /^[a-zA-Z0-9][a-zA-Z0-9-_.]*\.[a-zA-Z]{2,}$/
+    return domainPattern.test(url)
+  }
+
+  const validateEmail = (email: string): boolean => {
+    if (!email) return true // Optional field
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailPattern.test(email)
+  }
+
+  const handleDomainChange = (domain: string) => {
+    setFormData(prev => ({ ...prev, domain }))
+    
+    if (domain && !validateURL(domain)) {
+      setValidationErrors(prev => ({
+        ...prev,
+        domain: 'Please enter a valid URL (e.g., https://example.com or example.com)'
+      }))
+    } else {
+      setValidationErrors(prev => ({ ...prev, domain: '' }))
+    }
+  }
+
+  const handleEmailChange = (email: string) => {
+    setFormData(prev => ({ ...prev, billing_email: email }))
+    
+    if (email && !validateEmail(email)) {
+      setValidationErrors(prev => ({
+        ...prev,
+        billing_email: 'Please enter a valid email address'
+      }))
+    } else {
+      setValidationErrors(prev => ({ ...prev, billing_email: '' }))
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -43,13 +97,19 @@ export default function CompanyOnboardingPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
 
+      // Normalize domain - add https:// if no protocol
+      let normalizedDomain = formData.domain
+      if (normalizedDomain && !normalizedDomain.startsWith('http://') && !normalizedDomain.startsWith('https://')) {
+        normalizedDomain = `https://${normalizedDomain}`
+      }
+
       // Create company
       const { data: company, error: companyError } = await supabase
         .from('companies')
         .insert({
           name: formData.name,
           slug: formData.slug,
-          domain: formData.domain || null,
+          domain: normalizedDomain || null,
           billing_email: formData.billing_email || user.email,
           trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         })
@@ -58,12 +118,13 @@ export default function CompanyOnboardingPage() {
 
       if (companyError) throw companyError
 
-      // Update user with company_id
+      // Update user with company_id and mark progress to step 2
       const { error: userError } = await supabase
         .from('users')
         .update({ 
           company_id: company.id,
-          role: 'owner' // First user becomes owner
+          role: 'owner', // First user becomes owner
+          onboarding_step: 'analytics'
         })
         .eq('id', user.id)
 
@@ -78,7 +139,8 @@ export default function CompanyOnboardingPage() {
 
       if (trialError) throw trialError
 
-      router.push('/onboarding/posthog')
+      // Navigate to PostHog setup with company ID
+      router.push(`/onboarding/posthog?company_id=${company.id}`)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -169,12 +231,19 @@ export default function CompanyOnboardingPage() {
                   </label>
                   <Input
                     id="domain"
-                    type="url"
-                    placeholder="https://acme.com"
+                    type="text"
+                    placeholder="www.testwebsite.com"
                     value={formData.domain}
-                    onChange={(e) => setFormData(prev => ({ ...prev, domain: e.target.value }))}
+                    onChange={(e) => handleDomainChange(e.target.value)}
                     disabled={isLoading}
+                    className={validationErrors.domain ? 'border-red-500' : ''}
                   />
+                  {validationErrors.domain && (
+                    <div className="flex items-center mt-1 text-xs text-red-600">
+                      <AlertCircle className="h-3 w-3 mr-1" />
+                      {validationErrors.domain}
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -183,15 +252,23 @@ export default function CompanyOnboardingPage() {
                   </label>
                   <Input
                     id="billing_email"
-                    type="email"
-                    placeholder="billing@acme.com"
+                    type="text"
+                    placeholder="test@testwebsite.com"
                     value={formData.billing_email}
-                    onChange={(e) => setFormData(prev => ({ ...prev, billing_email: e.target.value }))}
+                    onChange={(e) => handleEmailChange(e.target.value)}
                     disabled={isLoading}
+                    className={validationErrors.billing_email ? 'border-red-500' : ''}
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Leave blank to use your login email
-                  </p>
+                  {validationErrors.billing_email ? (
+                    <div className="flex items-center mt-1 text-xs text-red-600">
+                      <AlertCircle className="h-3 w-3 mr-1" />
+                      {validationErrors.billing_email}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Leave blank to use your login email
+                    </p>
+                  )}
                 </div>
               </div>
 
