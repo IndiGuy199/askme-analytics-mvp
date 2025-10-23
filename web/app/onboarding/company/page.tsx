@@ -130,11 +130,11 @@ export default function CompanyOnboardingPage() {
 
       if (userError) throw userError
 
-      // Start Premium trial using the database function
+      // Start Basic trial using the database function
       const { error: trialError } = await supabase.rpc('start_trial', {
         p_company_id: company.id,
-        p_plan_id: 'premium',
-        p_trial_days: 14
+        p_plan_id: 'basic',
+        p_trial_days: 30
       })
 
       if (trialError) throw trialError

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { stripe } from '@/lib/stripe/config'
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 
 export async function POST(req: NextRequest) {
@@ -35,7 +35,17 @@ export async function POST(req: NextRequest) {
 
   console.log('🔔 Webhook received:', event.type)
 
-  const supabase = await createClient()
+  // Create Supabase client with service role for webhooks (bypasses RLS)
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    }
+  )
 
   try {
     switch (event.type) {
@@ -68,26 +78,32 @@ export async function POST(req: NextRequest) {
         })
 
         // Create or update subscription in database
+        // First, cancel any existing active subscriptions for this company
+        await supabase
+          .from('subscriptions')
+          .update({ 
+            status: 'canceled',
+            canceled_at: new Date().toISOString()
+          })
+          .eq('company_id', companyId)
+          .in('status', ['active', 'trialing', 'past_due'])
+
+        // Insert new subscription
         const { error } = await supabase
           .from('subscriptions')
-          .upsert(
-            {
-              company_id: companyId,
-              plan_id: planId,
-              stripe_subscription_id: subscriptionId,
-              stripe_customer_id: session.customer as string,
-              status: subscription.status,
-              current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-              current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-              trial_end: subscription.trial_end
-                ? new Date(subscription.trial_end * 1000).toISOString()
-                : null,
-              cancel_at_period_end: subscription.cancel_at_period_end,
-            },
-            {
-              onConflict: 'company_id',
-            }
-          )
+          .insert({
+            company_id: companyId,
+            plan_id: planId,
+            stripe_subscription_id: subscriptionId,
+            stripe_customer_id: session.customer as string,
+            status: subscription.status,
+            current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+            trial_end: subscription.trial_end
+              ? new Date(subscription.trial_end * 1000).toISOString()
+              : null,
+            cancel_at_period_end: subscription.cancel_at_period_end,
+          })
 
         if (error) {
           console.error('❌ Error creating subscription:', error)
@@ -117,7 +133,7 @@ export async function POST(req: NextRequest) {
 
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription
-        const companyId = subscription.metadata?.company_id
+        let companyId = subscription.metadata?.company_id
 
         console.log('🔄 Subscription updated:', {
           id: subscription.id,
@@ -128,34 +144,46 @@ export async function POST(req: NextRequest) {
 
         if (!companyId) {
           // Try to find subscription by stripe_subscription_id
-          const { data: existingSub } = await supabase
+          const { data: existingSub, error: fetchError } = await supabase
             .from('subscriptions')
             .select('company_id')
             .eq('stripe_subscription_id', subscription.id)
             .single()
 
-          if (!existingSub) {
-            console.error('❌ Could not find subscription in database')
+          if (fetchError || !existingSub) {
+            console.warn('⚠️ Subscription not found in database yet (might be created in another event):', subscription.id)
+            // Return 200 to acknowledge receipt, subscription will be created by checkout.session.completed
             break
           }
+          
+          companyId = existingSub.company_id
         }
 
         // Update subscription in database
+        const updateData: any = {
+          status: subscription.status,
+          cancel_at_period_end: subscription.cancel_at_period_end,
+        }
+
+        // Only add dates if they're valid
+        if (subscription.current_period_start) {
+          updateData.current_period_start = new Date(subscription.current_period_start * 1000).toISOString()
+        }
+        if (subscription.current_period_end) {
+          updateData.current_period_end = new Date(subscription.current_period_end * 1000).toISOString()
+        }
+        if (subscription.trial_end) {
+          updateData.trial_end = new Date(subscription.trial_end * 1000).toISOString()
+        }
+
         const { error } = await supabase
           .from('subscriptions')
-          .update({
-            status: subscription.status,
-            current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-            trial_end: subscription.trial_end
-              ? new Date(subscription.trial_end * 1000).toISOString()
-              : null,
-            cancel_at_period_end: subscription.cancel_at_period_end,
-          })
+          .update(updateData)
           .eq('stripe_subscription_id', subscription.id)
 
         if (error) {
           console.error('❌ Error updating subscription:', error)
+          throw error // This will cause 500 and retry
         } else {
           console.log('✅ Subscription updated in database:', subscription.id)
         }
@@ -188,14 +216,131 @@ export async function POST(req: NextRequest) {
         const invoice = event.data.object as Stripe.Invoice
         console.log('✅ Payment succeeded for invoice:', invoice.id)
 
+        // Get subscription details to find company_id
+        let companyId: string | null = null
+        let subscriptionDbId: string | null = null
+        
+        if (invoice.subscription) {
+          // Try to find subscription, with a retry in case it hasn't been created yet
+          let attempts = 0
+          let subData = null
+          
+          while (attempts < 3 && !subData) {
+            const { data, error } = await supabase
+              .from('subscriptions')
+              .select('id, company_id, plan_id')
+              .eq('stripe_subscription_id', invoice.subscription as string)
+              .single()
+            
+            if (data) {
+              subData = data
+            } else if (attempts < 2) {
+              console.log(`⏳ Subscription not found yet, retrying in 1 second... (attempt ${attempts + 1}/3)`)
+              await new Promise(resolve => setTimeout(resolve, 1000))
+            }
+            attempts++
+          }
+          
+          if (subData) {
+            companyId = subData.company_id
+            subscriptionDbId = subData.id
+          }
+        }
+
+        // Record payment transaction
+        if (companyId) {
+          const { error: paymentError } = await supabase
+            .from('payment_transactions')
+            .insert({
+              company_id: companyId,
+              subscription_id: subscriptionDbId,
+              stripe_payment_intent_id: invoice.payment_intent as string,
+              stripe_charge_id: invoice.charge as string,
+              stripe_invoice_id: invoice.id,
+              stripe_subscription_id: invoice.subscription as string,
+              stripe_customer_id: invoice.customer as string,
+              amount: (invoice.amount_paid / 100), // Convert cents to dollars
+              currency: invoice.currency,
+              status: 'succeeded',
+              payment_method_type: invoice.payment_intent 
+                ? (await stripe.paymentIntents.retrieve(invoice.payment_intent as string)).payment_method_types[0]
+                : 'unknown',
+              description: invoice.description || `Payment for ${invoice.period_start ? new Date(invoice.period_start * 1000).toLocaleDateString() : 'subscription'}`,
+              receipt_url: invoice.hosted_invoice_url,
+              invoice_pdf_url: invoice.invoice_pdf,
+              paid_at: new Date(invoice.status_transitions.paid_at! * 1000).toISOString(),
+              metadata: {
+                invoice_number: invoice.number,
+                billing_reason: invoice.billing_reason,
+                period_start: invoice.period_start,
+                period_end: invoice.period_end,
+              }
+            })
+
+          if (paymentError) {
+            console.error('❌ Error recording payment transaction:', paymentError)
+          } else {
+            console.log('✅ Payment transaction recorded:', invoice.id)
+          }
+        } else {
+          console.warn('⚠️ Could not find company_id for invoice after 3 attempts:', invoice.id)
+        }
+
         // Optional: Send payment confirmation email
-        // Optional: Log payment in separate payments table
         break
       }
 
       case 'invoice.payment_failed': {
         const invoice = event.data.object as Stripe.Invoice
         console.error('❌ Payment failed for invoice:', invoice.id)
+
+        // Get subscription details to find company_id
+        let companyId: string | null = null
+        let subscriptionDbId: string | null = null
+        
+        if (invoice.subscription) {
+          const { data: subData } = await supabase
+            .from('subscriptions')
+            .select('id, company_id')
+            .eq('stripe_subscription_id', invoice.subscription as string)
+            .single()
+          
+          if (subData) {
+            companyId = subData.company_id
+            subscriptionDbId = subData.id
+          }
+        }
+
+        // Record failed payment transaction
+        if (companyId) {
+          const { error: paymentError } = await supabase
+            .from('payment_transactions')
+            .insert({
+              company_id: companyId,
+              subscription_id: subscriptionDbId,
+              stripe_payment_intent_id: invoice.payment_intent as string,
+              stripe_invoice_id: invoice.id,
+              stripe_subscription_id: invoice.subscription as string,
+              stripe_customer_id: invoice.customer as string,
+              amount: (invoice.amount_due / 100), // Convert cents to dollars
+              currency: invoice.currency,
+              status: 'failed',
+              description: `Failed payment for ${invoice.description || 'subscription'}`,
+              failed_at: new Date().toISOString(),
+              metadata: {
+                invoice_number: invoice.number,
+                billing_reason: invoice.billing_reason,
+                attempt_count: invoice.attempt_count,
+                last_finalization_error: invoice.last_finalization_error,
+              }
+            })
+
+          if (paymentError) {
+            console.error('❌ Error recording failed payment:', paymentError)
+          } else {
+            console.log('✅ Failed payment recorded:', invoice.id)
+          }
+        }
 
         // Update subscription status to past_due
         if (invoice.subscription) {
@@ -220,6 +365,34 @@ export async function POST(req: NextRequest) {
         console.log('⏰ Trial ending soon for subscription:', subscription.id)
 
         // Optional: Send trial ending reminder email
+        break
+      }
+
+      case 'charge.refunded': {
+        const charge = event.data.object as Stripe.Charge
+        console.log('💰 Charge refunded:', charge.id)
+
+        // Update payment transaction to refunded status
+        const { error } = await supabase
+          .from('payment_transactions')
+          .update({
+            status: 'refunded',
+            refunded_at: new Date().toISOString(),
+            metadata: supabase.raw(`
+              COALESCE(metadata, '{}'::jsonb) || 
+              jsonb_build_object(
+                'refund_amount', ${charge.amount_refunded / 100},
+                'refund_reason', '${charge.refunds?.data[0]?.reason || 'unknown'}'
+              )
+            `)
+          })
+          .eq('stripe_charge_id', charge.id)
+
+        if (error) {
+          console.error('❌ Error updating refunded payment:', error)
+        } else {
+          console.log('✅ Payment marked as refunded:', charge.id)
+        }
         break
       }
 

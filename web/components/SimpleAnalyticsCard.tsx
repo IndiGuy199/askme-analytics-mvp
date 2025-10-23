@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, CartesianGrid } from 'recharts';
 import { Info } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
 // Chart color palette
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#84CC16', '#F97316'];
@@ -13,18 +14,20 @@ interface SimpleAnalyticsCardProps {
   companyId?: string;
   dateRange?: string;
   comparisonMode?: string;
+  onError?: (message: string) => void;
 }
 
 export default function SimpleAnalyticsCard({
   clientId,
   companyId,
   dateRange = '30d',
-  comparisonMode = 'none'
+  comparisonMode = 'none',
+  onError
 }: SimpleAnalyticsCardProps) {
-  const [kpis, setKpis] = useState<any>(null);
+  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
+  const [kpis, setKpis] = useState<any>(null);
   const [geographyView, setGeographyView] = useState<'countries' | 'cities'>('countries');
   const [trafficView, setTrafficView] = useState<'visitors' | 'pageviews'>('visitors');
   const [retentionView, setRetentionView] = useState<'daily' | 'cumulative'>('daily');
@@ -38,10 +41,9 @@ export default function SimpleAnalyticsCard({
       setLoading(true);
       setError(null);
 
-      // 🆕 Use companyId if provided (for impersonation), otherwise use clientId
       const params = new URLSearchParams({
         dateRange,
-        compare: comparisonMode === 'previous' ? 'true' : 'false' // ✅ Convert to boolean
+        compare: comparisonMode === 'previous' ? 'true' : 'false'
       });
       
       if (companyId) {
@@ -58,17 +60,28 @@ export default function SimpleAnalyticsCard({
       console.log('Simple Analytics API response:', data);
 
       if (!response.ok) {
+        // Check for specific PostHog configuration error
+        if (data.error === 'PostHog not configured for this company') {
+          const friendlyMessage = 'Analytics are not configured yet. Please contact us to start the process if you have not done so.';
+          setError(friendlyMessage);
+          if (onError) onError(friendlyMessage);
+          return;
+        }
+        
         throw new Error(data.error || 'Failed to fetch analytics');
       }
 
       if (data.success) {
         setKpis(data.kpis);
+        setError(null);
       } else {
         throw new Error(data.error || 'Failed to fetch analytics');
       }
     } catch (err) {
       console.error('Analytics fetch error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch analytics');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch analytics';
+      setError(errorMessage);
+      if (onError) onError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -78,7 +91,7 @@ export default function SimpleAnalyticsCard({
     if (mounted) {
       fetchAnalytics();
     }
-  }, [mounted, clientId, companyId, dateRange, comparisonMode]); // Add companyId to dependencies
+  }, [mounted, clientId, companyId, dateRange, comparisonMode]);
 
   // Prepare chart data using the working patterns from the old code
   // Select the appropriate series based on trafficView
@@ -139,19 +152,10 @@ export default function SimpleAnalyticsCard({
 
   if (loading) {
     return (
-      <div className="w-full max-w-7xl mx-auto p-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="h-32 bg-gray-200 rounded"></div>
-            ))}
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {[1, 2, 3, 4, 5, 6].map(i => (
-              <div key={i} className="h-64 bg-gray-200 rounded"></div>
-            ))}
-          </div>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading analytics...</p>
         </div>
       </div>
     );
@@ -159,16 +163,21 @@ export default function SimpleAnalyticsCard({
 
   if (error) {
     return (
-      <div className="w-full max-w-7xl mx-auto p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <h3 className="text-red-800 font-semibold">Error loading analytics</h3>
-          <p className="text-red-600 text-sm mt-1">{error}</p>
-          <button 
-            onClick={fetchAnalytics}
-            className="mt-3 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+      <div className="flex items-center justify-center min-h-[400px] px-6">
+        <div className="text-center max-w-md">
+          <div className="mx-auto w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
+            <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">Analytics Not Configured</h3>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <Link
+            href="/contact"
+            className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-colors"
           >
-            Retry
-          </button>
+            Contact Us to Get Started
+          </Link>
         </div>
       </div>
     );

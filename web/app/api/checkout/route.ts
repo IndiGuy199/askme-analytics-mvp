@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
     })
 
     // Create Checkout Session
-    const session = await stripe.checkout.sessions.create({
+    const sessionConfig: any = {
       customer: customerId,
       mode: 'subscription',
       payment_method_types: ['card'],
@@ -98,25 +98,6 @@ export async function POST(req: NextRequest) {
           quantity: 1,
         },
       ],
-      subscription_data: isTrialing
-        ? {
-            // Converting trial to paid - no new trial
-            trial_period_days: 0,
-            metadata: {
-              company_id: companyId,
-              plan_id: planId,
-              converted_from_trial: 'true',
-            },
-          }
-        : {
-            // New subscription with 30-day trial
-            trial_period_days: 30,
-            metadata: {
-              company_id: companyId,
-              plan_id: planId,
-              new_trial: 'true',
-            },
-          },
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?session_id={CHECKOUT_SESSION_ID}&success=true`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing?canceled=true`,
       metadata: {
@@ -126,10 +107,35 @@ export async function POST(req: NextRequest) {
       },
       allow_promotion_codes: true,
       billing_address_collection: 'auto',
-      automatic_tax: {
-        enabled: true,
-      },
-    })
+      // Disable automatic tax for sandbox testing
+      // automatic_tax: {
+      //   enabled: true,
+      // },
+    }
+
+    // Add subscription data based on trial status
+    if (isTrialing) {
+      // User is already trialing - convert to paid subscription (no trial)
+      sessionConfig.subscription_data = {
+        metadata: {
+          company_id: companyId,
+          plan_id: planId,
+          converted_from_trial: 'true',
+        },
+      }
+    } else {
+      // New subscription - give 30-day trial
+      sessionConfig.subscription_data = {
+        trial_period_days: 30,
+        metadata: {
+          company_id: companyId,
+          plan_id: planId,
+          new_trial: 'true',
+        },
+      }
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionConfig)
 
     console.log('✅ Created checkout session:', session.id)
 
