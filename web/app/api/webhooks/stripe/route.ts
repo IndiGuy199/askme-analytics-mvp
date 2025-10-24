@@ -461,19 +461,27 @@ export async function POST(req: NextRequest) {
         const charge = event.data.object as Stripe.Charge
         console.log('💰 Charge refunded:', charge.id)
 
+        // First, fetch the current metadata
+        const { data: currentTx } = await supabase
+          .from('payment_transactions')
+          .select('metadata')
+          .eq('stripe_charge_id', charge.id)
+          .single()
+
+        // Merge with refund info
+        const updatedMetadata = {
+          ...(currentTx?.metadata || {}),
+          refund_amount: charge.amount_refunded / 100,
+          refund_reason: charge.refunds?.data[0]?.reason || 'unknown'
+        }
+
         // Update payment transaction to refunded status
         const { error } = await supabase
           .from('payment_transactions')
           .update({
             status: 'refunded',
             refunded_at: new Date().toISOString(),
-            metadata: supabase.raw(`
-              COALESCE(metadata, '{}'::jsonb) || 
-              jsonb_build_object(
-                'refund_amount', ${charge.amount_refunded / 100},
-                'refund_reason', '${charge.refunds?.data[0]?.reason || 'unknown'}'
-              )
-            `)
+            metadata: updatedMetadata
           })
           .eq('stripe_charge_id', charge.id)
 

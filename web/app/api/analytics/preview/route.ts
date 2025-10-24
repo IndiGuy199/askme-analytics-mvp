@@ -712,7 +712,7 @@ export async function GET(request: NextRequest) {
     console.log('👤 Authenticated user:', user.email);
 
     let company
-    let clientConfig = null
+    let clientConfig: any = null
 
     // Find company and client configuration
     if (companyId) {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { BarChart3, ArrowRight, Eye, EyeOff, ExternalLink } from 'lucide-react'
 
-export default function PostHogOnboardingPage() {
+function PostHogOnboardingContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [formData, setFormData] = useState({
@@ -34,7 +34,7 @@ export default function PostHogOnboardingPage() {
       }
 
       // First check if company_id is in URL params (from step 1)
-      const urlCompanyId = searchParams.get('company_id')
+      const urlCompanyId = searchParams?.get('company_id')
       if (urlCompanyId) {
         setCompanyId(urlCompanyId)
         
@@ -355,5 +355,13 @@ export default function PostHogOnboardingPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function PostHogOnboardingPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <PostHogOnboardingContent />
+    </Suspense>
   )
 }

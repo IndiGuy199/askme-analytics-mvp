@@ -24,10 +24,7 @@ export default function CompanyOnboardingPage() {
   })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-  const [validationErrors, setValidationErrors] = useState({
-    domain: '',
-    billing_email: ''
-  })
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   
   const handleNameChange = (name: string) => {
     setFormData(prev => ({
@@ -126,7 +123,7 @@ export default function CompanyOnboardingPage() {
       errors.traffic_sources = 'At least one traffic source is required'
     }
     
-    if (formData.domain && !validateDomain(formData.domain)) {
+    if (formData.domain && !validateURL(formData.domain)) {
       errors.domain = 'Please enter a valid domain (e.g., example.com)'
     }
     
