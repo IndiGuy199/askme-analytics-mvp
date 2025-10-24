@@ -106,6 +106,17 @@ export default function SimpleAnalyticsCard({
 
       if (!isBackground) {
         console.log('Simple Analytics API response:', data);
+        // 🆕 Log comparison data explicitly
+        if (comparisonMode === 'previous' && data.kpis) {
+          console.log('🔍 Comparison Data Check:', {
+            has_traffic_previous: !!data.kpis.traffic?.previous_unique_users,
+            previous_unique_users: data.kpis.traffic?.previous_unique_users,
+            previous_pageviews: data.kpis.traffic?.previous_pageviews,
+            previous_sessions: data.kpis.previous_sessions,
+            previous_session_duration: data.kpis.previous_session_duration,
+            previous_bounce_rate: data.kpis.previous_bounce_rate
+          });
+        }
       }
 
       if (!response.ok) {
@@ -287,7 +298,7 @@ export default function SimpleAnalyticsCard({
   }
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
+    <div className="w-full max-w-7xl mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
       {/* Cache Indicator */}
       {isCacheHit && (
         <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2 flex items-center gap-2">
@@ -312,16 +323,16 @@ export default function SimpleAnalyticsCard({
       </div>
 
       {/* Mini Summary - Narrative-driven insight */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 shadow-sm">
-        <div className="flex items-start gap-3">
-          <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 sm:p-6 shadow-sm">
+        <div className="flex items-start gap-2 sm:gap-3">
+          <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-blue-500 rounded-full flex items-center justify-center">
+            <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Your Summary</h3>
-            <p className="text-gray-700 leading-relaxed">
+          <div className="flex-1 min-w-0">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Your Summary</h3>
+            <p className="text-sm sm:text-base text-gray-700 leading-relaxed break-words">
               {(() => {
                 const visitors = kpis.traffic?.unique_users || 0;
                 const pageviews = kpis.traffic?.pageviews || 0;
@@ -368,26 +379,26 @@ export default function SimpleAnalyticsCard({
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6 mb-6 sm:mb-8">
         {/* Total Visitors */}
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-gray-500 uppercase flex items-center gap-2">
-              Visitors
-              <div className="group relative">
-                <Info className="h-4 w-4 text-gray-400 cursor-help" />
-                <div className="absolute hidden group-hover:block bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap z-10">
+            <h3 className="text-xs sm:text-sm font-medium text-gray-500 uppercase flex items-center gap-1 sm:gap-2 truncate">
+              <span className="truncate">Visitors</span>
+              <div className="group relative flex-shrink-0">
+                <Info className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 cursor-help" />
+                <div className="absolute hidden group-hover:block bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 sm:px-3 py-1 sm:py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap z-10 max-w-xs">
                   {metricExplanations.visitors}
                   <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
                 </div>
               </div>
             </h3>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{kpis.traffic?.unique_users || 0}</p>
+          <p className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{kpis.traffic?.unique_users || 0}</p>
           
           {/* 🆕 Show comparison change */}
           {comparisonMode === 'previous' && kpis.traffic?.previous_unique_users !== undefined && (
-            <p className="text-sm mt-1">
+            <p className="text-xs sm:text-sm mt-1">
               {(() => {
                 const current = kpis.traffic.unique_users || 0;
                 const previous = kpis.traffic.previous_unique_users;
@@ -409,24 +420,24 @@ export default function SimpleAnalyticsCard({
         </div>
         
         {/* Page Views */}
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-gray-500 uppercase flex items-center gap-2">
-              Page Views
-              <div className="group relative">
-                <Info className="h-4 w-4 text-gray-400 cursor-help" />
-                <div className="absolute hidden group-hover:block bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap z-10">
+            <h3 className="text-xs sm:text-sm font-medium text-gray-500 uppercase flex items-center gap-1 sm:gap-2 truncate">
+              <span className="truncate">Page Views</span>
+              <div className="group relative flex-shrink-0">
+                <Info className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 cursor-help" />
+                <div className="absolute hidden group-hover:block bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 sm:px-3 py-1 sm:py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap z-10 max-w-xs">
                   {metricExplanations.pageViews}
                   <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
                 </div>
               </div>
             </h3>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{kpis.traffic?.pageviews || 0}</p>
+          <p className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{kpis.traffic?.pageviews || 0}</p>
           
           {/* 🆕 Show comparison change */}
           {comparisonMode === 'previous' && kpis.traffic?.previous_pageviews !== undefined && (
-            <p className="text-sm mt-1">
+            <p className="text-xs sm:text-sm mt-1">
               {(() => {
                 const current = kpis.traffic.pageviews || 0;
                 const previous = kpis.traffic.previous_pageviews;
@@ -448,25 +459,25 @@ export default function SimpleAnalyticsCard({
         </div>
         
         {/* Visits (previously Sessions) */}
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-gray-500 uppercase flex items-center gap-2">
-              Visits
-              <div className="group relative">
-                <Info className="h-4 w-4 text-gray-400 cursor-help" />
-                <div className="absolute hidden group-hover:block bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap z-10">
+            <h3 className="text-xs sm:text-sm font-medium text-gray-500 uppercase flex items-center gap-1 sm:gap-2 truncate">
+              <span className="truncate">Visits</span>
+              <div className="group relative flex-shrink-0">
+                <Info className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 cursor-help" />
+                <div className="absolute hidden group-hover:block bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 sm:px-3 py-1 sm:py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap z-10 max-w-xs">
                   {metricExplanations.visits}
                   <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
                 </div>
               </div>
             </h3>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{kpis.sessions || 0}</p>
+          <p className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{kpis.sessions || 0}</p>
           <p className="text-xs text-gray-400 mt-1">Website visits</p>
           
           {/* 🆕 Show comparison change */}
           {comparisonMode === 'previous' && kpis.previous_sessions !== undefined && (
-            <p className="text-sm mt-1">
+            <p className="text-xs sm:text-sm mt-1">
               {(() => {
                 const current = kpis.sessions || 0;
                 const previous = kpis.previous_sessions;
@@ -488,20 +499,20 @@ export default function SimpleAnalyticsCard({
         </div>
         
         {/* Visit Duration (previously Session Duration) */}
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-gray-500 uppercase flex items-center gap-2">
-              Visit Duration
-              <div className="group relative">
-                <Info className="h-4 w-4 text-gray-400 cursor-help" />
-                <div className="absolute hidden group-hover:block bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap z-10">
+            <h3 className="text-xs sm:text-sm font-medium text-gray-500 uppercase flex items-center gap-1 sm:gap-2 truncate">
+              <span className="truncate">Visit Duration</span>
+              <div className="group relative flex-shrink-0">
+                <Info className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 cursor-help" />
+                <div className="absolute hidden group-hover:block bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 sm:px-3 py-1 sm:py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap z-10 max-w-xs">
                   {metricExplanations.visitDuration}
                   <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
                 </div>
               </div>
             </h3>
           </div>
-          <p className="text-2xl font-bold text-gray-900">
+          <p className="text-xl sm:text-2xl font-bold text-gray-900 truncate">
             {kpis.session_duration 
               ? `${Math.floor(kpis.session_duration / 60)}m ${Math.floor(kpis.session_duration % 60)}s`
               : '0m 0s'
@@ -520,7 +531,7 @@ export default function SimpleAnalyticsCard({
           
           {/* 🆕 Show comparison change */}
           {comparisonMode === 'previous' && kpis.previous_session_duration !== undefined && (
-            <p className="text-sm mt-1">
+            <p className="text-xs sm:text-sm mt-1">
               {(() => {
                 const current = kpis.session_duration || 0;
                 const previous = kpis.previous_session_duration;
@@ -549,20 +560,20 @@ export default function SimpleAnalyticsCard({
         </div>
         
         {/* Quick Exits (previously Bounce Rate) */}
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-gray-500 uppercase flex items-center gap-2">
-              Quick Exits
-              <div className="group relative">
-                <Info className="h-4 w-4 text-gray-400 cursor-help" />
-                <div className="absolute hidden group-hover:block bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap z-10">
+            <h3 className="text-xs sm:text-sm font-medium text-gray-500 uppercase flex items-center gap-1 sm:gap-2 truncate">
+              <span className="truncate">Quick Exits</span>
+              <div className="group relative flex-shrink-0">
+                <Info className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 cursor-help" />
+                <div className="absolute hidden group-hover:block bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 sm:px-3 py-1 sm:py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap z-10 max-w-xs">
                   {metricExplanations.quickExits}
                   <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
                 </div>
               </div>
             </h3>
           </div>
-          <p className="text-2xl font-bold text-gray-900">
+          <p className="text-xl sm:text-2xl font-bold text-gray-900 truncate">
             {kpis.bounce_rate !== undefined 
               ? `${kpis.bounce_rate.toFixed(0)}%`
               : '-'
@@ -581,7 +592,7 @@ export default function SimpleAnalyticsCard({
           
           {/* 🆕 Show comparison change */}
           {comparisonMode === 'previous' && kpis.previous_bounce_rate !== undefined && (
-            <p className="text-sm mt-1">
+            <p className="text-xs sm:text-sm mt-1">
               {(() => {
                 const current = kpis.bounce_rate || 0;
                 const previous = kpis.previous_bounce_rate;
@@ -605,17 +616,17 @@ export default function SimpleAnalyticsCard({
       </div>
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         
         {/* Traffic Chart - Using the working pattern */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Traffic Overview</h3>
-            <div className="flex items-center gap-4">
-              <div className="flex bg-gray-100 rounded-lg p-1">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900">Traffic Overview</h3>
+            <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
+              <div className="flex bg-gray-100 rounded-lg p-0.5 sm:p-1 flex-1 sm:flex-none">
                 <button
                   onClick={() => setTrafficView('visitors')}
-                  className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                  className={`px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium rounded-md transition-colors flex-1 sm:flex-none ${
                     trafficView === 'visitors'
                       ? 'bg-white text-gray-900 shadow-sm'
                       : 'text-gray-500 hover:text-gray-700'
@@ -625,7 +636,7 @@ export default function SimpleAnalyticsCard({
                 </button>
                 <button
                   onClick={() => setTrafficView('pageviews')}
-                  className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                  className={`px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium rounded-md transition-colors flex-1 sm:flex-none ${
                     trafficView === 'pageviews'
                       ? 'bg-white text-gray-900 shadow-sm'
                       : 'text-gray-500 hover:text-gray-700'

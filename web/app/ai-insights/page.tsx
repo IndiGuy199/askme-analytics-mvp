@@ -431,29 +431,36 @@ export default function AIInsightsPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="outline" size="sm" onClick={() => router.push('/dashboard')}>
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6">
+          {/* Mobile: Stack vertically, Desktop: Side by side */}
+          <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+            <div className="flex flex-col space-y-3 sm:flex-row sm:items-start sm:space-y-0 sm:gap-4">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => router.push('/dashboard')}
+                className="self-start sm:self-auto"
+              >
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Dashboard
+                <span className="text-xs sm:text-sm">Back</span>
               </Button>
-              <div>
-                <div className="flex items-center gap-3">
-                  <Brain className="h-8 w-8 text-purple-600" />
-                  <h1 className="text-2xl font-bold text-gray-900">AI-Powered Insights</h1>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <Brain className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600 flex-shrink-0" />
+                  <h1 className="text-lg sm:text-2xl font-bold text-gray-900 truncate">AI-Powered Insights</h1>
                 </div>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-xs sm:text-sm text-gray-500 mt-1">
                   Actionable recommendations with industry benchmarks
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
+            {/* Controls: Stack on mobile, side by side on desktop */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
               <select
                 value={selectedDateRange}
                 onChange={(e) => setSelectedDateRange(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="px-2 sm:px-3 py-2 border border-gray-300 rounded-md bg-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
               >
                 <option value="7d">Last 7 days</option>
                 <option value="30d">Last 30 days</option>
@@ -463,17 +470,18 @@ export default function AIInsightsPage() {
               <Button
                 onClick={generateNewInsights}
                 disabled={generating || !kpis}
-                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
+                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-xs sm:text-sm px-3 sm:px-4 py-2"
               >
                 {generating ? (
                   <>
-                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                    Generating...
+                    <RefreshCw className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                    <span className="text-xs sm:text-sm">Generating...</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Generate New Insights
+                    <Sparkles className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                    <span className="text-xs sm:text-sm hidden sm:inline">Generate New Insights</span>
+                    <span className="text-xs sm:text-sm sm:hidden">Generate</span>
                   </>
                 )}
               </Button>
@@ -483,20 +491,20 @@ export default function AIInsightsPage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-8">
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-medium text-red-900">Error</p>
-              <p className="text-sm text-red-700">{error}</p>
+          <div className="mb-4 sm:mb-6 bg-red-50 border border-red-200 rounded-lg p-3 sm:p-4 flex items-start gap-2 sm:gap-3">
+            <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-red-900">Error</p>
+              <p className="text-xs sm:text-sm text-red-700 break-words">{error}</p>
             </div>
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
           {/* Latest Insight - Main Column */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
             {normalizedInsight ? (
               <>
                 {/* Headline Card */}

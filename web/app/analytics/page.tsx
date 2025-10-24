@@ -166,76 +166,83 @@ export default function AnalyticsPage() {
     <div className="min-h-screen bg-gray-50">
       {/* 🆕 Impersonation Banner */}
       {impersonationInfo?.isImpersonating && (
-        <div className="bg-red-600 text-white px-6 py-3 sticky top-0 z-50 shadow-lg">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Shield className="h-5 w-5" />
-              <div>
-                <span className="font-semibold">
-                  Super Admin Mode: Viewing {userCompany.name} ({userCompany.slug})
-                </span>
-                <p className="text-xs opacity-90">
-                  Started at {new Date(impersonationInfo.startedAt).toLocaleTimeString()}
-                </p>
+        <div className="bg-red-600 text-white px-4 sm:px-6 py-3 sticky top-0 z-50 shadow-lg">
+          <div className="max-w-7xl mx-auto">
+            {/* Mobile: Stack vertically, Desktop: Side by side */}
+            <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+              <div className="flex items-start sm:items-center gap-2 sm:gap-3">
+                <Shield className="h-5 w-5 flex-shrink-0 mt-0.5 sm:mt-0" />
+                <div className="flex-1 min-w-0">
+                  <span className="font-semibold block sm:inline truncate">
+                    Super Admin Mode: Viewing {userCompany.name}
+                  </span>
+                  <span className="text-sm sm:text-base block sm:inline truncate"> ({userCompany.slug})</span>
+                  <p className="text-xs opacity-90 mt-0.5 sm:mt-0 sm:ml-2 sm:inline-block">
+                    Started {new Date(impersonationInfo.startedAt).toLocaleTimeString()}
+                  </p>
+                </div>
               </div>
+              <button
+                onClick={handleEndImpersonation}
+                className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-white text-red-600 rounded-lg hover:bg-gray-100 font-medium transition-colors text-sm whitespace-nowrap w-full sm:w-auto"
+              >
+                <X className="h-4 w-4" />
+                <span>End Impersonation</span>
+              </button>
             </div>
-            <button
-              onClick={handleEndImpersonation}
-              className="flex items-center gap-2 px-4 py-2 bg-white text-red-600 rounded-lg hover:bg-gray-100 font-medium transition-colors"
-            >
-              <X className="h-4 w-4" />
-              End Impersonation
-            </button>
           </div>
         </div>
       )}
 
       {/* Header with client name and controls */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Standard Web Analytics</h1>
-            <p className="text-sm text-gray-500">
-              {userCompany.name} • Client ID: {userCompany.posthog_client_id}
-            </p>
-            {showCustomAnalyticsLink && (
-              <Link 
-                href="/custom-analytics"
-                className="text-sm text-blue-600 hover:text-blue-800 mt-1 inline-flex items-center gap-1"
-              >
-                View Custom Product Analytics →
-              </Link>
-            )}
-          </div>
-          
-          {/* 🆕 NEW: Combined Controls */}
-          <div className="flex items-center gap-4">
-            {/* Date Range Selector */}
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700">Date Range:</label>
-              <select
-                value={selectedDateRange}
-                onChange={(e) => setSelectedDateRange(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="24h">Last 24 hours</option>
-                <option value="7d">Last 7 days</option>
-                <option value="30d">Last 30 days</option>
-                <option value="90d">Last 90 days</option>
-              </select>
+      <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4">
+        <div className="max-w-7xl mx-auto">
+          {/* Mobile: Stack vertically, Desktop: Side by side */}
+          <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">Standard Web Analytics</h1>
+              <p className="text-xs sm:text-sm text-gray-500 mt-1 truncate">
+                {userCompany.name} • Client ID: {userCompany.posthog_client_id}
+              </p>
+              {showCustomAnalyticsLink && (
+                <Link 
+                  href="/custom-analytics"
+                  className="text-xs sm:text-sm text-blue-600 hover:text-blue-800 mt-1 inline-flex items-center gap-1"
+                >
+                  View Custom Product Analytics →
+                </Link>
+              )}
             </div>
+            
+            {/* Controls: Stack on mobile, side by side on tablet+ */}
+            <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:gap-3 sm:space-y-0 lg:gap-4">
+              {/* Date Range Selector */}
+              <div className="flex items-center gap-2">
+                <label className="text-xs sm:text-sm font-medium text-gray-700 whitespace-nowrap">Date Range:</label>
+                <select
+                  value={selectedDateRange}
+                  onChange={(e) => setSelectedDateRange(e.target.value)}
+                  className="flex-1 sm:flex-none px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-md bg-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="24h">Last 24 hours</option>
+                  <option value="7d">Last 7 days</option>
+                  <option value="30d">Last 30 days</option>
+                  <option value="90d">Last 90 days</option>
+                </select>
+              </div>
 
-            {/* 🆕 NEW: Comparison Mode Selector */}
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700">Compare:</label>
-              <select
-                value={comparisonMode}
-                onChange={(e) => setComparisonMode(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="none">No comparison</option>
-                <option value="previous">Previous period</option>
-              </select>
+              {/* Comparison Mode Selector */}
+              <div className="flex items-center gap-2">
+                <label className="text-xs sm:text-sm font-medium text-gray-700 whitespace-nowrap">Compare:</label>
+                <select
+                  value={comparisonMode}
+                  onChange={(e) => setComparisonMode(e.target.value)}
+                  className="flex-1 sm:flex-none px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-md bg-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="none">No comparison</option>
+                  <option value="previous">Previous period</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>

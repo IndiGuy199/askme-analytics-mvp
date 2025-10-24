@@ -149,55 +149,59 @@ export default function CustomAnalyticsPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Impersonation Banner */}
       {isImpersonating && (
-        <div className="bg-red-600 text-white px-6 py-3">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <div className="bg-red-600 text-white px-4 sm:px-6 py-3">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className="font-semibold">🎭 Super Admin Mode:</span>
-              <span>Viewing analytics for {impersonatedCompanyName}</span>
+              <span className="font-semibold text-sm sm:text-base">🎭 Super Admin Mode:</span>
+              <span className="text-sm sm:text-base truncate">Viewing {impersonatedCompanyName}</span>
             </div>
           </div>
         </div>
       )}
 
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Link href="/analytics" className="text-blue-600 hover:text-blue-800 text-sm">
-                ← Back to Standard Analytics
-              </Link>
+      <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4">
+        <div className="max-w-7xl mx-auto">
+          {/* Mobile: Stack vertically, Desktop: Side by side */}
+          <div className="flex flex-col space-y-3 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-2">
+                <Link href="/analytics" className="text-blue-600 hover:text-blue-800 text-xs sm:text-sm whitespace-nowrap">
+                  ← Back to Standard Analytics
+                </Link>
+              </div>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">Custom Product Analytics</h1>
+              <p className="text-xs sm:text-sm text-gray-500 mt-1 truncate">Client ID: {userCompany.posthog_client_id}</p>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">Custom Product Analytics</h1>
-            <p className="text-sm text-gray-500">Client ID: {userCompany.posthog_client_id}</p>
-          </div>
 
-          {/* Date Range Selector */}
-          <div className="flex items-center gap-4">
-            <select
-              value={selectedDateRange}
-              onChange={(e) => setSelectedDateRange(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="7d">Last 7 days</option>
-              <option value="30d">Last 30 days</option>
-              <option value="90d">Last 90 days</option>
-            </select>
+            {/* Date Range Selector */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs sm:text-sm font-medium text-gray-700 whitespace-nowrap">Date Range:</label>
+              <select
+                value={selectedDateRange}
+                onChange={(e) => setSelectedDateRange(e.target.value)}
+                className="flex-1 sm:flex-none px-2 sm:px-4 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs sm:text-sm"
+              >
+                <option value="7d">Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+                <option value="90d">Last 90 days</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-900">Custom Funnels</h2>
+      <div className="max-w-7xl mx-auto p-3 sm:p-6">
+        <div className="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
+          <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 mb-4 sm:mb-6">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Custom Funnels</h2>
             
-            {/* Funnel Type Selector - Show for all clients since standard queries include both funnels */}
-            <div className="flex gap-2">
+            {/* Funnel Type Selector - Stack on mobile, side by side on tablet+ */}
+            <div className="flex flex-col sm:flex-row gap-2">
               <button
                 onClick={() => setFunnelView('profile')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
                   funnelView === 'profile'
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -207,7 +211,7 @@ export default function CustomAnalyticsPage() {
               </button>
               <button
                 onClick={() => setFunnelView('renewal')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
                   funnelView === 'renewal'
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -228,20 +232,20 @@ export default function CustomAnalyticsPage() {
         </div>
 
         {/* Info Card */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 sm:p-6">
           <div className="flex items-start gap-3">
             <div className="flex-shrink-0 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-gray-900 mb-1">About Custom Product Analytics</h3>
-              <p className="text-sm text-gray-600">
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-gray-900 mb-1 text-sm sm:text-base">About Custom Product Analytics</h3>
+              <p className="text-xs sm:text-sm text-gray-600">
                 This page displays custom conversion funnels and product-specific metrics unique to your business. 
                 Custom funnels are configured per client and track user journeys through your specific workflows.
               </p>
-              <p className="text-sm text-gray-600 mt-2">
+              <p className="text-xs sm:text-sm text-gray-600 mt-2">
                 For standard web analytics (visitors, page views, traffic sources, etc.), visit the{' '}
                 <Link href="/analytics" className="text-blue-600 hover:underline font-medium">
                   Standard Web Analytics
