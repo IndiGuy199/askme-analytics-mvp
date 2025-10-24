@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
 
         // Create or update subscription in database
         // First, cancel any existing active subscriptions for this company
-        await supabase
+        const { error: cancelError } = await supabase
           .from('subscriptions')
           .update({ 
             status: 'canceled',
@@ -87,6 +87,13 @@ export async function POST(req: NextRequest) {
           })
           .eq('company_id', companyId)
           .in('status', ['active', 'trialing', 'past_due'])
+
+        if (cancelError) {
+          console.warn('⚠️ Error canceling existing subscriptions:', cancelError)
+        }
+
+        // Wait a moment for the cancel to complete
+        await new Promise(resolve => setTimeout(resolve, 100))
 
         // Insert new subscription
         const { error } = await supabase
@@ -107,6 +114,32 @@ export async function POST(req: NextRequest) {
 
         if (error) {
           console.error('❌ Error creating subscription:', error)
+          // If it's a duplicate key error, try updating instead
+          if (error.code === '23505') {
+            console.log('🔄 Attempting to update existing subscription instead...')
+            const { error: updateError } = await supabase
+              .from('subscriptions')
+              .update({
+                plan_id: planId,
+                stripe_subscription_id: subscriptionId,
+                stripe_customer_id: session.customer as string,
+                status: subscription.status,
+                current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+                current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+                trial_end: subscription.trial_end
+                  ? new Date(subscription.trial_end * 1000).toISOString()
+                  : null,
+                cancel_at_period_end: subscription.cancel_at_period_end,
+              })
+              .eq('company_id', companyId)
+              .in('status', ['active', 'trialing', 'past_due'])
+            
+            if (updateError) {
+              console.error('❌ Error updating subscription:', updateError)
+            } else {
+              console.log('✅ Subscription updated in database:', subscriptionId)
+            }
+          }
         } else {
           console.log('✅ Subscription created/updated in database:', subscriptionId)
         }
@@ -215,28 +248,45 @@ export async function POST(req: NextRequest) {
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object as Stripe.Invoice
         console.log('✅ Payment succeeded for invoice:', invoice.id)
+        console.log('🔍 Invoice details:', {
+          subscription: invoice.subscription,
+          customer: invoice.customer,
+          amount: invoice.amount_paid / 100
+        })
 
         // Get subscription details to find company_id
         let companyId: string | null = null
         let subscriptionDbId: string | null = null
+        let stripeSubscriptionId: string | null = null
         
+        // Method 1: Try to find by stripe_subscription_id if available
         if (invoice.subscription) {
-          // Try to find subscription, with a retry in case it hasn't been created yet
+          stripeSubscriptionId = invoice.subscription as string
+          
+          // Try to find subscription, with retry in case it hasn't been created yet
           let attempts = 0
           let subData = null
           
-          while (attempts < 3 && !subData) {
+          while (attempts < 5 && !subData) {
             const { data, error } = await supabase
               .from('subscriptions')
-              .select('id, company_id, plan_id')
-              .eq('stripe_subscription_id', invoice.subscription as string)
+              .select('id, company_id, plan_id, stripe_subscription_id')
+              .eq('stripe_subscription_id', stripeSubscriptionId)
               .single()
             
             if (data) {
               subData = data
-            } else if (attempts < 2) {
-              console.log(`⏳ Subscription not found yet, retrying in 1 second... (attempt ${attempts + 1}/3)`)
-              await new Promise(resolve => setTimeout(resolve, 1000))
+              console.log(`✅ Found subscription by ID on attempt ${attempts + 1}:`, {
+                id: data.id,
+                company_id: data.company_id,
+                stripe_subscription_id: data.stripe_subscription_id
+              })
+            } else {
+              console.log(`⏳ Subscription not found by ID (attempt ${attempts + 1}/5)`)
+              if (attempts < 4) {
+                console.log(`   Retrying in 2 seconds...`)
+                await new Promise(resolve => setTimeout(resolve, 2000))
+              }
             }
             attempts++
           }
@@ -246,9 +296,42 @@ export async function POST(req: NextRequest) {
             subscriptionDbId = subData.id
           }
         }
+        
+        // Method 2: Fallback - find by customer_id if subscription not found
+        if (!companyId && invoice.customer) {
+          console.log('🔄 Trying to find subscription by customer_id:', invoice.customer)
+          const { data: subData, error } = await supabase
+            .from('subscriptions')
+            .select('id, company_id, stripe_subscription_id')
+            .eq('stripe_customer_id', invoice.customer as string)
+            .in('status', ['active', 'trialing', 'past_due'])
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single()
+          
+          if (subData) {
+            companyId = subData.company_id
+            subscriptionDbId = subData.id
+            stripeSubscriptionId = subData.stripe_subscription_id
+            console.log('✅ Found subscription by customer_id:', {
+              id: subData.id,
+              company_id: subData.company_id,
+              stripe_subscription_id: subData.stripe_subscription_id
+            })
+          } else {
+            console.error('❌ Could not find subscription by customer_id. Error:', error)
+          }
+        }
 
         // Record payment transaction
         if (companyId) {
+          console.log('💰 Recording payment transaction:', {
+            company_id: companyId,
+            subscription_id: subscriptionDbId,
+            amount: invoice.amount_paid / 100,
+            stripe_subscription_id: stripeSubscriptionId
+          })
+          
           const { error: paymentError } = await supabase
             .from('payment_transactions')
             .insert({
@@ -257,7 +340,7 @@ export async function POST(req: NextRequest) {
               stripe_payment_intent_id: invoice.payment_intent as string,
               stripe_charge_id: invoice.charge as string,
               stripe_invoice_id: invoice.id,
-              stripe_subscription_id: invoice.subscription as string,
+              stripe_subscription_id: stripeSubscriptionId,
               stripe_customer_id: invoice.customer as string,
               amount: (invoice.amount_paid / 100), // Convert cents to dollars
               currency: invoice.currency,
@@ -280,10 +363,16 @@ export async function POST(req: NextRequest) {
           if (paymentError) {
             console.error('❌ Error recording payment transaction:', paymentError)
           } else {
-            console.log('✅ Payment transaction recorded:', invoice.id)
+            console.log('✅ Payment transaction recorded successfully!')
+            console.log('   Invoice ID:', invoice.id)
+            console.log('   Amount:', invoice.amount_paid / 100, invoice.currency.toUpperCase())
+            console.log('   Company ID:', companyId)
           }
         } else {
-          console.warn('⚠️ Could not find company_id for invoice after 3 attempts:', invoice.id)
+          console.error('⚠️ Could not find company_id for invoice after all attempts')
+          console.error('   Invoice ID:', invoice.id)
+          console.error('   Customer ID:', invoice.customer)
+          console.error('   Subscription ID:', invoice.subscription || 'undefined')
         }
 
         // Optional: Send payment confirmation email

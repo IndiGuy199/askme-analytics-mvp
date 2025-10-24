@@ -55,6 +55,11 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/faq" className="hover:text-white transition-colors">
+                  FAQ
+                </Link>
+              </li>
+              <li>
                 <a href="mailto:support@askme-analytics.com" className="hover:text-white transition-colors">
                   Support
                 </a>

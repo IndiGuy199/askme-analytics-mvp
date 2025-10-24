@@ -1,10 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter }        p_company_id: companyId,
-        p_plan_id: 'premium',
-        p_trial_days: 30
-      });m 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,7 +15,12 @@ export default function CompanyOnboardingPage() {
     name: '',
     slug: '',
     domain: '',
-    billing_email: ''
+    billing_email: '',
+    industry: '',
+    primary_goal: '',
+    monthly_visitors: '',
+    audience_region: '',
+    traffic_sources: [] as string[]
   })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -85,10 +87,61 @@ export default function CompanyOnboardingPage() {
     }
   }
 
+  const handleTrafficSourceToggle = (source: string) => {
+    setFormData(prev => ({
+      ...prev,
+      traffic_sources: prev.traffic_sources.includes(source)
+        ? prev.traffic_sources.filter(s => s !== source)
+        : [...prev.traffic_sources, source]
+    }))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Validate required fields
+    const errors: Record<string, string> = {}
+    
+    if (!formData.name.trim()) {
+      errors.name = 'Company name is required'
+    }
+    
+    if (!formData.industry) {
+      errors.industry = 'Industry is required'
+    }
+    
+    if (!formData.primary_goal) {
+      errors.primary_goal = 'Business goal is required'
+    }
+    
+    if (!formData.monthly_visitors) {
+      errors.monthly_visitors = 'Monthly visitors is required'
+    }
+    
+    if (!formData.audience_region) {
+      errors.audience_region = 'Audience region is required'
+    }
+    
+    if (formData.traffic_sources.length === 0) {
+      errors.traffic_sources = 'At least one traffic source is required'
+    }
+    
+    if (formData.domain && !validateDomain(formData.domain)) {
+      errors.domain = 'Please enter a valid domain (e.g., example.com)'
+    }
+    
+    if (formData.billing_email && !validateEmail(formData.billing_email)) {
+      errors.billing_email = 'Please enter a valid email address'
+    }
+    
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors)
+      return
+    }
+    
     setIsLoading(true)
     setError('')
+    setValidationErrors({})
 
     const supabase = createClient()
     
@@ -111,6 +164,12 @@ export default function CompanyOnboardingPage() {
           slug: formData.slug,
           domain: normalizedDomain || null,
           billing_email: formData.billing_email || user.email,
+          industry: formData.industry,
+          business_model: formData.industry === 'SaaS' || formData.industry === 'Software' ? 'B2B' : 'B2C',
+          primary_goal: formData.primary_goal,
+          audience_region: formData.audience_region,
+          traffic_sources: formData.traffic_sources,
+          monthly_visitors: parseInt(formData.monthly_visitors),
           trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         })
         .select()
@@ -269,6 +328,166 @@ export default function CompanyOnboardingPage() {
                       Leave blank to use your login email
                     </p>
                   )}
+                </div>
+
+                {/* Business Context Section */}
+                <div className="border-t pt-4 mt-4">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Business Context</h3>
+                  <p className="text-xs text-gray-600 mb-4">Help us provide more relevant insights for your business</p>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="industry" className="block text-sm font-medium text-gray-700 mb-2">
+                        Industry *
+                      </label>
+                      <select
+                        id="industry"
+                        value={formData.industry}
+                        onChange={(e) => setFormData(prev => ({ ...prev, industry: e.target.value }))}
+                        className={`w-full px-3 py-2 border rounded-md ${validationErrors.industry ? 'border-red-500' : 'border-gray-300'}`}
+                        required
+                        disabled={isLoading}
+                      >
+                        <option value="">Select an industry</option>
+                        <option value="E-commerce">E-commerce</option>
+                        <option value="SaaS">SaaS</option>
+                        <option value="Software">Software</option>
+                        <option value="Local Services">Local Services</option>
+                        <option value="Education">Education</option>
+                        <option value="Healthcare">Healthcare</option>
+                        <option value="Real Estate">Real Estate</option>
+                        <option value="Media & Publishing">Media & Publishing</option>
+                        <option value="Finance">Finance</option>
+                        <option value="Other">Other</option>
+                      </select>
+                      {validationErrors.industry && (
+                        <div className="flex items-center mt-1 text-xs text-red-600">
+                          <AlertCircle className="h-3 w-3 mr-1" />
+                          {validationErrors.industry}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label htmlFor="primary_goal" className="block text-sm font-medium text-gray-700 mb-2">
+                        What's your main business goal? *
+                      </label>
+                      <select
+                        id="primary_goal"
+                        value={formData.primary_goal}
+                        onChange={(e) => setFormData(prev => ({ ...prev, primary_goal: e.target.value }))}
+                        className={`w-full px-3 py-2 border rounded-md ${validationErrors.primary_goal ? 'border-red-500' : 'border-gray-300'}`}
+                        required
+                        disabled={isLoading}
+                      >
+                        <option value="">Select a goal</option>
+                        <option value="Generate leads">Generate leads</option>
+                        <option value="Get sign-ups">Get sign-ups</option>
+                        <option value="Sell products">Sell products</option>
+                        <option value="Book appointments">Book appointments</option>
+                        <option value="Increase engagement">Increase engagement</option>
+                        <option value="Drive subscriptions">Drive subscriptions</option>
+                        <option value="Other">Other</option>
+                      </select>
+                      {validationErrors.primary_goal && (
+                        <div className="flex items-center mt-1 text-xs text-red-600">
+                          <AlertCircle className="h-3 w-3 mr-1" />
+                          {validationErrors.primary_goal}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label htmlFor="monthly_visitors" className="block text-sm font-medium text-gray-700 mb-2">
+                        Approximate monthly visitors *
+                      </label>
+                      <select
+                        id="monthly_visitors"
+                        value={formData.monthly_visitors}
+                        onChange={(e) => setFormData(prev => ({ ...prev, monthly_visitors: e.target.value }))}
+                        className={`w-full px-3 py-2 border rounded-md ${validationErrors.monthly_visitors ? 'border-red-500' : 'border-gray-300'}`}
+                        required
+                        disabled={isLoading}
+                      >
+                        <option value="">Select range</option>
+                        <option value="1000">Under 1,000</option>
+                        <option value="5000">1,000 - 10,000</option>
+                        <option value="25000">10,000 - 50,000</option>
+                        <option value="75000">50,000 - 100,000</option>
+                        <option value="200000">100,000 - 500,000</option>
+                        <option value="750000">500,000+</option>
+                      </select>
+                      {validationErrors.monthly_visitors && (
+                        <div className="flex items-center mt-1 text-xs text-red-600">
+                          <AlertCircle className="h-3 w-3 mr-1" />
+                          {validationErrors.monthly_visitors}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label htmlFor="audience_region" className="block text-sm font-medium text-gray-700 mb-2">
+                        Primary audience region *
+                      </label>
+                      <select
+                        id="audience_region"
+                        value={formData.audience_region}
+                        onChange={(e) => setFormData(prev => ({ ...prev, audience_region: e.target.value }))}
+                        className={`w-full px-3 py-2 border rounded-md ${validationErrors.audience_region ? 'border-red-500' : 'border-gray-300'}`}
+                        required
+                        disabled={isLoading}
+                      >
+                        <option value="">Select region</option>
+                        <option value="US / Canada">US / Canada</option>
+                        <option value="Europe">Europe</option>
+                        <option value="Asia-Pacific">Asia-Pacific</option>
+                        <option value="Latin America">Latin America</option>
+                        <option value="Middle East / Africa">Middle East / Africa</option>
+                        <option value="Global">Global</option>
+                      </select>
+                      {validationErrors.audience_region && (
+                        <div className="flex items-center mt-1 text-xs text-red-600">
+                          <AlertCircle className="h-3 w-3 mr-1" />
+                          {validationErrors.audience_region}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Typical traffic sources * (select all that apply)
+                      </label>
+                      <div className="space-y-2">
+                        {[
+                          'Google Search',
+                          'Facebook / Instagram Ads',
+                          'LinkedIn',
+                          'Email Marketing',
+                          'Direct Traffic',
+                          'Referrals',
+                          'Content Marketing',
+                          'Other Paid Ads'
+                        ].map((source) => (
+                          <label key={source} className="flex items-center space-x-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={formData.traffic_sources.includes(source)}
+                              onChange={() => handleTrafficSourceToggle(source)}
+                              disabled={isLoading}
+                              className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <span className="text-sm text-gray-700">{source}</span>
+                          </label>
+                        ))}
+                      </div>
+                      {validationErrors.traffic_sources && (
+                        <div className="flex items-center mt-1 text-xs text-red-600">
+                          <AlertCircle className="h-3 w-3 mr-1" />
+                          {validationErrors.traffic_sources}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 

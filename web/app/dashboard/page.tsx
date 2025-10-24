@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { BarChart3, Settings, Users, Zap, LogOut, Shield } from 'lucide-react'
+import { BarChart3, Settings, Users, Zap, LogOut, Shield, Brain } from 'lucide-react'
 
 interface User {
   id: string
@@ -469,7 +469,16 @@ export default function DashboardPage() {
                           <Button 
                             variant="default" 
                             size="lg"
-                            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                            className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
+                            onClick={() => router.push('/ai-insights')}
+                          >
+                            <Brain className="mr-2 h-5 w-5" />
+                            View AI-Powered Insights
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="lg"
+                            className="w-full mt-3"
                             onClick={() => router.push('/analytics')}
                           >
                             <BarChart3 className="mr-2 h-5 w-5" />
@@ -497,6 +506,14 @@ export default function DashboardPage() {
                       <CardTitle className="text-lg">Quick Actions</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
+                      <Button 
+                        variant="outline" 
+                        className="w-full justify-start bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200 hover:from-purple-100 hover:to-indigo-100"
+                        onClick={() => router.push('/ai-insights')}
+                      >
+                        <Brain className="mr-2 h-4 w-4 text-purple-600" />
+                        <span className="text-purple-900 font-medium">AI Insights</span>
+                      </Button>
                       <Button 
                         variant="outline" 
                         className="w-full justify-start"

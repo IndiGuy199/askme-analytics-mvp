@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, CartesianGrid } from 'recharts';
 import { Info } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useAnalyticsCache } from '@/lib/hooks/useAnalyticsCache';
 
 // Chart color palette
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#84CC16', '#F97316'];
@@ -31,6 +32,13 @@ export default function SimpleAnalyticsCard({
   const [geographyView, setGeographyView] = useState<'countries' | 'cities'>('countries');
   const [trafficView, setTrafficView] = useState<'visitors' | 'pageviews'>('visitors');
   const [retentionView, setRetentionView] = useState<'daily' | 'cumulative'>('daily');
+  const [isCacheHit, setIsCacheHit] = useState(false);
+
+  // Initialize caching hook
+  const { getCachedData, setCachedData, getCacheStats } = useAnalyticsCache({
+    cacheTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 2 * 60 * 1000  // 2 minutes
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -40,7 +48,46 @@ export default function SimpleAnalyticsCard({
     try {
       setLoading(true);
       setError(null);
+      setIsCacheHit(false);
 
+      const cacheParams = {
+        clientId,
+        companyId,
+        dateRange,
+        comparisonMode
+      };
+
+      // Try to get from cache first
+      const { data: cachedData, isStale } = getCachedData(cacheParams);
+      
+      if (cachedData) {
+        console.log('📦 Cache HIT:', { dateRange, isStale, cacheStats: getCacheStats() });
+        setKpis(cachedData);
+        setIsCacheHit(true);
+        setLoading(false);
+        
+        // If data is stale, fetch in background
+        if (isStale) {
+          console.log('🔄 Data is stale, refreshing in background...');
+          fetchAndUpdateCache(cacheParams, true);
+        }
+        return;
+      }
+
+      console.log('🌐 Cache MISS, fetching from API...', { dateRange, cacheStats: getCacheStats() });
+      await fetchAndUpdateCache(cacheParams, false);
+
+    } catch (err) {
+      console.error('Analytics fetch error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch analytics';
+      setError(errorMessage);
+      if (onError) onError(errorMessage);
+      setLoading(false);
+    }
+  };
+
+  const fetchAndUpdateCache = async (cacheParams: any, isBackground: boolean) => {
+    try {
       const params = new URLSearchParams({
         dateRange,
         compare: comparisonMode === 'previous' ? 'true' : 'false'
@@ -57,7 +104,9 @@ export default function SimpleAnalyticsCard({
       const response = await fetch(`/api/analytics/preview?${params}`);
       const data = await response.json();
 
-      console.log('Simple Analytics API response:', data);
+      if (!isBackground) {
+        console.log('Simple Analytics API response:', data);
+      }
 
       if (!response.ok) {
         // Check for specific PostHog configuration error
@@ -72,18 +121,24 @@ export default function SimpleAnalyticsCard({
       }
 
       if (data.success) {
-        setKpis(data.kpis);
-        setError(null);
+        // Cache the response
+        setCachedData(cacheParams, data.kpis);
+        
+        if (!isBackground) {
+          setKpis(data.kpis);
+          setError(null);
+        } else {
+          // Silently update in background
+          setKpis(data.kpis);
+          console.log('✅ Background refresh completed');
+        }
       } else {
         throw new Error(data.error || 'Failed to fetch analytics');
       }
-    } catch (err) {
-      console.error('Analytics fetch error:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch analytics';
-      setError(errorMessage);
-      if (onError) onError(errorMessage);
     } finally {
-      setLoading(false);
+      if (!isBackground) {
+        setLoading(false);
+      }
     }
   };
 
@@ -233,6 +288,17 @@ export default function SimpleAnalyticsCard({
 
   return (
     <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
+      {/* Cache Indicator */}
+      {isCacheHit && (
+        <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2 flex items-center gap-2">
+          <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          <span className="text-sm text-green-800 font-medium">
+            📦 Showing cached data for faster performance • Last updated: {new Date().toLocaleTimeString()}
+          </span>
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <Link href="/dashboard" className="group">
