@@ -56,43 +56,42 @@ export default function PricingPage() {
     const fetchData = async () => {
       const supabase = createClient()
       
-      // Get current user
+      // Get current user (but don't redirect if not logged in)
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
+      
+      // If user is logged in, fetch their data
+      if (user) {
+        // Get user data with current subscription
+        const { data: userData } = await supabase
+          .from('users')
+          .select(`
+            *,
+            companies!inner(
+              id,
+              name,
+              slug,
+              subscriptions(plan_id, status)
+            )
+          `)
+          .eq('id', user.id)
+          .single()
 
-      // Get user data with current subscription
-      const { data: userData } = await supabase
-        .from('users')
-        .select(`
-          *,
-          companies!inner(
-            id,
-            name,
-            slug,
-            subscriptions(plan_id, status)
+        if (userData) {
+          setCurrentUser(userData as User)
+          if (userData.companies) {
+            setCompany(userData.companies as unknown as Company)
+          }
+          const activeSubscription = userData.companies?.subscriptions?.find(
+            (sub: any) => sub.status === 'active' || sub.status === 'trialing'
           )
-        `)
-        .eq('id', user.id)
-        .single()
-
-      if (userData) {
-        setCurrentUser(userData as User)
-        if (userData.companies) {
-          setCompany(userData.companies as unknown as Company)
-        }
-        const activeSubscription = userData.companies?.subscriptions?.find(
-          (sub: any) => sub.status === 'active' || sub.status === 'trialing'
-        )
-        if (activeSubscription) {
-          setCurrentPlan(activeSubscription.plan_id)
-          setSubscriptionStatus(activeSubscription.status)
+          if (activeSubscription) {
+            setCurrentPlan(activeSubscription.plan_id)
+            setSubscriptionStatus(activeSubscription.status)
+          }
         }
       }
 
-      // Get available plans
+      // Get available plans (public data)
       const { data: plansData } = await supabase
         .from('plans')
         .select('*')
@@ -110,6 +109,12 @@ export default function PricingPage() {
   }, [router])
 
   const handleCheckout = async (planId: string) => {
+    // If user is not logged in, redirect to login
+    if (!currentUser) {
+      router.push('/login?redirect=/pricing')
+      return
+    }
+
     if (!company) {
       alert('Company information not found. Please try logging in again.')
       return
@@ -217,10 +222,13 @@ export default function PricingPage() {
     )
   }
 
-  // Filter plans based on interval and hide Enterprise
+  // Filter plans based on interval and hide Enterprise & Premium
   const displayPlans = plans.filter(plan => {
-    // Hide Enterprise plan (not ready yet)
+    // Hide Enterprise and Premium plans (not ready yet)
     if (plan.id.toLowerCase().includes('enterprise')) {
+      return false
+    }
+    if (plan.id.toLowerCase().includes('premium')) {
       return false
     }
     
@@ -238,13 +246,23 @@ export default function PricingPage() {
         <div className="flex justify-between items-center mb-8">
           <Button
             variant="outline"
-            onClick={() => router.push('/dashboard')}
+            onClick={() => router.push(currentUser ? '/dashboard' : '/')}
             className="bg-white hover:bg-gray-50"
           >
-            ← Back to Dashboard
+            ← Back to {currentUser ? 'Dashboard' : 'Home'}
           </Button>
           <div className="text-sm text-gray-600">
-            {currentUser?.email}
+            {currentUser ? (
+              currentUser.email
+            ) : (
+              <Button
+                variant="outline"
+                onClick={() => router.push('/login')}
+                className="bg-white hover:bg-gray-50"
+              >
+                Sign In
+              </Button>
+            )}
           </div>
         </div>
 
@@ -287,7 +305,13 @@ export default function PricingPage() {
           </div>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+        <div className={`grid gap-8 max-w-5xl mx-auto ${
+          displayPlans.length === 1 
+            ? 'md:grid-cols-1 max-w-md' 
+            : displayPlans.length === 2 
+            ? 'md:grid-cols-2 max-w-4xl' 
+            : 'md:grid-cols-3'
+        }`}>
           {displayPlans.map((plan) => {
             const isCurrentPlan = currentPlan === plan.id
             const monthlyEquivalent = plan.interval === 'year' ? plan.price_cents / 12 : plan.price_cents
@@ -340,6 +364,11 @@ export default function PricingPage() {
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                         Processing...
                       </div>
+                    ) : !currentUser ? (
+                      <>
+                        Start Free Trial
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </>
                     ) : isCurrentPlan && subscriptionStatus === 'trialing' ? (
                       <>
                         Subscribe Now
@@ -372,6 +401,16 @@ export default function PricingPage() {
               </Card>
             )
           })}
+        </div>
+
+        {/* Coming Soon Message */}
+        <div className="mt-8 text-center">
+          <div className="inline-flex items-center gap-2 bg-white px-6 py-3 rounded-full shadow-sm border border-gray-200">
+            <Sparkles className="h-4 w-4 text-indigo-600" />
+            <span className="text-sm text-gray-600">
+              More plans coming soon with advanced features!
+            </span>
+          </div>
         </div>
 
         {/* Feature comparison */}

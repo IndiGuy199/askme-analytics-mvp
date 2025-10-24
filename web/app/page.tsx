@@ -57,13 +57,13 @@ export default async function HomePage() {
             <h2 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
               Transform Your{' '}
               <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                PostHog Data
+                Analytics Data
               </span>{' '}
               Into Actionable Insights
             </h2>
             
             <p className="text-xl text-gray-600 mb-10 leading-relaxed">
-              Get AI-powered analytics, automated insights, and weekly digests from your PostHog data. 
+              Get AI-powered analytics, automated insights, and weekly digests from your data. 
               No complex setup required - just connect and start getting insights.
             </p>
 
@@ -71,8 +71,8 @@ export default async function HomePage() {
               <Button size="lg" className="text-lg px-8 py-3" asChild>
                 <a href="/login">Start Free Trial</a>
               </Button>
-              <Button size="lg" variant="outline" className="text-lg px-8 py-3">
-                View Demo
+              <Button size="lg" variant="outline" className="text-lg px-8 py-3" asChild>
+                <a href="/demo">View Demo</a>
               </Button>
             </div>
 
@@ -89,7 +89,7 @@ export default async function HomePage() {
               Everything you need to understand your data
             </h3>
             <p className="text-lg text-gray-600">
-              Powerful analytics tools that work seamlessly with your PostHog setup
+              Powerful analytics tools that work seamlessly with your setup
             </p>
           </div>
 
@@ -104,7 +104,7 @@ export default async function HomePage() {
               <CardContent>
                 <CardDescription className="text-center text-base leading-relaxed">
                   Get intelligent analysis of your user behavior, trends, and opportunities 
-                  automatically generated from your PostHog data.
+                  automatically generated from your analytics data.
                 </CardDescription>
               </CardContent>
             </Card>

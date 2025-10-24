@@ -221,7 +221,7 @@ export default function CompanyOnboardingPage() {
               <div className="flex items-center justify-center w-8 h-8 bg-gray-300 text-gray-500 rounded-full text-sm font-medium">
                 2
               </div>
-              <span className="ml-2 text-sm text-gray-500">PostHog</span>
+              <span className="ml-2 text-sm text-gray-500">Analytics</span>
             </div>
             <div className="w-16 h-px bg-gray-300"></div>
             <div className="flex items-center">

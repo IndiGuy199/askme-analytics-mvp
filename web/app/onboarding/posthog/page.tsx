@@ -314,7 +314,7 @@ function PostHogOnboardingContent() {
                     </p>
                   ) : (
                     <p className="text-xs text-gray-500 mt-1">
-                      Use this to filter analytics when multiple companies share the same PostHog project. Only lowercase letters, numbers, hyphens, and underscores allowed.
+                      Use this to filter analytics when multiple companies share the same analytics project. Only lowercase letters, numbers, hyphens, and underscores allowed.
                     </p>
                   )}
                 </div>

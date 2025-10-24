@@ -280,7 +280,7 @@ export default function SuperAdminDashboard() {
                         <span className="font-medium">Client ID:</span> {company.posthog_client_id || 'Not set'}
                       </div>
                       <div>
-                        <span className="font-medium">PostHog Project:</span> {company.posthog_project_id || 'Not configured'}
+                        <span className="font-medium">Analytics Project:</span> {company.posthog_project_id || 'Not configured'}
                       </div>
                       <div>
                         <span className="font-medium">Created:</span> {new Date(company.created_at).toLocaleDateString()}
