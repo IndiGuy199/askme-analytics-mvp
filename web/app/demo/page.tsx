@@ -131,33 +131,34 @@ export default function DemoPage() {
       </div>
 
       {/* Hero Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="text-center mb-12">
-          <h1 className="text-5xl font-bold text-gray-900 mb-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+        <div className="text-center mb-8 sm:mb-12">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
             See AskMe Analytics in Action
           </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto px-2">
             Take a guided tour through every feature. From login to AI insights, see exactly how our platform helps you understand and grow your business.
           </p>
         </div>
 
         {/* Navigation Pills */}
-        <div className="flex flex-wrap justify-center gap-3 mb-12">
+        <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-8 sm:mb-12 px-2">
           {demoSteps.map((step, index) => (
             <button
               key={step.id}
               onClick={() => setActiveDemo(step.id)}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+              className={`flex items-center space-x-1 sm:space-x-2 px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all ${
                 activeDemo === step.id
                   ? 'bg-indigo-600 text-white shadow-lg scale-105'
                   : 'bg-white text-gray-700 hover:bg-gray-50 shadow'
               }`}
             >
-              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-white/20 text-xs font-bold">
+              <span className="flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-white/20 text-xs font-bold">
                 {index + 1}
               </span>
-              <step.icon className="h-4 w-4" />
-              <span>{step.title}</span>
+              <step.icon className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">{step.title}</span>
+              <span className="sm:hidden">{step.title.split(' ')[0]}</span>
             </button>
           ))}
         </div>
@@ -168,23 +169,23 @@ export default function DemoPage() {
             key={step.id}
             className={`${activeDemo === step.id ? 'block' : 'hidden'}`}
           >
-            <Card className="mb-8 shadow-xl border-2 border-indigo-100">
-              <CardHeader className="bg-gradient-to-r from-indigo-50 to-purple-50 border-b">
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-indigo-600 text-white">
-                    <step.icon className="h-6 w-6" />
+            <Card className="mb-6 sm:mb-8 shadow-xl border-2 border-indigo-100 overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-indigo-50 to-purple-50 border-b p-4 sm:p-6">
+                <div className="flex items-center space-x-3 sm:space-x-4">
+                  <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-indigo-600 text-white flex-shrink-0">
+                    <step.icon className="h-5 w-5 sm:h-6 sm:w-6" />
                   </div>
-                  <div>
-                    <CardTitle className="text-2xl">{step.title}</CardTitle>
-                    <CardDescription className="text-base mt-1">
+                  <div className="min-w-0 flex-1">
+                    <CardTitle className="text-lg sm:text-xl lg:text-2xl truncate">{step.title}</CardTitle>
+                    <CardDescription className="text-sm sm:text-base mt-1">
                       {step.description}
                     </CardDescription>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="p-8">
+              <CardContent className="p-4 sm:p-6 lg:p-8">
                 {/* Demo Preview Area */}
-                <div className="mb-8">
+                <div className="mb-6 sm:mb-8">
                   {step.id === 'login' && <LoginDemo />}
                   {step.id === 'onboarding' && <OnboardingDemo />}
                   {step.id === 'dashboard' && <DashboardDemo />}
@@ -194,13 +195,13 @@ export default function DemoPage() {
                 </div>
 
                 {/* Features List */}
-                <div className="border-t pt-6">
-                  <h4 className="font-semibold text-gray-900 mb-4">Key Features:</h4>
-                  <div className="grid md:grid-cols-2 gap-3">
+                <div className="border-t pt-4 sm:pt-6">
+                  <h4 className="font-semibold text-gray-900 mb-3 sm:mb-4 text-sm sm:text-base">Key Features:</h4>
+                  <div className="grid sm:grid-cols-2 gap-2 sm:gap-3">
                     {step.features.map((feature, index) => (
                       <div key={index} className="flex items-center space-x-2">
-                        <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
-                        <span className="text-gray-700">{feature}</span>
+                        <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 flex-shrink-0" />
+                        <span className="text-gray-700 text-sm sm:text-base">{feature}</span>
                       </div>
                     ))}
                   </div>
@@ -209,7 +210,7 @@ export default function DemoPage() {
             </Card>
 
             {/* Navigation Buttons */}
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 sm:gap-0">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -249,23 +250,23 @@ export default function DemoPage() {
       </div>
 
       {/* CTA Section */}
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 py-16 mt-20">
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 py-12 sm:py-16 mt-12 sm:mt-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
+          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3 sm:mb-4">
             Ready to Transform Your Data?
           </h2>
-          <p className="text-xl text-indigo-100 mb-8">
+          <p className="text-base sm:text-lg lg:text-xl text-indigo-100 mb-6 sm:mb-8">
             Start your 30-day free trial today. No credit card required.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/login">
-              <Button size="lg" variant="secondary" className="text-lg">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
+            <Link href="/login" className="w-full sm:w-auto">
+              <Button size="lg" variant="secondary" className="text-base sm:text-lg w-full sm:w-auto">
                 Start Free Trial
-                <ArrowRight className="ml-2 h-5 w-5" />
+                <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
             </Link>
-            <Link href="/pricing">
-              <Button size="lg" variant="outline" className="text-lg bg-white/10 text-white border-white hover:bg-white/20">
+            <Link href="/pricing" className="w-full sm:w-auto">
+              <Button size="lg" variant="outline" className="text-base sm:text-lg bg-white/10 text-white border-white hover:bg-white/20 w-full sm:w-auto">
                 View Pricing
               </Button>
             </Link>
@@ -279,38 +280,38 @@ export default function DemoPage() {
 // Demo Components with Sample Data
 function LoginDemo() {
   return (
-    <div className="bg-gray-50 rounded-lg p-8 border-2 border-gray-200">
-      <div className="max-w-md mx-auto bg-white rounded-xl shadow-lg p-8">
-        <div className="text-center mb-6">
-          <BarChart3 className="h-12 w-12 text-indigo-600 mx-auto mb-3" />
-          <h3 className="text-2xl font-bold text-gray-900">Welcome Back</h3>
-          <p className="text-gray-600 mt-1">Sign in to your account</p>
+    <div className="bg-gray-50 rounded-lg p-4 sm:p-6 lg:p-8 border-2 border-gray-200">
+      <div className="max-w-md mx-auto bg-white rounded-xl shadow-lg p-4 sm:p-6 lg:p-8">
+        <div className="text-center mb-4 sm:mb-6">
+          <BarChart3 className="h-10 w-10 sm:h-12 sm:w-12 text-indigo-600 mx-auto mb-2 sm:mb-3" />
+          <h3 className="text-xl sm:text-2xl font-bold text-gray-900">Welcome Back</h3>
+          <p className="text-sm sm:text-base text-gray-600 mt-1">Sign in to your account</p>
         </div>
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Email</label>
             <input
               type="email"
               placeholder="you@company.com"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm sm:text-base"
               disabled
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Password</label>
             <input
               type="password"
               placeholder="••••••••"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm sm:text-base"
               disabled
             />
           </div>
-          <Button className="w-full" disabled>
+          <Button className="w-full text-sm sm:text-base" disabled>
             Sign In
           </Button>
           <div className="text-center">
-            <span className="text-sm text-gray-600">Don't have an account? </span>
-            <span className="text-sm text-indigo-600 font-medium">Sign up</span>
+            <span className="text-xs sm:text-sm text-gray-600">Don't have an account? </span>
+            <span className="text-xs sm:text-sm text-indigo-600 font-medium">Sign up</span>
           </div>
         </div>
       </div>
@@ -320,60 +321,60 @@ function LoginDemo() {
 
 function OnboardingDemo() {
   return (
-    <div className="bg-gray-50 rounded-lg p-8 border-2 border-gray-200">
-      <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-8">
+    <div className="bg-gray-50 rounded-lg p-4 sm:p-6 lg:p-8 border-2 border-gray-200">
+      <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-4 sm:p-6 lg:p-8">
         {/* Progress Steps */}
-        <div className="flex items-center justify-center space-x-4 mb-8">
-          <div className="flex items-center">
-            <div className="flex items-center justify-center w-8 h-8 bg-indigo-600 text-white rounded-full text-sm font-medium">
+        <div className="flex items-center justify-center space-x-2 sm:space-x-4 mb-6 sm:mb-8 overflow-x-auto">
+          <div className="flex items-center flex-shrink-0">
+            <div className="flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 bg-indigo-600 text-white rounded-full text-xs sm:text-sm font-medium">
               1
             </div>
-            <span className="ml-2 text-sm font-medium text-indigo-600">Company</span>
+            <span className="ml-1 sm:ml-2 text-xs sm:text-sm font-medium text-indigo-600">Company</span>
           </div>
-          <div className="w-16 h-px bg-gray-300"></div>
-          <div className="flex items-center">
-            <div className="flex items-center justify-center w-8 h-8 bg-gray-300 text-gray-500 rounded-full text-sm font-medium">
+          <div className="w-8 sm:w-16 h-px bg-gray-300 flex-shrink-0"></div>
+          <div className="flex items-center flex-shrink-0">
+            <div className="flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 bg-gray-300 text-gray-500 rounded-full text-xs sm:text-sm font-medium">
               2
             </div>
-            <span className="ml-2 text-sm text-gray-500">Analytics</span>
+            <span className="ml-1 sm:ml-2 text-xs sm:text-sm text-gray-500">Analytics</span>
           </div>
-          <div className="w-16 h-px bg-gray-300"></div>
-          <div className="flex items-center">
-            <div className="flex items-center justify-center w-8 h-8 bg-gray-300 text-gray-500 rounded-full text-sm font-medium">
+          <div className="w-8 sm:w-16 h-px bg-gray-300 flex-shrink-0"></div>
+          <div className="flex items-center flex-shrink-0">
+            <div className="flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 bg-gray-300 text-gray-500 rounded-full text-xs sm:text-sm font-medium">
               3
             </div>
-            <span className="ml-2 text-sm text-gray-500">Dashboard</span>
+            <span className="ml-1 sm:ml-2 text-xs sm:text-sm text-gray-500">Dashboard</span>
           </div>
         </div>
 
-        <div className="text-center mb-6">
-          <h3 className="text-2xl font-bold text-gray-900">Create Your Company Profile</h3>
-          <p className="text-gray-600 mt-1">Tell us about your business</p>
+        <div className="text-center mb-4 sm:mb-6">
+          <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">Create Your Company Profile</h3>
+          <p className="text-sm sm:text-base text-gray-600 mt-1">Tell us about your business</p>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Company Name</label>
             <input
               type="text"
               placeholder="Acme Corporation"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg text-sm sm:text-base"
               disabled
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Company Slug</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Company Slug</label>
             <input
               type="text"
               placeholder="acme-corp"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg text-sm sm:text-base"
               disabled
             />
             <p className="text-xs text-gray-500 mt-1">This will be used in your URL</p>
           </div>
-          <Button className="w-full" disabled>
+          <Button className="w-full text-sm sm:text-base" disabled>
             Continue to Analytics Setup
-            <ArrowRight className="ml-2 h-4 w-4" />
+            <ArrowRight className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
           </Button>
         </div>
       </div>
@@ -383,53 +384,53 @@ function OnboardingDemo() {
 
 function DashboardDemo() {
   return (
-    <div className="bg-gray-50 rounded-lg p-6 border-2 border-gray-200">
-      <div className="bg-white rounded-lg shadow">
+    <div className="bg-gray-50 rounded-lg p-3 sm:p-4 lg:p-6 border-2 border-gray-200">
+      <div className="bg-white rounded-lg shadow overflow-hidden">
         {/* Header */}
-        <div className="border-b px-6 py-4">
-          <h3 className="text-xl font-bold text-gray-900">Dashboard Overview</h3>
-          <p className="text-sm text-gray-600 mt-1">Welcome back! Here's what's happening with your business.</p>
+        <div className="border-b px-4 sm:px-6 py-3 sm:py-4">
+          <h3 className="text-lg sm:text-xl font-bold text-gray-900">Dashboard Overview</h3>
+          <p className="text-xs sm:text-sm text-gray-600 mt-1">Welcome back! Here's what's happening with your business.</p>
         </div>
 
         {/* Quick Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6">
-          <div className="bg-blue-50 rounded-lg p-4">
-            <Users className="h-6 w-6 text-blue-600 mb-2" />
-            <p className="text-sm text-gray-600">Total Users</p>
-            <p className="text-2xl font-bold text-gray-900">2,543</p>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 p-4 sm:p-6">
+          <div className="bg-blue-50 rounded-lg p-3 sm:p-4">
+            <Users className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 mb-1 sm:mb-2" />
+            <p className="text-xs sm:text-sm text-gray-600">Total Users</p>
+            <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">2,543</p>
             <p className="text-xs text-green-600 mt-1">↑ 12% from last month</p>
           </div>
-          <div className="bg-green-50 rounded-lg p-4">
-            <BarChart3 className="h-6 w-6 text-green-600 mb-2" />
-            <p className="text-sm text-gray-600">Page Views</p>
-            <p className="text-2xl font-bold text-gray-900">48.2K</p>
+          <div className="bg-green-50 rounded-lg p-3 sm:p-4">
+            <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 text-green-600 mb-1 sm:mb-2" />
+            <p className="text-xs sm:text-sm text-gray-600">Page Views</p>
+            <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">48.2K</p>
             <p className="text-xs text-green-600 mt-1">↑ 8% from last month</p>
           </div>
-          <div className="bg-purple-50 rounded-lg p-4">
-            <TrendingUp className="h-6 w-6 text-purple-600 mb-2" />
-            <p className="text-sm text-gray-600">Conversions</p>
-            <p className="text-2xl font-bold text-gray-900">326</p>
+          <div className="bg-purple-50 rounded-lg p-3 sm:p-4">
+            <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600 mb-1 sm:mb-2" />
+            <p className="text-xs sm:text-sm text-gray-600">Conversions</p>
+            <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">326</p>
             <p className="text-xs text-green-600 mt-1">↑ 15% from last month</p>
           </div>
-          <div className="bg-orange-50 rounded-lg p-4">
-            <Sparkles className="h-6 w-6 text-orange-600 mb-2" />
-            <p className="text-sm text-gray-600">AI Insights</p>
-            <p className="text-2xl font-bold text-gray-900">12</p>
+          <div className="bg-orange-50 rounded-lg p-3 sm:p-4">
+            <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-orange-600 mb-1 sm:mb-2" />
+            <p className="text-xs sm:text-sm text-gray-600">AI Insights</p>
+            <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">12</p>
             <p className="text-xs text-gray-600 mt-1">New recommendations</p>
           </div>
         </div>
 
         {/* Quick Actions */}
-        <div className="border-t px-6 py-4 bg-gray-50">
-          <p className="text-sm font-medium text-gray-700 mb-3">Quick Actions</p>
+        <div className="border-t px-4 sm:px-6 py-3 sm:py-4 bg-gray-50">
+          <p className="text-xs sm:text-sm font-medium text-gray-700 mb-2 sm:mb-3">Quick Actions</p>
           <div className="flex flex-wrap gap-2">
-            <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors">
+            <button className="px-3 sm:px-4 py-1.5 sm:py-2 bg-indigo-600 text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-indigo-700 transition-colors">
               View Analytics
             </button>
-            <button className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
+            <button className="px-3 sm:px-4 py-1.5 sm:py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-xs sm:text-sm font-medium hover:bg-gray-50 transition-colors">
               Create Custom Funnel
             </button>
-            <button className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
+            <button className="px-3 sm:px-4 py-1.5 sm:py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-xs sm:text-sm font-medium hover:bg-gray-50 transition-colors">
               View AI Insights
             </button>
           </div>
