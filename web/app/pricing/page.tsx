@@ -156,7 +156,7 @@ export default function PricingPage() {
   }
 
   const getPlanIcon = (planId: string) => {
-    if (planId.includes('basic')) return <Sparkles className="h-5 w-5" />
+    if (planId.includes('premium')) return <Sparkles className="h-5 w-5" />
     if (planId.includes('premium')) return <Zap className="h-5 w-5" />
     if (planId.includes('enterprise')) return <Crown className="h-5 w-5" />
     return <Sparkles className="h-5 w-5" />
@@ -165,8 +165,8 @@ export default function PricingPage() {
   const getPlanFeatures = (plan: Plan): string[] => {
     const planId = plan.id.toLowerCase()
     
-    // Basic Plan Features
-    if (planId.includes('basic')) {
+    // Premium Plan Features
+    if (planId.includes('premium')) {
       return [
         'Track 1 website/app',
         'Add 1 team member (2 total)',
@@ -178,7 +178,7 @@ export default function PricingPage() {
       ]
     }
     
-    // Premium/Standard Plan Features (inherits from Basic + additional)
+    // Enterprise Plan Features (inherits from Premium + additional)
     if (planId.includes('premium') || planId.includes('standard')) {
       return [
         'Track up to 3 websites/apps',
@@ -222,13 +222,15 @@ export default function PricingPage() {
     )
   }
 
-  // Filter plans based on interval and hide Enterprise & Premium
+  // Filter plans based on interval and hide Basic + Enterprise
   const displayPlans = plans.filter(plan => {
-    // Hide Enterprise and Premium plans (not ready yet)
-    if (plan.id.toLowerCase().includes('enterprise')) {
+    // Hide Basic plan (not offering anymore)
+    if (plan.id.toLowerCase().includes('basic')) {
       return false
     }
-    if (plan.id.toLowerCase().includes('premium')) {
+    
+    // Hide Enterprise plan (not ready yet)
+    if (plan.id.toLowerCase().includes('enterprise')) {
       return false
     }
     
@@ -305,12 +307,12 @@ export default function PricingPage() {
           </div>
         </div>
 
-        <div className={`grid gap-8 max-w-5xl mx-auto ${
+        <div className={`grid gap-8 mx-auto ${
           displayPlans.length === 1 
-            ? 'md:grid-cols-1 max-w-md' 
+            ? 'max-w-md justify-center' 
             : displayPlans.length === 2 
             ? 'md:grid-cols-2 max-w-4xl' 
-            : 'md:grid-cols-3'
+            : 'md:grid-cols-3 max-w-5xl'
         }`}>
           {displayPlans.map((plan) => {
             const isCurrentPlan = currentPlan === plan.id
@@ -369,19 +371,16 @@ export default function PricingPage() {
                         Start Free Trial
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </>
-                    ) : isCurrentPlan && subscriptionStatus === 'trialing' ? (
-                      <>
-                        Subscribe Now
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </>
                     ) : isCurrentPlan && subscriptionStatus === 'active' ? (
                       'Current Plan'
-                    ) : subscriptionStatus === 'trialing' ? (
+                    ) : subscriptionStatus ? (
+                      // User has a subscription (active or trialing), so no more trials
                       <>
                         Subscribe Now
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </>
                     ) : (
+                      // New user with no subscription ever
                       <>
                         Start Free Trial
                         <ArrowRight className="ml-2 h-4 w-4" />

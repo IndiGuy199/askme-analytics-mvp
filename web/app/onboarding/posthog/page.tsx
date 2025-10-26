@@ -112,15 +112,17 @@ function PostHogOnboardingContent() {
   }
 
   const handleClientIdChange = async (value: string) => {
-    setFormData(prev => ({ ...prev, posthog_client_id: value.toLowerCase() }))
+    // Remove spaces and convert to lowercase
+    const sanitized = value.replace(/\s+/g, '').toLowerCase()
+    setFormData(prev => ({ ...prev, posthog_client_id: sanitized }))
     
-    if (!value) {
+    if (!sanitized) {
       setClientIdError('Client ID is required')
       return
     }
     
     // Validate format first
-    if (!validateClientId(value)) {
+    if (!validateClientId(sanitized)) {
       return
     }
     
@@ -131,7 +133,7 @@ function PostHogOnboardingContent() {
     const { data: existingCompany, error: checkError } = await supabase
       .from('companies')
       .select('id, name')
-      .eq('posthog_client_id', value.toLowerCase())
+      .eq('posthog_client_id', sanitized)
       .neq('id', companyId || '')
       .maybeSingle()
     
@@ -296,7 +298,7 @@ function PostHogOnboardingContent() {
                   <Input
                     id="client_id"
                     type="text"
-                    placeholder="my-company-prod"
+                    placeholder="ask-me-abc"
                     value={formData.posthog_client_id}
                     onChange={(e) => handleClientIdChange(e.target.value)}
                     disabled={isLoading}
@@ -314,7 +316,7 @@ function PostHogOnboardingContent() {
                     </p>
                   ) : (
                     <p className="text-xs text-gray-500 mt-1">
-                      Use this to filter analytics when multiple companies share the same analytics project. Only lowercase letters, numbers, hyphens, and underscores allowed.
+                      Use this to filter analytics when multiple companies share the same analytics project. Only lowercase letters, numbers, and hyphens allowed. No spaces.
                     </p>
                   )}
                 </div>

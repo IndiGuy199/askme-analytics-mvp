@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Building2, ArrowRight, Check, AlertCircle } from 'lucide-react'
 import { generateSlug } from '@/lib/utils'
+import TermsModal from '@/components/TermsModal'
 
 export default function CompanyOnboardingPage() {
   const router = useRouter()
@@ -25,6 +26,8 @@ export default function CompanyOnboardingPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [showTermsModal, setShowTermsModal] = useState(false)
   
   const handleNameChange = (name: string) => {
     setFormData(prev => ({
@@ -96,6 +99,12 @@ export default function CompanyOnboardingPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
+    // Check terms acceptance first
+    if (!termsAccepted) {
+      setError('You must accept the Terms and Conditions to continue')
+      return
+    }
+    
     // Validate required fields
     const errors: Record<string, string> = {}
     
@@ -146,6 +155,21 @@ export default function CompanyOnboardingPage() {
       // Get current user
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
+      
+      // Record consent
+      try {
+        await fetch('/api/consent/accept', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            email: user.email, 
+            termsVersion: '1.0' 
+          })
+        })
+      } catch (consentError) {
+        console.error('Failed to record consent:', consentError)
+        // Continue with onboarding even if consent recording fails
+      }
 
       // Normalize domain - add https:// if no protocol
       let normalizedDomain = formData.domain
@@ -519,9 +543,31 @@ export default function CompanyOnboardingPage() {
                 </div>
               </div>
 
+              {/* Terms and Conditions */}
+              <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <input
+                  type="checkbox"
+                  id="terms"
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  className="mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
+                />
+                <label htmlFor="terms" className="text-sm text-gray-700 flex-1">
+                  I agree to the{' '}
+                  <button
+                    type="button"
+                    onClick={() => setShowTermsModal(true)}
+                    className="text-indigo-600 hover:text-indigo-800 underline font-medium"
+                  >
+                    Terms and Conditions
+                  </button>
+                  {' '}and consent to sharing my data (including email) with our analytics provider for service improvement.
+                </label>
+              </div>
+
               <Button
                 type="submit"
-                disabled={isLoading || !formData.name || !formData.slug}
+                disabled={isLoading || !formData.name || !formData.slug || !termsAccepted}
                 className="w-full"
                 size="lg"
               >
@@ -540,6 +586,17 @@ export default function CompanyOnboardingPage() {
             </form>
           </CardContent>
         </Card>
+        
+        {/* Terms Modal */}
+        <TermsModal
+          isOpen={showTermsModal}
+          onClose={() => setShowTermsModal(false)}
+          onAccept={() => {
+            setTermsAccepted(true)
+            setShowTermsModal(false)
+          }}
+          showAcceptButton={true}
+        />
       </div>
     </div>
   )

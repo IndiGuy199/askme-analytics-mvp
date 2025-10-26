@@ -35,6 +35,8 @@ interface Subscription {
 interface AnalyticsData {
   totalViews: number
   activeUsers: number
+  error?: string
+  needsSetup?: boolean
 }
 
 export default function DashboardPage() {
@@ -43,7 +45,12 @@ export default function DashboardPage() {
   const [company, setCompany] = useState<Company | null>(null)
   const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
-  const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({ totalViews: 0, activeUsers: 0 })
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({ 
+    totalViews: 0, 
+    activeUsers: 0,
+    error: undefined,
+    needsSetup: false
+  })
   const [analyticsLoading, setAnalyticsLoading] = useState(true)
   const [showSuccessMessage, setShowSuccessMessage] = useState(false)
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
@@ -153,11 +160,27 @@ export default function DashboardPage() {
         
         setAnalyticsData({
           totalViews: data.kpis?.traffic?.pageviews || 0,
-          activeUsers: data.kpis?.traffic?.unique_users || 0
+          activeUsers: data.kpis?.traffic?.unique_users || 0,
+          error: undefined,
+          needsSetup: false
+        })
+      } else {
+        const errorData = await response.json()
+        setAnalyticsData({
+          totalViews: 0,
+          activeUsers: 0,
+          error: errorData.error || 'Failed to load analytics',
+          needsSetup: errorData.error?.includes('not configured') || errorData.error?.includes('PostHog')
         })
       }
     } catch (error) {
       console.error('Error fetching analytics:', error)
+      setAnalyticsData({
+        totalViews: 0,
+        activeUsers: 0,
+        error: 'Failed to load analytics data',
+        needsSetup: false
+      })
     } finally {
       setAnalyticsLoading(false)
     }
@@ -351,8 +374,121 @@ export default function DashboardPage() {
         ) : (
           // Company exists - show dashboard
           <div className="space-y-8">
+            {/* Membership Valid Till & Renewal Alert */}
+            {subscription && (subscription.status === 'active' || subscription.status === 'trialing') && (
+              <>
+                {/* Membership Valid Till */}
+                <Card className="border-blue-200 bg-blue-50">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-blue-900">
+                          {subscription.status === 'trialing' 
+                            ? `Your trial membership is valid until`
+                            : `Your ${subscription.plan_id === 'premium_yearly' ? 'Premium (Yearly)' : 'Premium'} membership is valid until`
+                          }
+                        </p>
+                        <p className="text-base font-bold text-blue-900">
+                          {subscription.status === 'trialing' && subscription.trial_end
+                            ? new Date(subscription.trial_end).toLocaleDateString('en-US', { 
+                                month: 'long', 
+                                day: 'numeric', 
+                                year: 'numeric' 
+                              })
+                            : new Date(subscription.current_period_end).toLocaleDateString('en-US', { 
+                                month: 'long', 
+                                day: 'numeric', 
+                                year: 'numeric' 
+                              })
+                          }
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Renewal Alert (10 days before expiry) */}
+                {(() => {
+                  const expiryDate = subscription.status === 'trialing' && subscription.trial_end 
+                    ? new Date(subscription.trial_end)
+                    : new Date(subscription.current_period_end)
+                  const daysUntilExpiry = Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+                  return daysUntilExpiry <= 10 && daysUntilExpiry > 0 ? (
+                    <Card className="border-orange-200 bg-orange-50">
+                      <CardContent className="p-6">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center">
+                              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-orange-900">
+                                {subscription.status === 'trialing' 
+                                  ? 'Your trial expires soon!'
+                                  : 'Your membership expires soon!'
+                                }
+                              </p>
+                              <p className="text-sm text-orange-700 mt-1">
+                                Renew your subscription to continue enjoying uninterrupted access to all features.
+                              </p>
+                              <p className="text-xs text-orange-600 mt-2 font-medium">
+                                {daysUntilExpiry === 1 ? '1 day remaining' : `${daysUntilExpiry} days remaining`}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            onClick={() => router.push('/pricing')}
+                            className="bg-orange-600 hover:bg-orange-700 text-white ml-4"
+                            size="sm"
+                          >
+                            Renew Subscription
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ) : null
+                })()}
+              </>
+            )}
+
             <div>
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Quick Analytics Overview</h2>
+              
+              {/* Analytics Error Message */}
+              {analyticsData.error && (
+                <Card className="mb-6 border-orange-200 bg-orange-50">
+                  <CardContent className="p-6">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0">
+                        <svg className="h-6 w-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                      </div>
+                      <div className="ml-4 flex-1">
+                        <h3 className="text-sm font-medium text-orange-800">
+                          Analytics Not Set Up Yet
+                        </h3>
+                        <p className="mt-1 text-sm text-orange-700">
+                          Your analytics has not been set up yet. Please contact us to start the process.
+                        </p>
+                        <Button
+                          onClick={() => router.push('/contact')}
+                          className="mt-3 h-9 px-3 bg-orange-600 hover:bg-orange-700"
+                        >
+                          Contact Us
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
               
               {/* Quick Stats */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

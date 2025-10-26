@@ -270,7 +270,7 @@ export async function POST(req: NextRequest) {
           while (attempts < 5 && !subData) {
             const { data, error } = await supabase
               .from('subscriptions')
-              .select('id, company_id, plan_id, stripe_subscription_id')
+              .select('id, company_id, stripe_subscription_id')
               .eq('stripe_subscription_id', stripeSubscriptionId)
               .single()
             

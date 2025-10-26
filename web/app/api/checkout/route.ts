@@ -74,16 +74,16 @@ export async function POST(req: NextRequest) {
       console.log('✅ Created Stripe customer:', customerId)
     }
 
-    // Check if user is currently trialing
-    const activeSubscription = company.subscriptions?.find(
-      (sub: any) => sub.status === 'trialing' || sub.status === 'active'
-    )
+    // Check if user has any current or past subscriptions
+    const hasAnySubscription = company.subscriptions && company.subscriptions.length > 0
+    
+    // Only offer trial if user has never had any subscription
+    const shouldOfferTrial = !hasAnySubscription
 
-    const isTrialing = activeSubscription?.status === 'trialing'
-
-    console.log('🔍 Subscription status:', {
-      isTrialing,
-      currentStatus: activeSubscription?.status,
+    console.log('🔍 Subscription check:', {
+      hasAnySubscription,
+      shouldOfferTrial,
+      subscriptionCount: company.subscriptions?.length || 0,
       planId,
     })
 
@@ -113,24 +113,24 @@ export async function POST(req: NextRequest) {
       // },
     }
 
-    // Add subscription data based on trial status
-    if (isTrialing) {
-      // User is already trialing - convert to paid subscription (no trial)
-      sessionConfig.subscription_data = {
-        metadata: {
-          company_id: companyId,
-          plan_id: planId,
-          converted_from_trial: 'true',
-        },
-      }
-    } else {
-      // New subscription - give 30-day trial
+    // Add subscription data based on whether user should get a trial
+    if (shouldOfferTrial) {
+      // New user - give 30-day trial
       sessionConfig.subscription_data = {
         trial_period_days: 30,
         metadata: {
           company_id: companyId,
           plan_id: planId,
           new_trial: 'true',
+        },
+      }
+    } else {
+      // Existing user (has had subscription before) - no trial, immediate payment
+      sessionConfig.subscription_data = {
+        metadata: {
+          company_id: companyId,
+          plan_id: planId,
+          existing_customer: 'true',
         },
       }
     }
