@@ -39,7 +39,7 @@ CREATE TABLE users (
 
 -- Plans table - three tiers only
 CREATE TABLE plans (
-    id VARCHAR(50) PRIMARY KEY, -- 'basic', 'premium', 'enterprise'
+    id VARCHAR(50) PRIMARY KEY, -- 'premium', 'enterprise'
     name VARCHAR(100) NOT NULL,
     description TEXT,
     price_cents INTEGER NOT NULL,
@@ -319,13 +319,13 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Insert three subscription plans
 INSERT INTO plans (id, name, description, price_cents, max_team_members, ai_insights, slack_integration, email_digest, priority_support, is_popular, sort_order) VALUES
-('basic', 'Basic', 'Essential analytics for growing teams', 3900, 2, true, false, true, false, false, 1),
+('premium', 'Premium', 'Advanced analytics for growing teams', 3900, 2, true, false, true, false, false, 1),
 ('premium', 'Premium', 'Advanced analytics with AI insights', 7900, 6, true, true, true, true, true, 2),
 ('enterprise', 'Enterprise', 'Full-featured analytics for large organizations', 29900, -1, true, true, true, true, false, 3);
 
 -- Insert yearly variants (17% discount)
 INSERT INTO plans (id, name, description, price_cents, currency, interval, max_team_members, ai_insights, slack_integration, email_digest, priority_support, sort_order) VALUES
-('basic_yearly', 'Basic (Yearly)', 'Essential analytics - 2 months free', 39000, 'usd', 'year', 2, true, false, true, false, 4),
+('premium_yearly', 'Premium (Yearly)', 'Advanced analytics - 2 months free', 39000, 'usd', 'year', 2, true, false, true, false, 4),
 ('premium_yearly', 'Premium (Yearly)', 'Advanced analytics - 2 months free', 79000, 'usd', 'year', 6, true, true, true, true, 5),
 ('enterprise_yearly', 'Enterprise (Yearly)', 'Full-featured analytics - 2 months free', 299000, 'usd', 'year', -1, true, true, true, true, 6);
 
@@ -386,7 +386,7 @@ END $$;
 -- Comments
 COMMENT ON TABLE companies IS 'Organizations with PostHog integration and billing';
 COMMENT ON TABLE users IS 'Users linked to Supabase auth with magic link support';
-COMMENT ON TABLE plans IS 'Three subscription tiers: basic, premium, enterprise';
+COMMENT ON TABLE plans IS 'Two subscription tiers: premium, enterprise';
 COMMENT ON TABLE subscriptions IS 'Billing subscriptions with flexible trial periods';
 COMMENT ON TABLE analytics_snapshots IS 'Analytics data directly linked to companies';
 COMMENT ON FUNCTION start_trial IS 'Start trial for any plan with custom duration';
