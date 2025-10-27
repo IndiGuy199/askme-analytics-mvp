@@ -1,0 +1,29 @@
+name: Clone Supabase DB (Prod -> Staging)
+on:
+  workflow_dispatch: {}   # run manually from the Actions tab
+
+jobs:
+  dump-and-restore:
+    runs-on: ubuntu-latest
+    container: postgres:16
+    steps:
+      - name: Dump PROD -> artifact
+        run: |
+          pg_dump --format=custom --no-owner --no-privileges \
+            --dbname="$PROD_URL" --compress=9 -f /tmp/full.dump
+        env:
+          PROD_URL: ${{ secrets.PROD_URL }}
+
+      - name: Restore into STAGING
+        run: |
+          pg_restore --no-owner --no-privileges \
+            --dbname="$STAGING_URL" /tmp/full.dump
+        env:
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+
+      - name: Upload dump (optional)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-full-dump
+          path: /tmp/full.dump
