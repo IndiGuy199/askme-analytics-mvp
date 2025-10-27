@@ -1,12 +1,11 @@
 name: Clone Supabase DB (Prod -> Staging)
 on:
-  workflow_dispatch: {}  # run manually
+  workflow_dispatch: {}  # manual only
 
 jobs:
   dump-and-restore:
     runs-on: ubuntu-latest
     env:
-      # optional: force TLS if your URLs don't have sslmode=require
       PGSSLMODE: require
     steps:
       - name: Install Postgres client
@@ -16,14 +15,9 @@ jobs:
           psql --version
           pg_dump --version
 
-      - name: Sanity check DNS/IPv6
-        run: |
-          getent ahosts "$(python3 - <<'PY' import os, urllib.parse print(urllib.parse.urlparse(os.environ['PROD_URL']).hostname) PY )"
-        env:
-          PROD_URL: ${{ secrets.PROD_URL }}
-
       - name: Dump PROD -> artifact
         run: |
+          echo "Dumping PROD database..."
           pg_dump --format=custom --no-owner --no-privileges \
             --dbname="$PROD_URL" --compress=9 -f /tmp/full.dump
         env:
@@ -31,12 +25,13 @@ jobs:
 
       - name: Restore into STAGING
         run: |
+          echo "Restoring into STAGING database..."
           pg_restore --no-owner --no-privileges \
             --dbname="$STAGING_URL" /tmp/full.dump
         env:
           STAGING_URL: ${{ secrets.STAGING_URL }}
 
-      - name: Upload dump (optional)
+      - name: Upload dump artifact (optional)
         uses: actions/upload-artifact@v4
         with:
           name: supabase-full-dump
