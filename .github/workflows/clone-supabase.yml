@@ -18,11 +18,7 @@ jobs:
 
       - name: Sanity check DNS/IPv6
         run: |
-          getent ahosts "$(python3 - <<'PY'
-import os, urllib.parse
-print(urllib.parse.urlparse(os.environ['PROD_URL']).hostname)
-PY
-)"
+          getent ahosts "$(python3 - <<'PY' import os, urllib.parse print(urllib.parse.urlparse(os.environ['PROD_URL']).hostname) PY )"
         env:
           PROD_URL: ${{ secrets.PROD_URL }}
 
