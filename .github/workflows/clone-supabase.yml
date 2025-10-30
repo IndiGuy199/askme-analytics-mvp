@@ -1,0 +1,38 @@
+name: Clone Supabase DB (Prod -> Staging)
+on:
+  workflow_dispatch: {}  # manual only
+
+jobs:
+  dump-and-restore:
+    runs-on: ubuntu-latest
+    env:
+      PGSSLMODE: require
+    steps:
+      - name: Install Postgres client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          psql --version
+          pg_dump --version
+
+      - name: Dump PROD -> artifact
+        run: |
+          echo "Dumping PROD database..."
+          pg_dump --format=custom --no-owner --no-privileges \
+            --dbname="$PROD_URL" --compress=9 -f /tmp/full.dump
+        env:
+          PROD_URL: ${{ secrets.PROD_URL }}
+
+      - name: Restore into STAGING
+        run: |
+          echo "Restoring into STAGING database..."
+          pg_restore --no-owner --no-privileges \
+            --dbname="$STAGING_URL" /tmp/full.dump
+        env:
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+
+      - name: Upload dump artifact (optional)
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-full-dump
+          path: /tmp/full.dump
