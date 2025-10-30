@@ -27,13 +27,13 @@
         emailSelectors: 'input[type="email"], input[name*="email" i], input[placeholder*="email" i], input[id*="email" i]',
         
         // Path to analytics library (clients can override)
-        analyticsLibraryPath: './ask-me-analytics.js',
+        analyticsLibraryPath: '/lib/clientAnalytics/ask-me-analytics.js',
         
         // Path to constants file
-        constantsPath: './ph-constants.js',
+        constantsPath: '/lib/clientAnalytics/ph-constants.js',
         
         // Path to product injector
-        injectorPath: './ph-product-injector.js',
+        injectorPath: '/lib/clientAnalytics/ph-product-injector.js',
         
         // Product tracking configuration
         productConfig: {

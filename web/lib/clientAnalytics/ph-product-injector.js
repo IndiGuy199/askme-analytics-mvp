@@ -175,7 +175,7 @@
         }
 
         // 🆕 Add referrer for purchase completion events
-        const purchaseEvents = [EK.RENEWAL_COMPLETED, EK.CHECKOUT_COMPLETED];
+        const purchaseEvents = [EK.SUBSCRIPTION_COMPLETED, EK.CHECKOUT_COMPLETED];
         if (purchaseEvents.includes(name) && document.referrer) {
             props[P.REFERRER] = document.referrer;
         }
