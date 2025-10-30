@@ -35,31 +35,31 @@
         // Path to product injector
         injectorPath: './ph-product-injector.js',
         
-        // Product tracking configuration (CLIENT-SPECIFIC - configure this in your site)
-        // productConfig: {
-        //     eventName: 'renew_click',
-        //     pageMatch: '/app/renew',
-        //     panelClass: 'price',
-        //     titleClass: 'panel-heading',
-        //     priceClass: 'memberVal',
-        //     currencyClass: 'memTop'
-        // },
+        // Product tracking configuration
+        productConfig: {
+            eventName: 'renew_click',
+            pageMatch: '/app/renew',
+            panelClass: 'price',
+            titleClass: 'panel-heading',
+            priceClass: 'memberVal',
+            currencyClass: 'memTop'
+        },
         
-        // Step definitions for funnel tracking (CLIENT-SPECIFIC - configure this in your site)
-        // steps: [
-        //     {"key":"RENEWAL_STARTED","url":"/app/membership","urlMatch":"contains","selector":"form input[type=submit]"},
-        //     {"key":"PRODUCT_SELECTED","url":"/app/renew/index","urlMatch":"contains","selector":"form input[type=submit]"},
-        //     {"key":"CHECKOUT_VIEWED","url":"/app/renew/submitRenewal","urlMatch":"contains"},
-        //     {"key":"CHECKOUT_SUBMITTED","url":"/app/renew/submitRenewal","urlMatch":"contains","selector":"input[type=submit]"},
-        //     {"key":"CHECKOUT_ERROR","url":"/app/renew/pay","urlMatch":"contains","selector":"input[type=submit]","requireSelectorPresent":true},
-        //     {"key":"RENEWAL_COMPLETED","url":"/app/renew/pay","urlMatch":"contains","selector":".receipt","requireSelectorPresent":true},
-        //     {"key":"ONBOARDING_STARTED","url":"/app/profile/createProfile","urlMatch":"contains","selector":"#membershipProfile","autoFire":true},
-        //     {"key":"ONBOARDING_STEP1_COMPLETED","url":"/app/profile/createProfile","urlMatch":"contains","selector":"#membershipProfile input[type=submit]"},
-        //     {"key":"ONBOARDING_STEP2_COMPLETED","url":"/app/profile/createProfile","urlMatch":"contains","selector":"#contactForm input[type=button]#pwsubmit"},
-        //     {"key":"ONBOARDING_STEP3_COMPLETED","url":"/app/profile/createSecurityQuestions","urlMatch":"contains","selector":"#createProfileStep3Form input[type=submit]"},
-        //     {"key":"CONSENT_PROVIDED","url":"/app/membership/consent","urlMatch":"contains","selector":"#consent-form input[type=button]"},
-        //     {"key":"SIGNUP_COMPLETED","url":"/auth/dashboard","urlMatch":"contains"}
-        // ]
+        // Step definitions (clients can override/extend)
+        steps: [
+            {"key":"RENEWAL_STARTED","url":"/app/membership","urlMatch":"contains","selector":"form input[type=submit]"},
+            {"key":"PRODUCT_SELECTED","url":"/app/renew/index","urlMatch":"contains","selector":"form input[type=submit]"},
+            {"key":"CHECKOUT_VIEWED","url":"/app/renew/submitRenewal","urlMatch":"contains"},
+            {"key":"CHECKOUT_SUBMITTED","url":"/app/renew/submitRenewal","urlMatch":"contains","selector":"input[type=submit]"},
+            {"key":"CHECKOUT_ERROR","url":"/app/renew/pay","urlMatch":"contains","selector":"input[type=submit]","requireSelectorPresent":true},
+            {"key":"RENEWAL_COMPLETED","url":"/app/renew/pay","urlMatch":"contains","selector":".receipt","requireSelectorPresent":true},
+            {"key":"ONBOARDING_STARTED","url":"/app/profile/createProfile","urlMatch":"contains","selector":"#membershipProfile","autoFire":true},
+            {"key":"ONBOARDING_STEP1_COMPLETED","url":"/app/profile/createProfile","urlMatch":"contains","selector":"#membershipProfile input[type=submit]"},
+            {"key":"ONBOARDING_STEP2_COMPLETED","url":"/app/profile/createProfile","urlMatch":"contains","selector":"#contactForm input[type=button]#pwsubmit"},
+            {"key":"ONBOARDING_STEP3_COMPLETED","url":"/app/profile/createSecurityQuestions","urlMatch":"contains","selector":"#createProfileStep3Form input[type=submit]"},
+            {"key":"CONSENT_PROVIDED","url":"/app/membership/consent","urlMatch":"contains","selector":"#consent-form input[type=button]"},
+            {"key":"SIGNUP_COMPLETED","url":"/auth/dashboard","urlMatch":"contains"}
+        ]
     };
 
     // Page type detection function
@@ -281,26 +281,21 @@
         script.id = 'ph-product-injector';
         script.src = config.injectorPath;
 
-        // Set attributes using constants (only if productConfig exists)
-        if (config.productConfig) {
-            script.setAttribute(window.PH_DATA_KEYS.EVENT_NAME, config.productConfig.eventName || 'product_click');
-            script.setAttribute(window.PH_DATA_KEYS.PAGE_MATCH, config.productConfig.pageMatch || '');
-            script.setAttribute(window.PH_DATA_KEYS.PANEL_CLASS, config.productConfig.panelClass || '');
-            script.setAttribute(window.PH_DATA_KEYS.TITLE_CLASS, config.productConfig.titleClass || '');
-            script.setAttribute(window.PH_DATA_KEYS.PRICE_CLASS, config.productConfig.priceClass || '');
-            script.setAttribute(window.PH_DATA_KEYS.CURRENCY_CLASS, config.productConfig.currencyClass || '');
-        }
+        // Set attributes using constants
+        script.setAttribute(window.PH_DATA_KEYS.EVENT_NAME, config.productConfig.eventName);
+        script.setAttribute(window.PH_DATA_KEYS.PAGE_MATCH, config.productConfig.pageMatch);
+        script.setAttribute(window.PH_DATA_KEYS.PANEL_CLASS, config.productConfig.panelClass);
+        script.setAttribute(window.PH_DATA_KEYS.TITLE_CLASS, config.productConfig.titleClass);
+        script.setAttribute(window.PH_DATA_KEYS.PRICE_CLASS, config.productConfig.priceClass);
+        script.setAttribute(window.PH_DATA_KEYS.CURRENCY_CLASS, config.productConfig.currencyClass);
 
-        // Convert step keys to actual enum values (only if steps exist)
-        if (config.steps && Array.isArray(config.steps) && config.steps.length > 0) {
-            const resolvedSteps = config.steps.map(step => ({
-                ...step,
-                key: window.PH_KEYS[step.key] || step.key
-            }));
-            script.setAttribute(window.PH_DATA_KEYS.STEPS, JSON.stringify(resolvedSteps));
-        } else {
-            script.setAttribute(window.PH_DATA_KEYS.STEPS, JSON.stringify([]));
-        }
+        // Convert step keys to actual enum values
+        const resolvedSteps = config.steps.map(step => ({
+            ...step,
+            key: window.PH_KEYS[step.key] || step.key
+        }));
+
+        script.setAttribute(window.PH_DATA_KEYS.STEPS, JSON.stringify(resolvedSteps));
 
         document.head.appendChild(script);
         console.log('✅ Product injector script loaded');
