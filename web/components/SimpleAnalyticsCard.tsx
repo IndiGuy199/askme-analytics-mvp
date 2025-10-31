@@ -403,8 +403,18 @@ export default function SimpleAnalyticsCard({
                 const current = kpis.traffic.unique_users || 0;
                 const previous = kpis.traffic.previous_unique_users;
                 const change = current - previous;
-                const percentChange = previous > 0 ? ((change / previous) * 100).toFixed(1) : '0.0';
                 const isPositive = change > 0;
+                
+                // If no previous data, show "New" badge
+                if (previous === 0 && current > 0) {
+                  return (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                      New
+                    </span>
+                  );
+                }
+                
+                const percentChange = previous > 0 ? ((change / previous) * 100).toFixed(1) : '0.0';
                 
                 return (
                   <>
@@ -442,8 +452,18 @@ export default function SimpleAnalyticsCard({
                 const current = kpis.traffic.pageviews || 0;
                 const previous = kpis.traffic.previous_pageviews;
                 const change = current - previous;
-                const percentChange = previous > 0 ? ((change / previous) * 100).toFixed(1) : '0.0';
                 const isPositive = change > 0;
+                
+                // If no previous data, show "New" badge
+                if (previous === 0 && current > 0) {
+                  return (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                      New
+                    </span>
+                  );
+                }
+                
+                const percentChange = previous > 0 ? ((change / previous) * 100).toFixed(1) : '0.0';
                 
                 return (
                   <>
@@ -482,8 +502,18 @@ export default function SimpleAnalyticsCard({
                 const current = kpis.sessions || 0;
                 const previous = kpis.previous_sessions;
                 const change = current - previous;
-                const percentChange = previous > 0 ? ((change / previous) * 100).toFixed(1) : '0.0';
                 const isPositive = change > 0;
+                
+                // If no previous data, show "New" badge
+                if (previous === 0 && current > 0) {
+                  return (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                      New
+                    </span>
+                  );
+                }
+                
+                const percentChange = previous > 0 ? ((change / previous) * 100).toFixed(1) : '0.0';
                 
                 return (
                   <>
@@ -536,8 +566,18 @@ export default function SimpleAnalyticsCard({
                 const current = kpis.session_duration || 0;
                 const previous = kpis.previous_session_duration;
                 const change = current - previous;
-                const percentChange = previous > 0 ? ((change / previous) * 100).toFixed(1) : '0.0';
                 const isPositive = change > 0;
+                
+                // If no previous data, show "New" badge
+                if (previous === 0 && current > 0) {
+                  return (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                      New
+                    </span>
+                  );
+                }
+                
+                const percentChange = previous > 0 ? ((change / previous) * 100).toFixed(1) : '0.0';
                 
                 // Format time change nicely
                 const changeMinutes = Math.floor(Math.abs(change) / 60);
@@ -597,9 +637,19 @@ export default function SimpleAnalyticsCard({
                 const current = kpis.bounce_rate || 0;
                 const previous = kpis.previous_bounce_rate;
                 const change = current - previous;
-                const percentChange = previous > 0 ? ((change / previous) * 100).toFixed(1) : '0.0';
                 // For bounce rate, lower is better, so we invert the color logic
                 const isPositive = change < 0;
+                
+                // If no previous data, show "New" badge
+                if (previous === 0 && current > 0) {
+                  return (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                      New
+                    </span>
+                  );
+                }
+                
+                const percentChange = previous > 0 ? ((change / previous) * 100).toFixed(1) : '0.0';
                 
                 return (
                   <>
@@ -666,6 +716,15 @@ export default function SimpleAnalyticsCard({
                       const previous = trafficView === 'visitors'
                         ? (kpis.traffic?.previous_unique_users || 0)
                         : (kpis.traffic?.previous_pageviews || 0);
+                      
+                      // If no previous data, show "New" badge
+                      if (previous === 0 && current > 0) {
+                        return (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                            New
+                          </span>
+                        );
+                      }
                       
                       if (previous === 0) return null;
                       
