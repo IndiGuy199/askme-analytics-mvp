@@ -53,7 +53,7 @@ export default function RootLayout({
         
         {/* AskMe Analytics Initialization */}
         <Script 
-          src="https://askmeanalytics.com/lib/clientAnalytics/askme-analytics-init.js" 
+          src="/lib/clientAnalytics/askme-analytics-init.js" 
           strategy="afterInteractive"
         />
       </head>
