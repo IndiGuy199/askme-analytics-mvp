@@ -12,8 +12,8 @@ function PostHogOnboardingContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [formData, setFormData] = useState({
-    posthog_project_id: '',
-    posthog_api_key: '',
+    posthog_project_id: '202299', // Default PostHog project ID
+    posthog_api_key: 'phx_tmki9RqkURHkZJxHnFErIij6C8zcnStWQ4HajDA51GY1QFY', // Default Personal API Key
     posthog_client_id: ''
   })
   const [showApiKey, setShowApiKey] = useState(false)
@@ -38,7 +38,7 @@ function PostHogOnboardingContent() {
       if (urlCompanyId) {
         setCompanyId(urlCompanyId)
         
-        // Fetch existing company data to pre-fill the form
+        // Fetch existing company data to pre-fill the form (only if already configured)
         const { data: companyData } = await supabase
           .from('companies')
           .select('posthog_project_id, posthog_api_key_encrypted, posthog_client_id')
@@ -46,11 +46,12 @@ function PostHogOnboardingContent() {
           .single()
         
         if (companyData) {
-          setFormData({
-            posthog_project_id: companyData.posthog_project_id?.toString() || '',
-            posthog_api_key: companyData.posthog_api_key_encrypted || '',
-            posthog_client_id: companyData.posthog_client_id || ''
-          })
+          setFormData(prev => ({
+            // Keep defaults if not set in DB, otherwise use DB values
+            posthog_project_id: companyData.posthog_project_id?.toString() || prev.posthog_project_id,
+            posthog_api_key: companyData.posthog_api_key_encrypted || prev.posthog_api_key,
+            posthog_client_id: companyData.posthog_client_id || prev.posthog_client_id
+          }))
         }
         return
       }
@@ -69,7 +70,7 @@ function PostHogOnboardingContent() {
 
       setCompanyId(userData.company_id)
       
-      // Fetch existing company data to pre-fill the form
+      // Fetch existing company data to pre-fill the form (only if already configured)
       const { data: companyData } = await supabase
         .from('companies')
         .select('posthog_project_id, posthog_api_key_encrypted, posthog_client_id')
@@ -77,11 +78,12 @@ function PostHogOnboardingContent() {
         .single()
       
       if (companyData) {
-        setFormData({
-          posthog_project_id: companyData.posthog_project_id?.toString() || '',
-          posthog_api_key: companyData.posthog_api_key_encrypted || '',
-          posthog_client_id: companyData.posthog_client_id || ''
-        })
+        setFormData(prev => ({
+          // Keep defaults if not set in DB, otherwise use DB values
+          posthog_project_id: companyData.posthog_project_id?.toString() || prev.posthog_project_id,
+          posthog_api_key: companyData.posthog_api_key_encrypted || prev.posthog_api_key,
+          posthog_client_id: companyData.posthog_client_id || prev.posthog_client_id
+        }))
       }
     }
 

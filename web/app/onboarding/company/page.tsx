@@ -155,21 +155,6 @@ export default function CompanyOnboardingPage() {
       // Get current user
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
-      
-      // Record consent
-      try {
-        await fetch('/api/consent/accept', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            email: user.email, 
-            termsVersion: '1.0' 
-          })
-        })
-      } catch (consentError) {
-        console.error('Failed to record consent:', consentError)
-        // Continue with onboarding even if consent recording fails
-      }
 
       // Normalize domain - add https:// if no protocol
       let normalizedDomain = formData.domain
@@ -198,17 +183,26 @@ export default function CompanyOnboardingPage() {
 
       if (companyError) throw companyError
 
-      // Update user with company_id and mark progress to step 2
+      // Get client IP for consent record-keeping
+      const clientIp = 'consent-via-onboarding' // Simplified for now
+
+      // Update user with company_id, role, and record consent
       const { error: userError } = await supabase
         .from('users')
         .update({ 
           company_id: company.id,
           role: 'owner', // First user becomes owner
-          onboarding_step: 'analytics'
+          onboarding_step: 'analytics',
+          terms_accepted_at: new Date().toISOString(),
+          terms_version: '1.0',
+          consent_ip_address: clientIp
         })
         .eq('id', user.id)
 
-      if (userError) throw userError
+      if (userError) {
+        console.error('User update error:', userError)
+        throw new Error(`Failed to update user: ${userError.message}`)
+      }
 
       // Start Basic trial using the database function
       const { error: trialError } = await supabase.rpc('start_trial', {
