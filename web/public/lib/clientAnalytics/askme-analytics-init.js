@@ -8,12 +8,15 @@
     'use strict';
 
     // Configuration object that clients can override
-    window.AskMeAnalyticsConfig = window.AskMeAnalyticsConfig || {
-        // Core PostHog settings
-        apiKey: 'phc_MN5MXCec7lNZtZakqpRQZqTLaPfcV6CxeE8hfbTUFE2',
-        apiHost: 'https://us.i.posthog.com',
-        clientId: 'askme-ai-app', // Default client ID
-        debug: false, // Set to true for development
+    window.AskMeAnalyticsConfig = window.AskMeAnalyticsConfig || {};
+    
+    // Merge with defaults (allows clients to override only what they need)
+    window.AskMeAnalyticsConfig = Object.assign({
+        // Core PostHog settings (REQUIRED - must be overridden by client)
+        apiKey: window.AskMeAnalyticsConfig.apiKey || '',
+        apiHost: window.AskMeAnalyticsConfig.apiHost || 'https://us.i.posthog.com',
+        clientId: window.AskMeAnalyticsConfig.clientId || 'askme-ai-app',
+        debug: window.AskMeAnalyticsConfig.debug !== undefined ? window.AskMeAnalyticsConfig.debug : false,
         
         // Analytics library settings
         autocapture: true,
@@ -26,41 +29,21 @@
         // User identification settings
         emailSelectors: 'input[type="email"], input[name*="email" i], input[placeholder*="email" i], input[id*="email" i]',
         
-        // Path to analytics library (clients can override)
-        analyticsLibraryPath: './ask-me-analytics.min.js',
+        // Path to analytics library (has defaults, clients can override)
+        analyticsLibraryPath: '/lib/clientAnalytics/ask-me-analytics.min.js',
         
         // Path to constants file
-        constantsPath: './ph-constants.minjs',
+        constantsPath: '/lib/clientAnalytics/ph-constants.min.js',
         
         // Path to product injector
-        injectorPath: './ph-product-injector.min.js',
+        injectorPath: '/lib/clientAnalytics/ph-product-injector.min.js',
         
-        // Product tracking configuration (CLIENT-SPECIFIC - configure this in your site)
-        // productConfig: {
-        //     eventName: 'renew_click',
-        //     pageMatch: '/app/renew',
-        //     panelClass: 'price',
-        //     titleClass: 'panel-heading',
-        //     priceClass: 'memberVal',
-        //     currencyClass: 'memTop'
-        // },
+        // Product tracking configuration (CLIENT-SPECIFIC - override in your config)
+        productConfig: null,
         
-        // Step definitions for funnel tracking (CLIENT-SPECIFIC - configure this in your site)
-        // steps: [
-        //     {"key":"RENEWAL_STARTED","url":"/app/membership","urlMatch":"contains","selector":"form input[type=submit]"},
-        //     {"key":"PRODUCT_SELECTED","url":"/app/renew/index","urlMatch":"contains","selector":"form input[type=submit]"},
-        //     {"key":"CHECKOUT_VIEWED","url":"/app/renew/submitRenewal","urlMatch":"contains"},
-        //     {"key":"CHECKOUT_SUBMITTED","url":"/app/renew/submitRenewal","urlMatch":"contains","selector":"input[type=submit]"},
-        //     {"key":"CHECKOUT_ERROR","url":"/app/renew/pay","urlMatch":"contains","selector":"input[type=submit]","requireSelectorPresent":true},
-        //     {"key":"RENEWAL_COMPLETED","url":"/app/renew/pay","urlMatch":"contains","selector":".receipt","requireSelectorPresent":true},
-        //     {"key":"ONBOARDING_STARTED","url":"/app/profile/createProfile","urlMatch":"contains","selector":"#membershipProfile","autoFire":true},
-        //     {"key":"ONBOARDING_STEP1_COMPLETED","url":"/app/profile/createProfile","urlMatch":"contains","selector":"#membershipProfile input[type=submit]"},
-        //     {"key":"ONBOARDING_STEP2_COMPLETED","url":"/app/profile/createProfile","urlMatch":"contains","selector":"#contactForm input[type=button]#pwsubmit"},
-        //     {"key":"ONBOARDING_STEP3_COMPLETED","url":"/app/profile/createSecurityQuestions","urlMatch":"contains","selector":"#createProfileStep3Form input[type=submit]"},
-        //     {"key":"CONSENT_PROVIDED","url":"/app/membership/consent","urlMatch":"contains","selector":"#consent-form input[type=button]"},
-        //     {"key":"SIGNUP_COMPLETED","url":"/auth/dashboard","urlMatch":"contains"}
-        // ]
-    };
+        // Step definitions for funnel tracking (CLIENT-SPECIFIC - override in your config)
+        steps: []
+    }, window.AskMeAnalyticsConfig);
 
     // Page type detection function
     function getPageType() {

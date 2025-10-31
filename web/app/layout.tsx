@@ -21,7 +21,22 @@ export default function RootLayout({
              
         {/* AskMe Analytics Initialization */}
         <Script id="askme-analytics-config" strategy="beforeInteractive">
-          {`window.AskMeAnalyticsConfig = { clientId: 'askme-analytics-app', analyticsLibraryPath: '/lib/clientAnalytics/ask-me-analytics.min.js', constantsPath: '/lib/clientAnalytics/ph-constants.min.js', injectorPath: '/lib/clientAnalytics/ph-product-injector.min.js' };`}
+          {`
+            window.AskMeAnalyticsConfig = {
+              // Required: PostHog credentials
+              apiKey: 'phc_MN5MXCec7lNZtZakqpRQZqTLaPfcV6CxeE8hfbTUFE2',
+              apiHost: 'https://us.i.posthog.com',
+              
+              // Client-specific identifier (override per client)
+              clientId: 'askme-analytics-app',
+              
+              // Debug mode (set to false in production)
+              debug: true
+              
+              // Library paths are optional - defaults are set in askme-analytics-init.js
+              // Only override if you host the files at a different location
+            };
+          `}
         </Script>
 
         <Script 
