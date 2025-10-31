@@ -20,6 +20,10 @@ export default function RootLayout({
       <head>
              
         {/* AskMe Analytics Initialization */}
+        <Script id="askme-analytics-config" strategy="beforeInteractive">
+          {`window.AskMeAnalyticsConfig = { clientId: 'askme-analytics-app', analyticsLibraryPath: '/lib/clientAnalytics/ask-me-analytics.min.js', constantsPath: '/lib/clientAnalytics/ph-constants.min.js', injectorPath: '/lib/clientAnalytics/ph-product-injector.min.js' };`}
+        </Script>
+
         <Script 
           src="/lib/clientAnalytics/askme-analytics-init.js" 
           strategy="afterInteractive"
