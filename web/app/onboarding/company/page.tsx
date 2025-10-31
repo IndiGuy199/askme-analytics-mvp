@@ -183,9 +183,6 @@ export default function CompanyOnboardingPage() {
 
       if (companyError) throw companyError
 
-      // Get client IP for consent record-keeping
-      const clientIp = 'consent-via-onboarding' // Simplified for now
-
       // Update user with company_id, role, and record consent
       const { error: userError } = await supabase
         .from('users')
@@ -195,7 +192,7 @@ export default function CompanyOnboardingPage() {
           onboarding_step: 'analytics',
           terms_accepted_at: new Date().toISOString(),
           terms_version: '1.0',
-          consent_ip_address: clientIp
+          consent_ip_address: null // IP tracking not implemented yet
         })
         .eq('id', user.id)
 
