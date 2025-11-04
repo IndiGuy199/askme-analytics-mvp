@@ -251,10 +251,45 @@
             }
         }
 
-        // 🆕 Add referrer for purchase completion events
+        // 🆕 Enhanced revenue tracking for purchase completion events
         const purchaseEvents = [EK.SUBSCRIPTION_COMPLETED, EK.CHECKOUT_COMPLETED];
-        if (purchaseEvents.includes(name) && document.referrer) {
-            props[P.REFERRER] = document.referrer;
+        if (purchaseEvents.includes(name)) {
+            // Add referrer
+            if (document.referrer) {
+                props[P.REFERRER] = document.referrer;
+            }
+            
+            // Calculate revenue = price × quantity
+            const price = parseFloat(props[P.PRICE] || props.price || '0');
+            const quantity = parseInt(props[P.QUANTITY] || props.quantity || '1', 10);
+            const revenue = price * quantity;
+            
+            // Add comprehensive revenue properties
+            props[P.REVENUE] = revenue.toFixed(2);
+            props[P.UNIT_PRICE] = price.toFixed(2);
+            props[P.QUANTITY] = String(quantity);
+            
+            // Normalize product_name and product_id
+            if (props[P.PRODUCT]) {
+                props[P.PRODUCT_NAME] = props[P.PRODUCT];
+                props[P.PRODUCT_ID] = props[P.PRODUCT];
+            }
+            
+            // Extract UTM parameters from URL
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.has('utm_source')) props[P.UTM_SOURCE] = urlParams.get('utm_source');
+                if (urlParams.has('utm_medium')) props[P.UTM_MEDIUM] = urlParams.get('utm_medium');
+                if (urlParams.has('utm_campaign')) props[P.UTM_CAMPAIGN] = urlParams.get('utm_campaign');
+                
+                // Try to get UTM from sessionStorage if not in current URL
+                if (!props[P.UTM_SOURCE]) {
+                    const storedSource = sessionStorage.getItem('ph_utm_source');
+                    if (storedSource) props[P.UTM_SOURCE] = storedSource;
+                }
+            } catch (e) {
+                console.warn('[ph-injector] Failed to extract UTM parameters:', e);
+            }
         }
 
         if (phReady) {
@@ -302,7 +337,10 @@
         // 🆕 NEW: Configurable selectors for dynamic elements
         priceWatchSelectors : SCRIPT.getAttribute(K.PRICE_WATCH_SELECTORS),
         emailSelectors      : SCRIPT.getAttribute(K.EMAIL_SELECTORS),
-        buttonSelectors     : SCRIPT.getAttribute(K.BUTTON_SELECTORS)
+        buttonSelectors     : SCRIPT.getAttribute(K.BUTTON_SELECTORS),
+        // 🆕 NEW: Quantity tracking configuration
+        quantityClass       : SCRIPT.getAttribute(K.QUANTITY_CLASS),
+        quantityAttr        : SCRIPT.getAttribute(K.QUANTITY_ATTR)
     };
 
     /* ---------- 4) Page gating -------------------------------------------- */
@@ -453,8 +491,58 @@
             }
         }
 
+        // 🆕 quantity - try multiple sources
+        let quantity = '1'; // default to 1
+        
+        // 1. Try data-quantity attribute on container
+        if (container.hasAttribute && container.hasAttribute('data-quantity')) {
+            quantity = container.getAttribute('data-quantity');
+        }
+        
+        // 2. Try configured quantity attribute
+        if (quantity === '1' && DS.quantityAttr && container.hasAttribute && container.hasAttribute(DS.quantityAttr)) {
+            quantity = container.getAttribute(DS.quantityAttr);
+        }
+        
+        // 3. Try configured quantity classes
+        if (quantity === '1' && DS.quantityClass) {
+            const qCsv = classToSelectorCsv(DS.quantityClass);
+            const qn = first(container, qCsv || '.quantity,.qty,.seats,input[type="number"]');
+            if (qn) {
+                // Handle input/select elements
+                if (qn.tagName === 'INPUT' || qn.tagName === 'SELECT') {
+                    quantity = qn.value || '1';
+                } else {
+                    // Try data-quantity attribute first, then text content
+                    quantity = qn.getAttribute('data-quantity') || parseNum(text(qn)) || '1';
+                }
+            }
+        }
+        
+        // 4. Fallback: Try common quantity input selectors
+        if (quantity === '1') {
+            const commonSelectors = 'input[name*="quantity" i], input[name*="qty" i], select[name*="quantity" i], .quantity input, .qty input';
+            const qn = first(container, commonSelectors);
+            if (qn && (qn.tagName === 'INPUT' || qn.tagName === 'SELECT')) {
+                quantity = qn.value || '1';
+            }
+        }
+        
+        // Ensure quantity is a valid number
+        const parsedQty = parseFloat(quantity);
+        if (isNaN(parsedQty) || parsedQty < 1) {
+            quantity = '1';
+        } else {
+            quantity = String(Math.floor(parsedQty)); // Convert to integer string
+        }
+
         const prodNorm = (product ? product.toLowerCase().replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_') : 'unknown_product');
-        return { [P.PRODUCT]: prodNorm, [P.PRICE]: price || '0.00', [P.CURRENCY]: currency };
+        return { 
+            [P.PRODUCT]: prodNorm, 
+            [P.PRICE]: price || '0.00', 
+            [P.CURRENCY]: currency,
+            [P.QUANTITY]: quantity
+        };
     }
 
     function annotateSubmit(btn) {
@@ -468,6 +556,7 @@
         btn.setAttribute(DOM.PRODUCT,  props[P.PRODUCT]);
         btn.setAttribute(DOM.PRICE,    String(props[P.PRICE]));
         btn.setAttribute(DOM.CURRENCY, props[P.CURRENCY]);
+        btn.setAttribute(DOM.QUANTITY, String(props[P.QUANTITY] || '1'));
         
         sentButtons.add(btn);
     }
@@ -743,7 +832,8 @@
         const a = el.getAttribute(DOM.PRODUCT);
         const b = el.getAttribute(DOM.PRICE);
         const c = el.getAttribute(DOM.CURRENCY);
-        if (a && b && c) return { [P.PRODUCT]: a, [P.PRICE]: b, [P.CURRENCY]: c };
+        const q = el.getAttribute(DOM.QUANTITY);
+        if (a && b && c) return { [P.PRODUCT]: a, [P.PRICE]: b, [P.CURRENCY]: c, [P.QUANTITY]: q || '1' };
 
         // 2) nearest submit
         const btn = el.closest('input[type="submit"], button[type="submit"]');
@@ -751,7 +841,8 @@
             const a2 = btn.getAttribute(DOM.PRODUCT);
             const b2 = btn.getAttribute(DOM.PRICE);
             const c2 = btn.getAttribute(DOM.CURRENCY);
-            if (a2 && b2 && c2) return { [P.PRODUCT]: a2, [P.PRICE]: b2, [P.CURRENCY]: c2 };
+            const q2 = btn.getAttribute(DOM.QUANTITY);
+            if (a2 && b2 && c2) return { [P.PRODUCT]: a2, [P.PRICE]: b2, [P.CURRENCY]: c2, [P.QUANTITY]: q2 || '1' };
         }
 
         // 3) walk up a bit
@@ -760,7 +851,8 @@
             const a3 = p.getAttribute?.(DOM.PRODUCT);
             const b3 = p.getAttribute?.(DOM.PRICE);
             const c3 = p.getAttribute?.(DOM.CURRENCY);
-            if (a3 && b3 && c3) return { [P.PRODUCT]: a3, [P.PRICE]: b3, [P.CURRENCY]: c3 };
+            const q3 = p.getAttribute?.(DOM.QUANTITY);
+            if (a3 && b3 && c3) return { [P.PRODUCT]: a3, [P.PRICE]: b3, [P.CURRENCY]: c3, [P.QUANTITY]: q3 || '1' };
             p = p.parentElement;
         }
         return null;
@@ -795,10 +887,27 @@
                     const prod = btn.getAttribute(DOM.PRODUCT);
                     const price = btn.getAttribute(DOM.PRICE);
                     const curr = btn.getAttribute(DOM.CURRENCY);
+                    const qty = btn.getAttribute(DOM.QUANTITY) || '1';
                     if (prod && price && curr) {
+                        // Store product data in sessionStorage for checkout completion
+                        try {
+                            sessionStorage.setItem('ph_last_product', prod);
+                            sessionStorage.setItem('ph_last_price', price);
+                            sessionStorage.setItem('ph_last_currency', curr);
+                            sessionStorage.setItem('ph_last_quantity', qty);
+                        } catch (e) {
+                            console.warn('[ph-product-injector] sessionStorage not available:', e);
+                        }
+                        
                         captureOnce(
                             productEventName,
-                            { [P.PRODUCT]: prod, [P.PRICE]: price, [P.CURRENCY]: curr, [P.PATH]: location.pathname },
+                            { 
+                                [P.PRODUCT]: prod, 
+                                [P.PRICE]: price, 
+                                [P.CURRENCY]: curr, 
+                                [P.QUANTITY]: qty,
+                                [P.PATH]: location.pathname 
+                            },
                             { scopePath: true }
                         );
                         sentButtons.add(btn);
@@ -902,6 +1011,22 @@
 
     /* ---------- 11) Boot -------------------------------------------------- */
     function boot() {
+        // 🆕 Capture UTM parameters to sessionStorage on initial load
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('utm_source')) {
+                sessionStorage.setItem('ph_utm_source', urlParams.get('utm_source'));
+            }
+            if (urlParams.has('utm_medium')) {
+                sessionStorage.setItem('ph_utm_medium', urlParams.get('utm_medium'));
+            }
+            if (urlParams.has('utm_campaign')) {
+                sessionStorage.setItem('ph_utm_campaign', urlParams.get('utm_campaign'));
+            }
+        } catch (e) {
+            console.warn('[ph-injector] Failed to store UTM parameters:', e);
+        }
+        
         applyAllRules();
         if (pageMatches(DS.pageMatch)) {
             scanAndAnnotate();

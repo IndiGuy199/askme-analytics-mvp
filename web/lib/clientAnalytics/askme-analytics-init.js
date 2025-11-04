@@ -42,7 +42,9 @@
         //     panelClass: 'price',
         //     titleClass: 'panel-heading',
         //     priceClass: 'memberVal',
-        //     currencyClass: 'memTop'
+        //     currencyClass: 'memTop',
+        //     quantityClass: 'quantity, qty, seats', // 🆕 NEW: Classes for quantity inputs/displays
+        //     quantityAttr: 'data-quantity' // 🆕 NEW: Attribute for quantity value
         // },
         
         // Step definitions for funnel tracking (CLIENT-SPECIFIC - configure this in your site)
@@ -52,6 +54,7 @@
         //     {"key":"CHECKOUT_VIEWED","url":"/app/renew/submitRenewal","urlMatch":"contains"},
         //     {"key":"CHECKOUT_SUBMITTED","url":"/app/renew/submitRenewal","urlMatch":"contains","selector":"input[type=submit]"},
         //     {"key":"CHECKOUT_ERROR","url":"/app/renew/pay","urlMatch":"contains","selector":"input[type=submit]","requireSelectorPresent":true},
+        //     {"key":"CHECKOUT_COMPLETED","url":"/app/renew/pay","urlMatch":"contains","selector":".receipt","requireSelectorPresent":true}, // 🆕 Revenue event
         //     {"key":"RENEWAL_COMPLETED","url":"/app/renew/pay","urlMatch":"contains","selector":".receipt","requireSelectorPresent":true},
         //     {"key":"ONBOARDING_STARTED","url":"/app/profile/createProfile","urlMatch":"contains","selector":"#membershipProfile","autoFire":true},
         //     {"key":"ONBOARDING_STEP1_COMPLETED","url":"/app/profile/createProfile","urlMatch":"contains","selector":"#membershipProfile input[type=submit]"},
@@ -289,6 +292,13 @@
             script.setAttribute(window.PH_DATA_KEYS.TITLE_CLASS, config.productConfig.titleClass || '');
             script.setAttribute(window.PH_DATA_KEYS.PRICE_CLASS, config.productConfig.priceClass || '');
             script.setAttribute(window.PH_DATA_KEYS.CURRENCY_CLASS, config.productConfig.currencyClass || '');
+            // 🆕 NEW: Quantity tracking configuration
+            if (config.productConfig.quantityClass) {
+                script.setAttribute(window.PH_DATA_KEYS.QUANTITY_CLASS, config.productConfig.quantityClass);
+            }
+            if (config.productConfig.quantityAttr) {
+                script.setAttribute(window.PH_DATA_KEYS.QUANTITY_ATTR, config.productConfig.quantityAttr);
+            }
         }
 
         // Convert step keys to actual enum values (only if steps exist)

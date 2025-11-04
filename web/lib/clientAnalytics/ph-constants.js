@@ -25,7 +25,10 @@ window.PH_DATA_KEYS = Object.freeze({
     // 🆕 NEW: Configurable selectors for dynamic elements
     PRICE_WATCH_SELECTORS: 'data-price-watch-selectors',
     EMAIL_SELECTORS: 'data-email-selectors',
-    BUTTON_SELECTORS: 'data-button-selectors'
+    BUTTON_SELECTORS: 'data-button-selectors',
+    // 🆕 NEW: Quantity tracking configuration
+    QUANTITY_CLASS: 'data-quantity-class',
+    QUANTITY_ATTR: 'data-quantity-attr'
 });
 
 
@@ -86,7 +89,8 @@ window.PH_KEYS = Object.freeze({
 window.PH_PRODUCT_DOM = Object.freeze({
     PRODUCT  : 'data-product',
     PRICE    : 'data-price',
-    CURRENCY : 'data-currency'
+    CURRENCY : 'data-currency',
+    QUANTITY : 'data-quantity'
 });
 
 
@@ -94,7 +98,6 @@ window.PH_PRODUCT_DOM = Object.freeze({
 /**
  * Optional — consistent property names when sending PostHog events.
  * e.g. posthog.capture('renew_click', { [PH_PROPS.PRODUCT]: '2_years' })
- */
 window.PH_PROPS = Object.freeze({
     SOURCE   : 'source',
     PRODUCT  : 'product',
@@ -102,7 +105,16 @@ window.PH_PROPS = Object.freeze({
     CURRENCY : 'currency',
     PATH     : 'path',
     REFERRER : 'referrer',
-    DEDUPE   : '__dedupeKey'
+    DEDUPE   : '__dedupeKey',
+    QUANTITY : 'quantity',
+    REVENUE  : 'revenue',
+    UNIT_PRICE : 'unit_price',
+    PRODUCT_NAME : 'product_name',
+    PRODUCT_ID : 'product_id',
+    UTM_SOURCE : 'utm_source',
+    UTM_MEDIUM : 'utm_medium',
+    UTM_CAMPAIGN : 'utm_campaign'
+}); DEDUPE   : '__dedupeKey'
 });
 
 
