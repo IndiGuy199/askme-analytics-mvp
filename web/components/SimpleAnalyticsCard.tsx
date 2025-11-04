@@ -962,11 +962,15 @@ export default function SimpleAnalyticsCard({
                               <span className="font-medium">
                                 {country === "No Data" ? "No data available" : `${count} users (${percentage.toFixed(1)}%)`}
                               </span>
-                              {comparisonMode === 'previous' && previousCount > 0 && (
+                              {comparisonMode === 'previous' && previousCount === 0 && (count as number) > 0 ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                  New
+                                </span>
+                              ) : comparisonMode === 'previous' && previousCount > 0 ? (
                                 <span className={`text-xs ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                   {change >= 0 ? '↑' : '↓'} {Math.abs(change).toFixed(1)}%
                                 </span>
-                              )}
+                              ) : null}
                             </div>
                           </div>
                           {country !== "No Data" && (
@@ -1003,8 +1007,6 @@ export default function SimpleAnalyticsCard({
                         const data = cityData as any;
                         const total = Object.values(kpis.cityGeography.cities).reduce((a: number, b: any) => a + b.count, 0);
                         const percentage = total > 0 ? (data.count / total) * 100 : 0;
-                        
-                        // Get previous period data if available
                         const previousData = kpis.cityGeography?.previous_cities?.[cityKey] as any;
                         const previousCount = previousData?.count || 0;
                         const previousTotal = kpis.cityGeography?.previous_cities 
@@ -1019,11 +1021,15 @@ export default function SimpleAnalyticsCard({
                               <span className="font-medium text-gray-700">{data.city}, {data.country}</span>
                               <div className="flex items-center gap-2">
                                 <span className="font-medium">{data.count} users ({percentage.toFixed(1)}%)</span>
-                                {comparisonMode === 'previous' && previousCount > 0 && (
+                                {comparisonMode === 'previous' && previousCount === 0 && data.count > 0 ? (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                    New
+                                  </span>
+                                ) : comparisonMode === 'previous' && previousCount > 0 ? (
                                   <span className={`text-xs ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                     {change >= 0 ? '↑' : '↓'} {Math.abs(change).toFixed(1)}%
                                   </span>
-                                )}
+                                ) : null}
                               </div>
                             </div>
                             <div className="space-y-1">
@@ -1185,10 +1191,8 @@ export default function SimpleAnalyticsCard({
             {Object.entries(deviceMixData).map(([device, data], index) => {
               // Data is now an object with { count, percentage }
               const deviceData = data as { count: number; percentage: number };
-              const count = deviceData.count || 0;
-              const percentage = deviceData.percentage || 0;
-              
-              // Get previous period data
+              const count = deviceData.count;
+              const percentage = deviceData.percentage;
               const previousData = previousDeviceMixData[device] as { count: number; percentage: number } || { count: 0, percentage: 0 };
               const previousCount = previousData.count || 0;
               const previousPercentage = previousData.percentage || 0;
@@ -1210,13 +1214,17 @@ export default function SimpleAnalyticsCard({
                       {device === "No Data" ? "No data" : `${percentage.toFixed(1)}%`}
                     </div>
                     <div className="text-gray-500 text-xs">
-                      {count.toLocaleString()}
+                      {typeof count === 'number' && !isNaN(count) ? count.toLocaleString() : '0'}
                     </div>
-                    {comparisonMode === 'previous' && previousCount > 0 && (
+                    {comparisonMode === 'previous' && previousCount === 0 && count > 0 ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                        New
+                      </span>
+                    ) : comparisonMode === 'previous' && previousCount > 0 ? (
                       <span className={`text-xs ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         {change >= 0 ? '↑' : '↓'} {Math.abs(change).toFixed(1)}%
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               );
@@ -1341,11 +1349,8 @@ export default function SimpleAnalyticsCard({
                   displayPath = urlObj.pathname + urlObj.search + urlObj.hash;
                   if (displayPath === '') displayPath = '/';
                 } catch (e) {
-                  // If URL parsing fails, just remove protocol and domain manually
-                  displayPath = page.url
-                    .replace(/^https?:\/\//, '') // Remove protocol
-                    .replace(/^[^\/]+/, '') // Remove domain
-                    || '/';
+                  // If URL parsing fails, keep the original
+                  displayPath = page.url;
                 }
                 
                 // Get previous period data if available
@@ -1378,11 +1383,15 @@ export default function SimpleAnalyticsCard({
                       <div className="text-sm font-medium text-gray-900 w-12 text-right">
                         {page.percentage.toFixed(1)}%
                       </div>
-                      {comparisonMode === 'previous' && previousVisits > 0 && (
+                      {comparisonMode === 'previous' && previousVisits === 0 && page.visits > 0 ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 w-14">
+                          New
+                        </span>
+                      ) : comparisonMode === 'previous' && previousVisits > 0 ? (
                         <span className={`text-xs ${change >= 0 ? 'text-green-600' : 'text-red-600'} w-14 text-right`}>
                           {change >= 0 ? '↑' : '↓'} {Math.abs(change).toFixed(0)}%
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 );

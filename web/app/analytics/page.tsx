@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { hasCustomQueries } from '@/src/config/clients';
 import SimpleAnalyticsCard from '../../components/SimpleAnalyticsCard';
+import PostHogIdentifier from '../../components/PostHogIdentifier';
 import Link from 'next/link';
 import { AlertCircle, X, Shield } from 'lucide-react';
 
@@ -164,6 +165,9 @@ export default function AnalyticsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Auto-identify authenticated users in PostHog */}
+      <PostHogIdentifier />
+      
       {/* 🆕 Impersonation Banner */}
       {impersonationInfo?.isImpersonating && (
         <div className="bg-red-600 text-white px-4 sm:px-6 py-3 sticky top-0 z-50 shadow-lg">

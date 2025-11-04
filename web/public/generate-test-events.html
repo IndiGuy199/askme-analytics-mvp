@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate Test Revenue Events</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        button {
+            background: #4f46e5;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #4338ca;
+        }
+        button.secondary {
+            background: #10b981;
+        }
+        button.secondary:hover {
+            background: #059669;
+        }
+        .log {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+        }
+        .log-entry.success {
+            color: #059669;
+        }
+        .log-entry.error {
+            color: #dc2626;
+        }
+        .log-entry.info {
+            color: #2563eb;
+        }
+        .warning {
+            background: #fef3c7;
+            border: 1px solid #fbbf24;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+            color: #92400e;
+        }
+        .instructions {
+            background: #dbeafe;
+            border: 1px solid #3b82f6;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+            color: #1e40af;
+        }
+        .instructions ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .instructions li {
+            margin: 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Revenue Events Test Generator</h1>
+        <p class="subtitle">Generate test checkout_completed events with revenue properties for PostHog</p>
+        
+        <div class="warning">
+            <strong>⚠️ Important:</strong> This page must be loaded on your client application (e.g., localhost:3000) where PostHog is initialized. PostHog must be available on window.posthog.
+        </div>
+
+        <div class="instructions">
+            <strong>📋 Instructions:</strong>
+            <ol>
+                <li>Open your application at <code>http://localhost:3000</code></li>
+                <li>Open DevTools Console (F12)</li>
+                <li>Paste this URL: <code>file:///path/to/this/generate-test-events.html</code><br>
+                    <em>OR copy the script below and paste directly in console</em>
+                </li>
+                <li>Click buttons below to generate events</li>
+                <li>Wait 1-2 minutes for PostHog to process</li>
+                <li>Refresh your dashboard to see the data</li>
+            </ol>
+        </div>
+
+        <div style="margin: 20px 0;">
+            <button onclick="generateSingleEvent()">Generate 1 Event</button>
+            <button class="secondary" onclick="generateMultipleEvents()">Generate 10 Events</button>
+            <button onclick="clearLog()" style="background: #6b7280;">Clear Log</button>
+        </div>
+
+        <div class="log" id="log">
+            <div class="log-entry info">Ready to generate events...</div>
+        </div>
+    </div>
+
+    <script>
+        // Check if PostHog is available
+        function checkPostHog() {
+            if (typeof window.posthog === 'undefined') {
+                addLog('❌ PostHog not found! Please run this on a page where PostHog is loaded.', 'error');
+                return false;
+            }
+            addLog('✅ PostHog detected', 'success');
+            return true;
+        }
+
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '<div class="log-entry info">Log cleared</div>';
+        }
+
+        function generateSingleEvent() {
+            if (!checkPostHog()) return;
+
+            const events = [
+                { revenue: 99.99, product: 'Premium Monthly Plan', source: 'google', medium: 'cpc' },
+            ];
+
+            const event = events[0];
+            try {
+                window.posthog.capture('checkout_completed', {
+                    revenue: event.revenue,
+                    currency: 'USD',
+                    product_name: event.product,
+                    product_id: event.product.toLowerCase().replace(/\s+/g, '_'),
+                    utm_source: event.source,
+                    utm_medium: event.medium,
+                    utm_campaign: 'test_campaign'
+                });
+                addLog(`✅ Event captured: $${event.revenue} - ${event.product} (${event.source})`, 'success');
+            } catch (error) {
+                addLog(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        function generateMultipleEvents() {
+            if (!checkPostHog()) return;
+
+            const events = [
+                { revenue: 99.99, product: 'Premium Monthly Plan', source: 'google', medium: 'cpc' },
+                { revenue: 149.99, product: 'Premium Yearly Plan', source: 'facebook', medium: 'social' },
+                { revenue: 49.99, product: 'Starter Plan', source: 'direct', medium: 'none' },
+                { revenue: 299.99, product: 'Enterprise Plan', source: 'email', medium: 'newsletter' },
+                { revenue: 99.99, product: 'Premium Monthly Plan', source: 'twitter', medium: 'social' },
+                { revenue: 149.99, product: 'Premium Yearly Plan', source: 'google', medium: 'cpc' },
+                { revenue: 49.99, product: 'Starter Plan', source: 'linkedin', medium: 'social' },
+                { revenue: 199.99, product: 'Pro Plan', source: 'google', medium: 'cpc' },
+                { revenue: 99.99, product: 'Premium Monthly Plan', source: 'facebook', medium: 'social' },
+                { revenue: 149.99, product: 'Premium Yearly Plan', source: 'direct', medium: 'none' }
+            ];
+
+            addLog(`🚀 Generating ${events.length} events...`, 'info');
+
+            events.forEach((event, i) => {
+                setTimeout(() => {
+                    try {
+                        window.posthog.capture('checkout_completed', {
+                            revenue: event.revenue,
+                            currency: 'USD',
+                            product_name: event.product,
+                            product_id: event.product.toLowerCase().replace(/\s+/g, '_'),
+                            utm_source: event.source,
+                            utm_medium: event.medium,
+                            utm_campaign: 'test_campaign_nov_2025'
+                        });
+                        addLog(`✅ Event ${i + 1}/${events.length}: $${event.revenue} - ${event.product} (${event.source})`, 'success');
+                        
+                        if (i === events.length - 1) {
+                            addLog('🎉 All events generated! Wait 1-2 minutes, then refresh /dashboard', 'success');
+                        }
+                    } catch (error) {
+                        addLog(`❌ Event ${i + 1} failed: ${error.message}`, 'error');
+                    }
+                }, i * 100);
+            });
+        }
+
+        // Check on load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                if (typeof window.posthog !== 'undefined') {
+                    addLog('✅ PostHog is loaded and ready', 'success');
+                } else {
+                    addLog('⚠️ PostHog not detected. Make sure to run this on your application page.', 'error');
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

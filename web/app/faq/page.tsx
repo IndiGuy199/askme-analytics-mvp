@@ -39,14 +39,14 @@ const faqs: FAQItem[] = [
     id: 'how-to-start',
     category: 'Getting Started',
     question: 'How do I get started?',
-    answer: 'After signing up, complete the onboarding process to create your company profile. You\'ll start with a 30-day free trial of our Basic plan, which includes access to standard analytics and AI insights. We\'ll help you configure PostHog integration during onboarding.',
+    answer: 'After signing up, complete the onboarding process to create your company profile. You\'ll start with a 30-day free trial of our Premium plan, which includes access to standard analytics, AI insights, and up to 5 team members. We\'ll help you configure PostHog integration during onboarding.',
     icon: Zap
   },
   {
     id: 'trial-period',
     category: 'Getting Started',
     question: 'What\'s included in the free trial?',
-    answer: 'Your 30-day free trial includes full access to the Basic plan: standard web analytics, AI-powered insights, up to 5 team members, and email support. No credit card required to start.',
+    answer: 'Your 30-day free trial includes full access to the Premium plan: comprehensive web analytics, AI-powered insights, up to 5 team members, and email support. No credit card required to start.',
     icon: Zap
   },
 
@@ -122,7 +122,7 @@ const faqs: FAQItem[] = [
     id: 'pricing-plans',
     category: 'Pricing & Billing',
     question: 'What are your pricing plans?',
-    answer: 'We offer flexible plans: Basic ($49/month or $490/year) includes 5 team members, standard analytics, and AI insights. Premium ($149/month or $1,490/year) adds 15 team members, custom funnels, and Slack integration. Enterprise (custom pricing) includes unlimited team members, dedicated support, and SLA.',
+    answer: 'We currently offer one plan: Premium at $39/month (or $390/year with 2 months free). It includes up to 5 team members, comprehensive web analytics, unlimited AI insights, custom funnels, and email support. Perfect for growing businesses who want actionable insights without complexity.',
     icon: CreditCard
   },
   {
@@ -189,14 +189,14 @@ const faqs: FAQItem[] = [
     id: 'api-access',
     category: 'Technical',
     question: 'Do you provide API access?',
-    answer: 'API access is coming soon for Enterprise plans. It will allow you to programmatically fetch analytics data, generate insights, and integrate AskMe into your own tools. Contact us if you need early access.',
+    answer: 'API access is coming soon! It will allow you to programmatically fetch analytics data, generate insights, and integrate AskMe into your own tools. Contact us if you need early access or have specific integration requirements.',
     icon: Zap
   },
   {
     id: 'custom-funnels',
     category: 'Technical',
     question: 'Can I create custom conversion funnels?',
-    answer: 'Yes! Premium and Enterprise plans include custom funnel creation. Define your own conversion steps, track specific user journeys, and get AI recommendations tailored to your funnel. You can create unlimited funnels and track them over time.',
+    answer: 'Yes! The Premium plan includes custom funnel creation. Define your own conversion steps, track specific user journeys, and get AI recommendations tailored to your funnel. You can create unlimited funnels and track them over time.',
     icon: BarChart3
   },
   {
@@ -212,14 +212,14 @@ const faqs: FAQItem[] = [
     id: 'support-channels',
     category: 'Support',
     question: 'How can I get help?',
-    answer: 'We offer multiple support channels: Email support (support@askmeanalytics.com) for all plans with 24-hour response time, In-app chat for Premium plans, Dedicated Slack channel for Enterprise, and comprehensive documentation. We\'re here to help you succeed!',
+    answer: 'We offer email support (support@askmeanalytics.com) with 24-hour response time, in-app help resources, and comprehensive documentation. For urgent issues, reach out via our contact form and we\'ll prioritize your request. We\'re here to help you succeed!',
     icon: Mail
   },
   {
     id: 'setup-assistance',
     category: 'Support',
     question: 'Do you help with setup and onboarding?',
-    answer: 'Yes! All new customers receive onboarding assistance. We\'ll help you configure PostHog integration, set up your first funnels, and generate your first AI insights. Premium and Enterprise plans include dedicated onboarding calls.',
+    answer: 'Yes! All new customers receive onboarding assistance. We\'ll help you configure PostHog integration, set up your first funnels, and generate your first AI insights. Our guided onboarding makes setup quick and painless.',
     icon: Mail
   },
   {

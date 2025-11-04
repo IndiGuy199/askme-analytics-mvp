@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { BarChart3, Settings, Users, Zap, LogOut, Shield, Brain } from 'lucide-react'
+import RevenueByChannelCard from '@/components/analytics/RevenueByChannelCard'
+import TopRevenueItemsCard from '@/components/analytics/TopRevenueItemsCard'
 
 interface User {
   id: string
@@ -187,6 +189,13 @@ export default function DashboardPage() {
   }
 
   const handleSignOut = async () => {
+    // Clear PostHog identification key from localStorage
+    const userId = user?.id;
+    if (userId) {
+      const localStorageKey = `posthog_identified_${userId}`;
+      localStorage.removeItem(localStorageKey);
+    }
+
     await supabase.auth.signOut()
     router.push('/')
   }
@@ -264,58 +273,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Trial Status Banner */}
-      {trialInfo && (
-        <div className={`${
-          trialInfo.isExpiringSoon 
-            ? 'bg-gradient-to-r from-orange-50 to-red-50 border-orange-200' 
-            : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200'
-        } border-b`}>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                  trialInfo.isExpiringSoon ? 'bg-orange-500' : 'bg-blue-500'
-                }`}>
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <p className={`text-sm font-semibold ${
-                    trialInfo.isExpiringSoon ? 'text-orange-900' : 'text-blue-900'
-                  }`}>
-                    {trialInfo.isExpiringSoon ? '⚠️ Trial Ending Soon' : '🎉 You\'re on a Free Trial'}
-                  </p>
-                  <p className={`text-xs ${
-                    trialInfo.isExpiringSoon ? 'text-orange-700' : 'text-blue-700'
-                  }`}>
-                    {trialInfo.daysLeft === 0 
-                      ? 'Your trial ends today' 
-                      : trialInfo.daysLeft === 1
-                      ? 'Your trial ends tomorrow'
-                      : `${trialInfo.daysLeft} days left in your trial`
-                    } • Trial ends on {trialInfo.trialEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                  </p>
-                </div>
-              </div>
-              <Button
-                onClick={() => router.push('/pricing')}
-                size="sm"
-                className={`${
-                  trialInfo.isExpiringSoon
-                    ? 'bg-orange-600 hover:bg-orange-700'
-                    : 'bg-blue-600 hover:bg-blue-700'
-                } text-white`}
-              >
-                <Zap className="h-4 w-4 mr-1" />
-                Upgrade Now
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Success Message Banner */}
       {showSuccessMessage && (
         <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-200">
@@ -374,89 +331,72 @@ export default function DashboardPage() {
         ) : (
           // Company exists - show dashboard
           <div className="space-y-8">
-            {/* Membership Valid Till & Renewal Alert */}
-            {subscription && (subscription.status === 'active' || subscription.status === 'trialing') && (
-              <>
-                {/* Membership Valid Till */}
-                <Card className="border-blue-200 bg-blue-50">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
-                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-blue-900">
-                          {subscription.status === 'trialing' 
-                            ? `Your trial membership is valid until`
-                            : `Your ${subscription.plan_id === 'premium_yearly' ? 'Premium (Yearly)' : 'Premium'} membership is valid until`
-                          }
-                        </p>
-                        <p className="text-base font-bold text-blue-900">
-                          {subscription.status === 'trialing' && subscription.trial_end
-                            ? new Date(subscription.trial_end).toLocaleDateString('en-US', { 
-                                month: 'long', 
-                                day: 'numeric', 
-                                year: 'numeric' 
-                              })
-                            : new Date(subscription.current_period_end).toLocaleDateString('en-US', { 
-                                month: 'long', 
-                                day: 'numeric', 
-                                year: 'numeric' 
-                              })
-                          }
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Renewal Alert (10 days before expiry) */}
-                {(() => {
-                  const expiryDate = subscription.status === 'trialing' && subscription.trial_end 
-                    ? new Date(subscription.trial_end)
-                    : new Date(subscription.current_period_end)
-                  const daysUntilExpiry = Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
-                  return daysUntilExpiry <= 10 && daysUntilExpiry > 0 ? (
-                    <Card className="border-orange-200 bg-orange-50">
-                      <CardContent className="p-6">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start gap-3">
-                            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center">
-                              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                            </div>
-                            <div>
-                              <p className="text-sm font-semibold text-orange-900">
+            {/* Consolidated Membership Status Card */}
+            {subscription && (subscription.status === 'active' || subscription.status === 'trialing') && (() => {
+              const expiryDate = subscription.status === 'trialing' && subscription.trial_end 
+                ? new Date(subscription.trial_end)
+                : new Date(subscription.current_period_end);
+              const daysUntilExpiry = Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+              const isExpiringSoon = daysUntilExpiry <= 10 && daysUntilExpiry > 0;
+              const planName = subscription.plan_id === 'premium_yearly' ? 'Premium (Yearly)' : 'Premium';
+              
+              return (
+                <Card className={`${isExpiringSoon ? 'border-orange-200 bg-orange-50' : 'border-blue-200 bg-blue-50'}`}>
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-3">
+                        <div className={`flex-shrink-0 w-10 h-10 rounded-full ${isExpiringSoon ? 'bg-orange-500' : 'bg-blue-500'} flex items-center justify-center`}>
+                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            {isExpiringSoon ? (
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            ) : (
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            )}
+                          </svg>
+                        </div>
+                        <div>
+                          <p className={`text-sm font-semibold ${isExpiringSoon ? 'text-orange-900' : 'text-blue-900'}`}>
+                            {subscription.status === 'trialing' 
+                              ? 'Your trial membership is valid until'
+                              : `Your ${planName} membership is valid until`
+                            }
+                          </p>
+                          <p className={`text-base font-bold ${isExpiringSoon ? 'text-orange-900' : 'text-blue-900'}`}>
+                            {expiryDate.toLocaleDateString('en-US', { 
+                              month: 'long', 
+                              day: 'numeric', 
+                              year: 'numeric' 
+                            })}
+                          </p>
+                          {isExpiringSoon && (
+                            <>
+                              <p className={`text-sm ${subscription.status === 'trialing' ? 'text-orange-700' : 'text-orange-700'} mt-2`}>
                                 {subscription.status === 'trialing' 
-                                  ? 'Your trial expires soon!'
-                                  : 'Your membership expires soon!'
+                                  ? 'Your trial expires soon! Subscribe now to continue enjoying uninterrupted access to all features.'
+                                  : 'Your membership expires soon! Renew your subscription to continue enjoying uninterrupted access to all features.'
                                 }
-                              </p>
-                              <p className="text-sm text-orange-700 mt-1">
-                                Renew your subscription to continue enjoying uninterrupted access to all features.
                               </p>
                               <p className="text-xs text-orange-600 mt-2 font-medium">
                                 {daysUntilExpiry === 1 ? '1 day remaining' : `${daysUntilExpiry} days remaining`}
                               </p>
-                            </div>
-                          </div>
-                          <Button
-                            onClick={() => router.push('/pricing')}
-                            className="bg-orange-600 hover:bg-orange-700 text-white ml-4"
-                            size="sm"
-                          >
-                            Renew Subscription
-                          </Button>
+                            </>
+                          )}
                         </div>
-                      </CardContent>
-                    </Card>
-                  ) : null
-                })()}
-              </>
-            )}
+                      </div>
+                      {isExpiringSoon && (
+                        <Button
+                          onClick={() => router.push('/pricing')}
+                          className={`${subscription.status === 'trialing' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-600 hover:bg-orange-700'} text-white ml-4`}
+                          size="sm"
+                        >
+                          {subscription.status === 'trialing' ? 'Subscribe Now' : 'Manage Plan'}
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })()}
 
             <div>
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Quick Analytics Overview</h2>
@@ -554,6 +494,17 @@ export default function DashboardPage() {
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Revenue Analytics Cards */}
+              {company && (
+                <div className="mb-8">
+                  <h2 className="text-xl font-bold text-gray-900 mb-4">Revenue Analytics</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <RevenueByChannelCard companyId={company.id} from="30d" to="now" />
+                    <TopRevenueItemsCard companyId={company.id} from="30d" to="now" />
+                  </div>
+                </div>
+              )}
 
               {/* Analytics Content */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

@@ -17,6 +17,83 @@
 * ======================================================================== */
 
 (function () {
+    /* ========================================================================
+     * BACKEND-AGNOSTIC IDENTITY BRIDGE (v1.2.0)
+     * Exposes AMA.preAuthMark(), AMA.afterLoginIdentify(), AMA.onLogoutCleanup()
+     * Works with any auth system (Email+Password, SSO, Magic Link)
+     * ======================================================================== */
+    window.AMA = window.AMA || {};
+
+    /** 1) Call right before starting any login (form submit or SSO click) */
+    window.AMA.preAuthMark = function () {
+        try {
+            const ph = window.posthog;
+            const preId = ph?.get_distinct_id?.() || null;
+            if (preId) sessionStorage.setItem('ama:pre_ph_id', preId);
+            return preId;
+        } catch { return null; }
+    };
+
+    /** helper to read the pre-login id after auth */
+    window.AMA._takePreAuthId = function () {
+        try {
+            const v = sessionStorage.getItem('ama:pre_ph_id');
+            if (v) return v;
+        } catch {}
+        try {
+            const u = new URL(location.href);
+            return u.searchParams.get('ph_id'); // optional fallback if passed via URL/state
+        } catch {}
+        return null;
+    };
+
+    /** 2) Call after login succeeds and you have the verified user */
+    window.AMA.afterLoginIdentify = function (user, props = {}) {
+        const ph = window.posthog;
+        if (!ph?.identify || !user?.id) return;
+
+        const current = ph?.get_distinct_id?.();
+        const ssKey = `ph_ss_identified_${user.id}`;
+        if (sessionStorage.getItem(ssKey) === '1' || current === user.id) {
+            sessionStorage.setItem(ssKey, '1');
+            return;
+        }
+
+        // Merge pre-login history
+        const carried = window.AMA._takePreAuthId();
+        if (carried && carried !== user.id && typeof ph.alias === 'function') {
+            ph.alias(user.id, carried);
+        }
+
+        // Identify with stable props
+        ph.identify(user.id, { email: user.email, ...props });
+
+        // Optional org-level analytics
+        if (props.company_id && typeof ph.group === 'function') {
+            ph.group('company', props.company_id, {
+                company_name: props.company_name,
+                company_slug: props.company_slug,
+            });
+        }
+
+        ph.capture?.('USER_IDENTIFIED', { identification_method: 'post_login', page: location.pathname });
+
+        sessionStorage.setItem(ssKey, '1');
+        try { localStorage.setItem(`posthog_identified_${user.id}`, user.id); } catch {}
+    };
+
+    /** 3) Call on logout */
+    window.AMA.onLogoutCleanup = function (userId) {
+        try {
+            if (userId) {
+                localStorage.removeItem(`posthog_identified_${userId}`);
+                sessionStorage.removeItem(`ph_ss_identified_${userId}`);
+            }
+            sessionStorage.removeItem('ama:pre_ph_id');
+        } catch {}
+        window.posthog?.reset?.();
+    };
+
     /* ---------- 0) Require enums, never redefine -------------------------- */
     const K  = window.PH_DATA_KEYS;
     const EK = window.PH_KEYS;

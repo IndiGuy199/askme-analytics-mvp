@@ -1,20 +1,86 @@
 # AskMe Analytics - ph-product-injector.js
 
-Complete documentation for the PostHog product analytics injector with dynamic step tagging and conditional rule blocking.
+**Version 1.2.0** — Complete analytics solution with backend-agnostic identity bridge
+
+---
+
+## 🚀 What's New in v1.2.0
+
+### Backend-Agnostic Identity Bridge
+
+The injector now includes a **client-side identity API** that works with any authentication system:
+
+```javascript
+// Before login
+window.AMA.preAuthMark();
+
+// After verified session
+window.AMA.afterLoginIdentify(
+  { id: 'user_123', email: 'user@example.com' },
+  { plan: 'premium', company_id: 'acme' }
+);
+
+// On logout
+window.AMA.onLogoutCleanup('user_123');
+```
+
+**Features:**
+- ✅ Works with Email+Password, SSO OAuth, Magic Link
+- ✅ No backend dependencies (Supabase, Auth0, etc.)
+- ✅ Privacy-first (no PII before verified auth)
+- ✅ Automatic history merge via PostHog alias
+- ✅ Session guards prevent duplicate identifies
+
+**👉 [Read the Identity Bridge Integration Guide →](docs/integration.md)**
 
 ---
 
 ## 📚 Table of Contents
 
-1. [Overview](#overview)
-2. [Features](#features)
-3. [Quick Start](#quick-start)
-4. [Configuration Guide](#configuration-guide)
-5. [Rule Blocking](#rule-blocking)
-6. [Testing](#testing)
-7. [Test Results](#test-results)
-8. [Troubleshooting](#troubleshooting)
-9. [API Reference](#api-reference)
+1. [Identity Bridge (NEW)](#identity-bridge-new)
+2. [Overview](#overview)
+3. [Features](#features)
+4. [Quick Start](#quick-start)
+5. [Configuration Guide](#configuration-guide)
+6. [Rule Blocking](#rule-blocking)
+7. [Testing](#testing)
+8. [Test Results](#test-results)
+9. [Troubleshooting](#troubleshooting)
+10. [API Reference](#api-reference)
+
+---
+
+## Identity Bridge (NEW)
+
+### Quick Integration
+
+**3-Step Pattern** for all auth types:
+
+```javascript
+// 1. Before login
+AMA.preAuthMark();
+
+// 2. After verified session
+const me = await fetch('/api/me').then(r => r.json());
+AMA.afterLoginIdentify(
+  { id: me.id, email: me.email },
+  { plan: me.plan, company_id: me.company_id }
+);
+
+// 3. On logout
+AMA.onLogoutCleanup(user.id);
+```
+
+### Documentation
+
+- **Complete Guide**: [docs/integration.md](docs/integration.md) — All auth types with examples
+- **QA Checklist**: [docs/QA_CHECKLIST.md](docs/QA_CHECKLIST.md) — 8 test scenarios
+- **Quick Start**: [QUICK_START.md](QUICK_START.md) — Copy-paste examples
+- **TypeScript**: [types/ama.d.ts](types/ama.d.ts) — Full type definitions
+
+### Test Demo
+
+Open [test-identity-bridge.html](test-identity-bridge.html) in your browser to see the identity bridge in action.
 
 ---
 
@@ -24,6 +90,7 @@ The `ph-product-injector.js` script provides automatic analytics tracking for us
 
 ### Key Capabilities
 
+- **🆕 Backend-Agnostic Identity Bridge**: Works with any auth system
 - **Dynamic Step Tagging**: Automatically tags elements based on URL and selector rules
 - **Conditional Rule Blocking**: Error states prevent success events from firing
 - **Product Metadata Tracking**: Captures product, price, and currency data

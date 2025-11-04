@@ -293,7 +293,7 @@ export default function SettingsPage() {
                 <div>
                   <label className="block text-sm font-medium mb-1">Current Plan</label>
                   <Badge variant="outline" className="text-sm">
-                    {company?.plan_name || 'Free'}
+                    {company?.plan_name === 'Basic' ? 'Premium' : company?.plan_name || 'Free'}
                   </Badge>
                 </div>
                 <div>
@@ -454,7 +454,7 @@ export default function SettingsPage() {
                 <div>
                   <label className="block text-sm font-medium mb-1">Current Plan</label>
                   <Badge variant="outline" className="text-sm mb-2">
-                    {company?.plan_name || 'Free'}
+                    {company?.plan_name === 'Basic' ? 'Premium' : company?.plan_name || 'Free'}
                   </Badge>
                   <p className="text-sm text-gray-600">
                     Status: {company?.subscription_status || 'inactive'}
@@ -464,12 +464,17 @@ export default function SettingsPage() {
                 {currentUserRole === 'owner' && (
                   <div className="flex gap-2">
                     <Button onClick={() => router.push('/pricing')}>
-                      Upgrade Plan
+                      {company?.subscription_status === 'trialing' || company?.subscription_status === 'expired' 
+                        ? 'Subscribe Now' 
+                        : 'Manage Plan'
+                      }
                     </Button>
-                    <Button variant="outline" onClick={openBillingPortal}>
-                      <ExternalLink className="h-4 w-4 mr-1" />
-                      Manage Billing
-                    </Button>
+                    {company?.subscription_status === 'active' && (
+                      <Button variant="outline" onClick={openBillingPortal}>
+                        <ExternalLink className="h-4 w-4 mr-1" />
+                        Manage Billing
+                      </Button>
+                    )}
                   </div>
                 )}
               </CardContent>

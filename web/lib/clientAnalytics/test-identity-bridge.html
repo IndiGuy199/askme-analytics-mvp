@@ -1,0 +1,480 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMA Identity Bridge - Test Demo</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            padding: 20px; 
+            max-width: 1200px; 
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+        h1 { color: #333; margin-bottom: 10px; }
+        .subtitle { color: #666; margin-bottom: 30px; }
+        .container { 
+            background: white; 
+            padding: 30px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .section { margin-bottom: 30px; }
+        .section h2 { color: #2563eb; margin-bottom: 15px; font-size: 18px; }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            transition: background 0.2s;
+        }
+        button:hover { background: #1d4ed8; }
+        button:disabled { background: #94a3b8; cursor: not-allowed; }
+        .button-secondary {
+            background: #64748b;
+        }
+        .button-secondary:hover { background: #475569; }
+        .button-danger {
+            background: #dc2626;
+        }
+        .button-danger:hover { background: #b91c1c; }
+        input {
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-right: 10px;
+            width: 250px;
+        }
+        .status { 
+            padding: 15px; 
+            border-radius: 6px; 
+            margin-top: 15px; 
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .status-info { background: #dbeafe; color: #1e40af; border-left: 4px solid #2563eb; }
+        .status-success { background: #dcfce7; color: #166534; border-left: 4px solid #16a34a; }
+        .status-warning { background: #fef3c7; color: #92400e; border-left: 4px solid #f59e0b; }
+        .status-error { background: #fee2e2; color: #991b1b; border-left: 4px solid #dc2626; }
+        pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 13px;
+            line-height: 1.6;
+            margin-top: 10px;
+        }
+        .log-entry {
+            padding: 8px 12px;
+            background: #f8fafc;
+            border-left: 3px solid #cbd5e1;
+            margin-bottom: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            border-radius: 4px;
+        }
+        .log-entry.success { border-left-color: #16a34a; background: #f0fdf4; }
+        .log-entry.error { border-left-color: #dc2626; background: #fef2f2; }
+        .log-entry.info { border-left-color: #2563eb; background: #eff6ff; }
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
+            gap: 20px;
+        }
+        .card {
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+        .card h3 { color: #475569; font-size: 14px; margin-bottom: 10px; font-weight: 600; }
+        .card .value { color: #0f172a; font-size: 16px; font-family: 'Courier New', monospace; word-break: break-all; }
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            background: #dbeafe;
+            color: #1e40af;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        .badge-success { background: #dcfce7; color: #166534; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+    </style>
+</head>
+<body>
+    <h1>🎯 AMA Identity Bridge - Test Demo</h1>
+    <p class="subtitle">Backend-agnostic identity tracking for PostHog analytics</p>
+
+    <div class="container">
+        <div class="section">
+            <h2>📊 Current State</h2>
+            <div class="grid">
+                <div class="card">
+                    <h3>PostHog Distinct ID</h3>
+                    <div class="value" id="current-id">-</div>
+                </div>
+                <div class="card">
+                    <h3>Pre-Auth ID (sessionStorage)</h3>
+                    <div class="value" id="pre-auth-id">-</div>
+                </div>
+                <div class="card">
+                    <h3>Session Guard</h3>
+                    <div class="value" id="session-guard">-</div>
+                </div>
+                <div class="card">
+                    <h3>API Status</h3>
+                    <div class="value" id="api-status">-</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🧪 Test Scenarios</h2>
+            
+            <div style="margin-bottom: 20px;">
+                <h3 style="color: #475569; font-size: 15px; margin-bottom: 10px;">Scenario 1: Email+Password Login</h3>
+                <button onclick="testEmailPassword()">1️⃣ Test Email+Password Flow</button>
+                <button onclick="testEmailPasswordInvalid()" class="button-secondary">Test with Invalid Data</button>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <h3 style="color: #475569; font-size: 15px; margin-bottom: 10px;">Scenario 2: SSO OAuth (Simulate)</h3>
+                <button onclick="testSSOSimple()">2️⃣ Test SSO (sessionStorage)</button>
+                <button onclick="testSSOBulletproof()">Test SSO (URL param)</button>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <h3 style="color: #475569; font-size: 15px; margin-bottom: 10px;">Scenario 3: Magic Link (Simulate)</h3>
+                <button onclick="testMagicLink()">3️⃣ Test Magic Link Flow</button>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <h3 style="color: #475569; font-size: 15px; margin-bottom: 10px;">Scenario 4: Session Guard</h3>
+                <button onclick="testSessionGuard()">4️⃣ Test Duplicate Prevention</button>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <h3 style="color: #475569; font-size: 15px; margin-bottom: 10px;">Scenario 5: Logout</h3>
+                <button onclick="testLogout()" class="button-danger">5️⃣ Test Logout & Reset</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🎮 Manual Controls</h2>
+            <input type="text" id="user-id" placeholder="User ID (e.g., user_123)" value="user_123">
+            <input type="email" id="user-email" placeholder="Email" value="test@example.com">
+            <br><br>
+            <button onclick="manualPreAuth()">📌 preAuthMark()</button>
+            <button onclick="manualIdentify()">✅ afterLoginIdentify()</button>
+            <button onclick="manualLogout()" class="button-danger">🚪 onLogoutCleanup()</button>
+            <button onclick="clearAll()" class="button-secondary">🗑️ Clear All Storage</button>
+        </div>
+
+        <div class="section">
+            <h2>📝 Event Log</h2>
+            <div id="log"></div>
+        </div>
+    </div>
+
+    <!-- Mock PostHog for testing -->
+    <script>
+        // Mock PostHog SDK
+        window.posthog = {
+            _distinctId: 'anon_' + Math.random().toString(36).substr(2, 9),
+            get_distinct_id: function() { return this._distinctId; },
+            identify: function(id, props) {
+                this._distinctId = id;
+                log(`✅ posthog.identify("${id}", ${JSON.stringify(props)})`, 'success');
+            },
+            alias: function(id, prevId) {
+                log(`🔗 posthog.alias("${id}", "${prevId}")`, 'info');
+            },
+            group: function(type, id, props) {
+                log(`👥 posthog.group("${type}", "${id}", ${JSON.stringify(props)})`, 'info');
+            },
+            capture: function(event, props) {
+                log(`📊 posthog.capture("${event}", ${JSON.stringify(props)})`, 'info');
+            },
+            reset: function() {
+                this._distinctId = 'anon_' + Math.random().toString(36).substr(2, 9);
+                log(`🔄 posthog.reset() - New ID: ${this._distinctId}`, 'success');
+            }
+        };
+    </script>
+
+    <!-- Load the identity bridge -->
+    <script src="ph-product-injector.js"></script>
+
+    <script>
+        let testRunning = false;
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.insertBefore(entry, logDiv.firstChild);
+            updateState();
+        }
+
+        function updateState() {
+            // Current PostHog ID
+            document.getElementById('current-id').textContent = 
+                window.posthog.get_distinct_id() || '-';
+
+            // Pre-auth ID
+            const preAuth = sessionStorage.getItem('ama:pre_ph_id');
+            document.getElementById('pre-auth-id').textContent = preAuth || 'Not set';
+
+            // Session guard
+            const userId = document.getElementById('user-id').value;
+            const guard = sessionStorage.getItem(`ph_ss_identified_${userId}`);
+            document.getElementById('session-guard').textContent = 
+                guard ? `Set for ${userId}` : 'Not set';
+
+            // API status
+            const apiOk = typeof window.AMA === 'object' && 
+                         typeof window.AMA.preAuthMark === 'function';
+            document.getElementById('api-status').textContent = 
+                apiOk ? '✅ Available' : '❌ Not loaded';
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Test Scenarios
+        async function testEmailPassword() {
+            if (testRunning) return;
+            testRunning = true;
+            log('━━━ TEST: Email+Password Login ━━━', 'info');
+
+            // Step 1: Pre-auth
+            log('Step 1: Calling preAuthMark()...', 'info');
+            const preId = window.AMA.preAuthMark();
+            log(`Pre-login ID captured: ${preId}`, 'success');
+            await sleep(500);
+
+            // Step 2: Simulate API call
+            log('Step 2: Simulating login API call...', 'info');
+            await sleep(1000);
+            log('Login successful! Session created.', 'success');
+
+            // Step 3: Identify
+            const userId = document.getElementById('user-id').value;
+            const email = document.getElementById('user-email').value;
+            log(`Step 3: Calling afterLoginIdentify()...`, 'info');
+            window.AMA.afterLoginIdentify(
+                { id: userId, email: email },
+                { plan: 'premium', company_id: 'acme_corp' }
+            );
+            log('✅ TEST COMPLETE: Check log for alias + identify calls', 'success');
+            testRunning = false;
+        }
+
+        async function testEmailPasswordInvalid() {
+            if (testRunning) return;
+            testRunning = true;
+            log('━━━ TEST: Invalid Data Handling ━━━', 'info');
+
+            log('Testing null user...', 'info');
+            window.AMA.afterLoginIdentify(null, {});
+            log('✅ No crash', 'success');
+
+            log('Testing missing ID...', 'info');
+            window.AMA.afterLoginIdentify({ email: 'test@test.com' }, {});
+            log('✅ No crash', 'success');
+
+            log('Testing empty ID...', 'info');
+            window.AMA.afterLoginIdentify({ id: '', email: 'test@test.com' }, {});
+            log('✅ No crash', 'success');
+
+            log('✅ TEST COMPLETE: All invalid inputs handled gracefully', 'success');
+            testRunning = false;
+        }
+
+        async function testSSOSimple() {
+            if (testRunning) return;
+            testRunning = true;
+            log('━━━ TEST: SSO OAuth (sessionStorage) ━━━', 'info');
+
+            log('Step 1: Pre-auth before redirect...', 'info');
+            const preId = window.AMA.preAuthMark();
+            log(`Saved to sessionStorage: ${preId}`, 'success');
+
+            log('Step 2: Simulating OAuth redirect...', 'info');
+            await sleep(1500);
+            log('Step 3: Returned from OAuth provider', 'success');
+
+            log('Step 4: Identifying user...', 'info');
+            const userId = document.getElementById('user-id').value;
+            window.AMA.afterLoginIdentify(
+                { id: userId, email: 'oauth@example.com' },
+                { provider: 'google', company_id: 'acme' }
+            );
+            log('✅ TEST COMPLETE: Check if alias merged history', 'success');
+            testRunning = false;
+        }
+
+        async function testSSOBulletproof() {
+            if (testRunning) return;
+            testRunning = true;
+            log('━━━ TEST: SSO OAuth (URL param) ━━━', 'info');
+
+            const preId = window.AMA.preAuthMark();
+            log(`Pre-login ID: ${preId}`, 'success');
+
+            // Simulate passing in URL
+            const fakeUrl = `${location.origin}/callback?ph_id=${preId}`;
+            log(`Generated callback URL: ${fakeUrl}`, 'info');
+
+            // Simulate URL being present (would normally come from redirect)
+            const url = new URL(location.href);
+            url.searchParams.set('ph_id', preId);
+            history.replaceState(null, '', url);
+
+            await sleep(1000);
+            const userId = document.getElementById('user-id').value;
+            window.AMA.afterLoginIdentify(
+                { id: userId, email: 'oauth@example.com' },
+                { provider: 'microsoft' }
+            );
+
+            // Clean up URL
+            url.searchParams.delete('ph_id');
+            history.replaceState(null, '', url);
+
+            log('✅ TEST COMPLETE: ph_id preserved via URL', 'success');
+            testRunning = false;
+        }
+
+        async function testMagicLink() {
+            if (testRunning) return;
+            testRunning = true;
+            log('━━━ TEST: Magic Link ━━━', 'info');
+
+            const preId = window.AMA.preAuthMark();
+            const callback = `${location.origin}/auth/magic-callback?ph_id=${preId}&token=abc123`;
+            log(`Magic link generated: ${callback}`, 'success');
+
+            log('Simulating email click...', 'info');
+            await sleep(1500);
+
+            // Simulate URL with ph_id
+            const url = new URL(location.href);
+            url.searchParams.set('ph_id', preId);
+            history.replaceState(null, '', url);
+
+            const userId = document.getElementById('user-id').value;
+            window.AMA.afterLoginIdentify(
+                { id: userId, email: 'magic@example.com' },
+                { plan: 'enterprise' }
+            );
+
+            url.searchParams.delete('ph_id');
+            history.replaceState(null, '', url);
+
+            log('✅ TEST COMPLETE: Magic link flow successful', 'success');
+            testRunning = false;
+        }
+
+        async function testSessionGuard() {
+            if (testRunning) return;
+            testRunning = true;
+            log('━━━ TEST: Session Guard (Duplicate Prevention) ━━━', 'info');
+
+            const userId = document.getElementById('user-id').value;
+            
+            log('First identify...', 'info');
+            window.AMA.afterLoginIdentify(
+                { id: userId, email: 'test@example.com' },
+                { plan: 'premium' }
+            );
+            await sleep(500);
+
+            log('Second identify (should be no-op)...', 'info');
+            window.AMA.afterLoginIdentify(
+                { id: userId, email: 'test@example.com' },
+                { plan: 'premium' }
+            );
+
+            log('✅ TEST COMPLETE: Check log - second identify should not call PostHog', 'success');
+            testRunning = false;
+        }
+
+        async function testLogout() {
+            if (testRunning) return;
+            testRunning = true;
+            log('━━━ TEST: Logout & Reset ━━━', 'info');
+
+            const beforeId = window.posthog.get_distinct_id();
+            log(`Before logout ID: ${beforeId}`, 'info');
+
+            const userId = document.getElementById('user-id').value;
+            window.AMA.onLogoutCleanup(userId);
+
+            const afterId = window.posthog.get_distinct_id();
+            log(`After logout ID: ${afterId}`, 'success');
+
+            if (beforeId !== afterId) {
+                log('✅ TEST COMPLETE: New anonymous session started', 'success');
+            } else {
+                log('❌ TEST FAILED: ID did not change', 'error');
+            }
+
+            testRunning = false;
+        }
+
+        // Manual controls
+        function manualPreAuth() {
+            const id = window.AMA.preAuthMark();
+            log(`preAuthMark() returned: ${id}`, 'success');
+        }
+
+        function manualIdentify() {
+            const userId = document.getElementById('user-id').value;
+            const email = document.getElementById('user-email').value;
+            window.AMA.afterLoginIdentify(
+                { id: userId, email: email },
+                { plan: 'premium', company_id: 'acme', role: 'admin' }
+            );
+            log('afterLoginIdentify() called', 'success');
+        }
+
+        function manualLogout() {
+            const userId = document.getElementById('user-id').value;
+            window.AMA.onLogoutCleanup(userId);
+            log('onLogoutCleanup() called', 'success');
+        }
+
+        function clearAll() {
+            sessionStorage.clear();
+            localStorage.clear();
+            window.posthog.reset();
+            document.getElementById('log').innerHTML = '';
+            log('All storage cleared and PostHog reset', 'success');
+        }
+
+        // Initialize
+        updateState();
+        setInterval(updateState, 1000);
+        log('🎯 AMA Identity Bridge Test Demo Ready', 'success');
+        log('Mock PostHog SDK loaded. Try the test scenarios above!', 'info');
+    </script>
+</body>
+</html>

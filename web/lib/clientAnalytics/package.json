@@ -1,0 +1,54 @@
+{
+  "name": "@askme/analytics-injector",
+  "version": "1.2.0",
+  "description": "Backend-agnostic identity bridge and product analytics injector for PostHog",
+  "main": "ph-product-injector.js",
+  "types": "types/ama.d.ts",
+  "scripts": {
+    "build": "node build.js",
+    "test": "echo \"Open test-manual.html or test-blocking.html in browser\" && exit 0"
+  },
+  "keywords": [
+    "analytics",
+    "posthog",
+    "identity",
+    "tracking",
+    "product-analytics",
+    "funnel-tracking",
+    "auth",
+    "sso",
+    "magic-link"
+  ],
+  "author": "AskMe Analytics Team",
+  "license": "MIT",
+  "files": [
+    "ph-product-injector.js",
+    "ph-constants.js",
+    "dist/ph-product-injector.min.js",
+    "types/ama.d.ts",
+    "docs/",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./types/ama.d.ts",
+      "default": "./ph-product-injector.js"
+    },
+    "./constants": "./ph-constants.js",
+    "./dist": "./dist/ph-product-injector.min.js",
+    "./types": "./types/ama.d.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/askme-analytics-mvp"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "peerDependencies": {
+    "posthog-js": ">=1.0.0"
+  }
+}
