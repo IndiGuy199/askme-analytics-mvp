@@ -98,6 +98,7 @@ window.PH_PRODUCT_DOM = Object.freeze({
 /**
  * Optional — consistent property names when sending PostHog events.
  * e.g. posthog.capture('renew_click', { [PH_PROPS.PRODUCT]: '2_years' })
+ */
 window.PH_PROPS = Object.freeze({
     SOURCE   : 'source',
     PRODUCT  : 'product',
@@ -114,7 +115,6 @@ window.PH_PROPS = Object.freeze({
     UTM_SOURCE : 'utm_source',
     UTM_MEDIUM : 'utm_medium',
     UTM_CAMPAIGN : 'utm_campaign'
-}); DEDUPE   : '__dedupeKey'
 });
 
 

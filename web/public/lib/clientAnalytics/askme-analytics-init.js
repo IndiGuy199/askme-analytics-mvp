@@ -12,8 +12,8 @@
         // Core PostHog settings
         apiKey: 'phc_MN5MXCec7lNZtZakqpRQZqTLaPfcV6CxeE8hfbTUFE2',
         apiHost: 'https://us.i.posthog.com',
-        clientId: 'askme-ai-app', // Default client ID
-        debug: false, // Set to true for development
+        clientId: 'askme-analytics-app', // Default client ID
+        debug: true, // Set to false in production
         
         // Analytics library settings
         autocapture: true,
@@ -26,43 +26,32 @@
         // User identification settings
         emailSelectors: 'input[type="email"], input[name*="email" i], input[placeholder*="email" i], input[id*="email" i]',
         
-        // Path to analytics library (clients can override)
-        analyticsLibraryPath: 'https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/ask-me-analytics.min.js',
+        // Local paths to analytics libraries (served from /public directory)
+        analyticsLibraryPath: '/lib/clientAnalytics/ask-me-analytics.min.js',
         
         // Path to constants file
-        constantsPath: 'https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/ph-constants.js',
+        constantsPath: '/lib/clientAnalytics/ph-constants.js',
         
         // Path to product injector
-        injectorPath: 'https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/ph-product-injector.js',
+        injectorPath: '/lib/clientAnalytics/ph-product-injector.js',
         
         // Product tracking configuration (CLIENT-SPECIFIC - configure this in your site)
-        // productConfig: {
-        //     eventName: 'renew_click',
-        //     pageMatch: '/app/renew',
-        //     panelClass: 'price',
-        //     titleClass: 'panel-heading',
-        //     priceClass: 'memberVal',
-        //     currencyClass: 'memTop',
-        //     quantityClass: 'quantity, qty, seats', // 🆕 NEW: Classes for quantity inputs/displays
-        //     quantityAttr: 'data-quantity' // 🆕 NEW: Attribute for quantity value
-        // },
+         productConfig: {
+             eventName: 'renew_click',
+             pageMatch: '/app/renew',
+            panelClass: 'price',
+            titleClass: 'panel-heading',
+           priceClass: 'memberVal',
+            currencyClass: 'memTop',
+            quantityClass: 'quantity, qty, seats', // 🆕 NEW: Classes for quantity inputs/displays
+             quantityAttr: 'data-quantity' // 🆕 NEW: Attribute for quantity value
+         },
         
         // Step definitions for funnel tracking (CLIENT-SPECIFIC - configure this in your site)
-        // steps: [
-        //     {"key":"RENEWAL_STARTED","url":"/app/membership","urlMatch":"contains","selector":"form input[type=submit]"},
-        //     {"key":"PRODUCT_SELECTED","url":"/app/renew/index","urlMatch":"contains","selector":"form input[type=submit]"},
-        //     {"key":"CHECKOUT_VIEWED","url":"/app/renew/submitRenewal","urlMatch":"contains"},
-        //     {"key":"CHECKOUT_SUBMITTED","url":"/app/renew/submitRenewal","urlMatch":"contains","selector":"input[type=submit]"},
-        //     {"key":"CHECKOUT_ERROR","url":"/app/renew/pay","urlMatch":"contains","selector":"input[type=submit]","requireSelectorPresent":true},
-        //     {"key":"CHECKOUT_COMPLETED","url":"/app/renew/pay","urlMatch":"contains","selector":".receipt","requireSelectorPresent":true}, // 🆕 Revenue event
-        //     {"key":"RENEWAL_COMPLETED","url":"/app/renew/pay","urlMatch":"contains","selector":".receipt","requireSelectorPresent":true},
-        //     {"key":"ONBOARDING_STARTED","url":"/app/profile/createProfile","urlMatch":"contains","selector":"#membershipProfile","autoFire":true},
-        //     {"key":"ONBOARDING_STEP1_COMPLETED","url":"/app/profile/createProfile","urlMatch":"contains","selector":"#membershipProfile input[type=submit]"},
-        //     {"key":"ONBOARDING_STEP2_COMPLETED","url":"/app/profile/createProfile","urlMatch":"contains","selector":"#contactForm input[type=button]#pwsubmit"},
-        //     {"key":"ONBOARDING_STEP3_COMPLETED","url":"/app/profile/createSecurityQuestions","urlMatch":"contains","selector":"#createProfileStep3Form input[type=submit]"},
-        //     {"key":"CONSENT_PROVIDED","url":"/app/membership/consent","urlMatch":"contains","selector":"#consent-form input[type=button]"},
-        //     {"key":"SIGNUP_COMPLETED","url":"/auth/dashboard","urlMatch":"contains"}
-        // ]
+        steps: [
+            {"key":"RENEWAL_STARTED","url":"/app/membership","urlMatch":"contains","selector":"form input[type=submit]"},
+            {"key":"PRODUCT_SELECTED","url":"/app/renew/index","urlMatch":"contains","selector":"form input[type=submit]"}
+        ]
     };
 
     // Page type detection function
@@ -125,16 +114,16 @@
         }
     }
 
-    // Setup product injector
     function setupProductInjector() {
         const config = window.AskMeAnalyticsConfig;
         
-        // Wait for constants to be loaded
-        if (!window.PH_DATA_KEYS || !window.PH_KEYS) {
-            console.warn('⚠️ PostHog constants not loaded, retrying...');
-            setTimeout(setupProductInjector, 100);
+        // Quick verification that constants loaded
+        if (!window.PH_DATA_KEYS || !window.PH_KEYS || !window.PH_PRODUCT_DOM || !window.PH_PROPS) {
+            console.error('❌ PostHog constants not loaded. Product tracking disabled.');
             return;
         }
+        
+        console.log('✅ PostHog constants verified, setting up product injector...');
 
         // ✅ Add PostHog group identification
         function setupGroupIdentification() {
@@ -283,6 +272,7 @@
         const script = document.createElement('script');
         script.id = 'ph-product-injector';
         script.src = config.injectorPath;
+        script.defer = true; // Ensure script executes after document is parsed
 
         // Set attributes using constants (only if productConfig exists)
         if (config.productConfig) {
@@ -331,20 +321,20 @@
         );
     }
 
-    // Main initialization sequence
+    /* =========================================
+     * Main Initialization Function
+     * ========================================= */
     function initialize() {
-        const config = window.AskMeAnalyticsConfig;
-        
         console.log('🚀 Initializing AskMe Analytics...');
         
-        // Step 1: Load analytics library
-        loadScript(config.analyticsLibraryPath,
+        // Step 1: Load main analytics library
+        loadScript(window.AskMeAnalyticsConfig.analyticsLibraryPath, 
             function() {
                 console.log('✅ Analytics library loaded');
                 initAnalytics();
             },
             function() {
-                console.error('❌ Failed to load analytics library from:', config.analyticsLibraryPath);
+                console.error('❌ Failed to load analytics library from:', window.AskMeAnalyticsConfig.analyticsLibraryPath);
             }
         );
         
