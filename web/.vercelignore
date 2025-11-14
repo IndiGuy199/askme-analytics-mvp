@@ -1,0 +1,29 @@
+# Test files
+**/__tests__/**
+**/*.test.js
+**/*.test.jsx
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.js
+**/*.spec.jsx
+**/*.spec.ts
+**/*.spec.tsx
+
+# Test configuration
+jest.config.js
+jest.setup.js
+
+# Coverage reports
+coverage/
+
+# Documentation
+*.md
+!README.md
+
+# Development files
+.env.local
+.env.development
+
+# IDE
+.vscode/
+.idea/

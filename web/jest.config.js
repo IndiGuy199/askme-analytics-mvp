@@ -10,7 +10,11 @@ module.exports = {
   ],
   testPathIgnorePatterns: [
     '/node_modules/',
-    '/__tests__/test-setup.js'
+    '/__tests__/test-setup.js',
+    '/.next/',
+    '/out/',
+    '/build/',
+    '/dist/'
   ],
   collectCoverageFrom: [
     'lib/clientAnalytics/**/*.js',
@@ -23,7 +27,9 @@ module.exports = {
     '/node_modules/',
     '/dist/',
     '/__tests__/',
-    '/build.js'
+    '/build.js',
+    '/.next/',
+    '/out/'
   ],
   // Note: Coverage thresholds removed for config/constant testing
   // Actual implementation logic is in browser-executed scripts
