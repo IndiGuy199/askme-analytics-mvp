@@ -1,0 +1,64 @@
+{
+  "clientId": "ask-me-ltp",
+  "debug": true,
+  "apiKey": "phc_MN5MXCec7lNZtZakqpRQZqTLaPfcV6CxeE8hfbTUFE2",
+  "apiHost": "https://us.i.posthog.com",
+  "autocapture": true,
+  "useBuiltInPageview": true,
+  "capture_pageview": true,
+  "capture_pageleave": true,
+  "enableCustomDomTracking": false,
+  "preferCustomOverAutocapture": false,
+  "emailSelectors": "input[type=\"email\"], input[name*=\"email\" i], input[placeholder*=\"email\" i], input[id*=\"email\" i]",
+  "analyticsLibraryPath": "https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/ask-me-analytics.min.js",
+  "constantsPath": "https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/ph-constants.js",
+  "injectorPath": "https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/ph-product-injector.js",
+  "productConfig": {
+    "eventName": "subscription_click",
+    "pageMatch": "/pricing",
+    "panelClass": "rounded-xl border bg-card text-card-foreground shadow",
+    "titleClass": "text-2xl",
+    "priceClass": "text-4xl font-bold",
+    "productButtonSelectors": "button.bg-blue-600, button.bg-gray-900, button.bg-indigo-600"
+  },
+  "steps": [
+    {
+      "key": "INFORMATIONAL_CONTENT_VIEWED",
+      "url": "/demo",
+      "urlMatch": "contains",
+      "autoFire": true
+    },
+    {
+      "key": "DASHBOARD_VIEWED",
+      "url": "/dashboard",
+      "urlMatch": "contains",
+      "autoFire": true,
+      "oncePerPath": true
+    },
+    {
+      "key": "SUBSCRIPTION_CONTENT_VIEWED",
+      "url": "/pricing",
+      "urlMatch": "contains",
+      "autoFire": true,
+      "oncePerPath": true
+    },
+    {
+      "key": "SUBSCRIPTION_PRODUCT_SELECTED",
+      "url": "/pricing",
+      "urlMatch": "contains",
+      "autoFire": true,
+      "oncePerPath": true,
+      "selector": ".font-semibold .text-blue-900",
+      "requireSelectorPresent": true
+    },
+    {
+      "key": "SUBSCRIPTION_COMPLETED",
+      "url": "/dashboard",
+      "urlMatch": "contains",
+      "autoFire": false,
+      "oncePerPath": true,
+      "selector": ".font-semibold .text-blue-900",
+      "requireSelectorPresent": false
+    }
+  ]
+}

@@ -1,7 +1,35 @@
 /**
- * AskMe Analytics Initialization Script
- * Standalone JavaScript file for client-side analytics setup
- * No server-side processing required
+ * AskMe Analytics Initialization Script - LTP Client
+ * 
+ * ⚠️ DEPRECATION NOTICE ⚠️
+ * This client-specific init file is DEPRECATED as of 2025-11-14.
+ * 
+ * Please migrate to the universal init script + configuration approach:
+ * 
+ * OLD (this file):
+ *   <script src=".../askme-analytics-init-ltp.js"></script>
+ * 
+ * NEW (recommended):
+ *   <script>window.AskMeAnalyticsClientId = 'ask-me-ltp';</script>
+ *   <script src=".../askme-analytics-init.js"></script>
+ * 
+ * Benefits of migration:
+ *   ✅ Automatic updates - bug fixes deploy to all clients instantly
+ *   ✅ Centralized config management
+ *   ✅ Easier maintenance
+ *   ✅ Better version control
+ * 
+ * Your client configuration is available at:
+ *   https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/configs/ask-me-ltp.json
+ * 
+ * See integration guide:
+ *   https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/configs/ltp-integration-example.html
+ * 
+ * This file will be archived on: 2026-05-14 (6 months)
+ * 
+ * @deprecated Use askme-analytics-init.js with clientId configuration instead
+ * @version 2.1.0-ltp-legacy
+ * @updated 2025-11-14
  */
 
 (function() {

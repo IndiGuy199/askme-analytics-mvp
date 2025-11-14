@@ -1,0 +1,231 @@
+<!-- 
+  AskMe Analytics Integration - Leisure Time Passport (Spring Boot)
+  
+  INTEGRATION INSTRUCTIONS:
+  
+  1. Add this code to your base layout/template file (e.g., layout.html, base.html, or header.jsp)
+  2. Place BEFORE the closing </head> tag OR at the end of <body> (preferred for non-blocking load)
+  3. The script loads asynchronously and won't block page rendering
+  
+  SPRING BOOT INTEGRATION OPTIONS:
+  
+  Option A: Thymeleaf Template (fragments/analytics.html)
+  Option B: JSP Include (WEB-INF/jsp/includes/analytics.jsp)
+  Option C: HTML Fragment (static/fragments/analytics.html)
+  
+-->
+
+<!-- ========================================
+     AskMe Analytics - LTP Client Integration
+     ======================================== -->
+
+<!-- Step 1: Set Client ID (REQUIRED) -->
+<script>
+  /**
+   * This tells the universal analytics script which configuration to load.
+   * The script will fetch: https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/configs/ask-me-ltp.json
+   */
+  window.AskMeAnalyticsClientId = 'ask-me-ltp';
+</script>
+
+<!-- Step 2: Load Universal Analytics Init Script (REQUIRED) -->
+<script 
+  src="https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/askme-analytics-init.js"
+  async
+  defer
+  data-client="ask-me-ltp"
+  data-version="2.1.0">
+</script>
+
+<!-- 
+  ========================================
+  THYMELEAF EXAMPLE (fragments/analytics.html)
+  ========================================
+  
+  <!DOCTYPE html>
+  <html xmlns:th="http://www.thymeleaf.org">
+  <th:block th:fragment="analytics">
+    <script>
+      window.AskMeAnalyticsClientId = 'ask-me-ltp';
+    </script>
+    <script 
+      src="https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/askme-analytics-init.js"
+      async defer>
+    </script>
+  </th:block>
+  </html>
+  
+  Then include in your layout:
+  <th:block th:replace="fragments/analytics :: analytics"></th:block>
+  
+  ========================================
+  JSP EXAMPLE (WEB-INF/jsp/includes/analytics.jsp)
+  ========================================
+  
+  <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+  <script>
+    window.AskMeAnalyticsClientId = 'ask-me-ltp';
+  </script>
+  <script 
+    src="https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/askme-analytics-init.js"
+    async defer>
+  </script>
+  
+  Then include in your layout:
+  <jsp:include page="/WEB-INF/jsp/includes/analytics.jsp" />
+  
+  ========================================
+  CONFIGURATION OVERRIDE (OPTIONAL)
+  ========================================
+  
+  If you need to override specific settings (debugging, custom selectors, etc.),
+  define window.AskMeAnalyticsConfig BEFORE setting the clientId:
+  
+  <script>
+    // Optional: Override specific config values
+    window.AskMeAnalyticsConfig = {
+      clientId: 'ask-me-ltp',
+      debug: true,  // Enable debug logging
+      emailSelectors: 'input[name="userEmail"], #emailField',  // Custom email selectors
+      // ... other overrides
+    };
+    
+    // This will use the inline config instead of loading from JSON
+  </script>
+  <script src=".../askme-analytics-init.js" async defer></script>
+  
+  ========================================
+  USER IDENTIFICATION (OPTIONAL)
+  ========================================
+  
+  If you have a logged-in user, you can identify them manually:
+  
+  <script>
+    // Wait for analytics to be ready
+    window.addEventListener('askme:analytics:ready', function(event) {
+      if (window.AskMeAnalytics && window.AskMeAnalytics.identify) {
+        // Identify user with email
+        window.AskMeAnalytics.identify('user@example.com', {
+          name: 'John Doe',
+          plan: 'premium',
+          signup_date: '2025-01-15'
+        });
+      }
+    });
+  </script>
+  
+  OR with Thymeleaf (server-side rendering):
+  
+  <script th:if="${user != null}">
+    window.addEventListener('askme:analytics:ready', function() {
+      if (window.AskMeAnalytics) {
+        window.AskMeAnalytics.identify(
+          /*[[${user.email}]]*/,
+          {
+            name: /*[[${user.fullName}]]*/,
+            plan: /*[[${user.subscriptionPlan}]]*/,
+            userId: /*[[${user.id}]]*/
+          }
+        );
+      }
+    });
+  </script>
+  
+  ========================================
+  CUSTOM EVENT TRACKING (OPTIONAL)
+  ========================================
+  
+  Track custom events anywhere in your application:
+  
+  <script>
+    // Track button click
+    document.getElementById('subscribeBtn').addEventListener('click', function() {
+      if (window.posthog) {
+        window.posthog.capture('subscription_button_clicked', {
+          plan: 'premium',
+          price: '$99',
+          source: 'pricing_page'
+        });
+      }
+    });
+  </script>
+  
+  With Thymeleaf inline:
+  
+  <button 
+    th:onclick="'if(window.posthog) window.posthog.capture(\'upgrade_clicked\', {plan: \'' + ${plan.name} + '\', price: \'' + ${plan.price} + '\'});'">
+    Upgrade
+  </button>
+  
+  ========================================
+  VERIFICATION STEPS
+  ========================================
+  
+  After integration, verify installation:
+  
+  1. Open browser DevTools Console (F12)
+  2. Check for initialization logs:
+     ✅ "🚀 Initializing AskMe Analytics..."
+     ✅ "✅ Configuration loaded for client: ask-me-ltp"
+     ✅ "✅ Analytics library loaded"
+     ✅ "✅ PostHog loaded (autocapture enabled)"
+  
+  3. Check PostHog dashboard (https://us.i.posthog.com):
+     - Filter events by client_id = 'ask-me-ltp'
+     - Verify $pageview events are coming through
+     - Check for analytics_initialized event
+  
+  4. Test product tracking (if on pricing page):
+     - Hover over pricing buttons
+     - Check console for: "[ph-injector] Product data injected"
+     - Verify data-product, data-price attributes on buttons
+  
+  ========================================
+  TROUBLESHOOTING
+  ========================================
+  
+  If analytics not loading:
+  
+  1. Check browser console for errors
+  2. Verify clientId matches config file name: ask-me-ltp.json
+  3. Check network tab for failed script loads
+  4. Ensure no Content Security Policy (CSP) blocking scripts
+  5. Verify no ad blockers blocking PostHog domain
+  
+  Common issues:
+  
+  - "Config not found": Check clientId spelling
+  - "Script blocked": Update CSP headers to allow askme-analytics-mvp.vercel.app
+  - "PostHog not loading": Check if ad blocker is enabled
+  - Duplicate events: Ensure script is only loaded once (check for multiple includes)
+  
+  ========================================
+  SPRING BOOT CONFIGURATION (if needed)
+  ========================================
+  
+  If using Content Security Policy, add to SecurityConfig:
+  
+  @Configuration
+  public class SecurityConfig extends WebSecurityConfigurerAdapter {
+      
+      @Override
+      protected void configure(HttpSecurity http) throws Exception {
+          http.headers()
+              .contentSecurityPolicy(
+                  "script-src 'self' 'unsafe-inline' " +
+                  "https://askme-analytics-mvp.vercel.app " +
+                  "https://us.i.posthog.com; " +
+                  "connect-src 'self' https://us.i.posthog.com;"
+              );
+      }
+  }
+  
+  ========================================
+  SUPPORT
+  ========================================
+  
+  Questions or issues? Contact analytics team or check:
+  - Configuration Guide: /CLIENT_CONFIGURATION_GUIDE.md
+  - Config README: /web/public/lib/clientAnalytics/configs/README.md
+  - Your config: https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/configs/ask-me-ltp.json
+-->

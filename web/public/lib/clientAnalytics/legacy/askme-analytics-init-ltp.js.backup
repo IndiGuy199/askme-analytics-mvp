@@ -1,74 +1,18 @@
 /**
  * AskMe Analytics Initialization Script
- * @version 2.1.0
- * @updated 2025-11-14
- * @features
- *   - Dynamic configuration loading from JSON files
- *   - Duplicate prevention guards
- *   - Support for inline config overrides
- *   - Automatic fallback to defaults
+ * Standalone JavaScript file for client-side analytics setup
+ * No server-side processing required
  */
 
 (function() {
     'use strict';
 
-    // ✅ Dynamic configuration loading
-    async function loadClientConfig() {
-        // Priority 1: Check for inline config override
-        if (window.AskMeAnalyticsConfig && window.AskMeAnalyticsConfig.clientId) {
-            console.log('✅ Using inline config for client:', window.AskMeAnalyticsConfig.clientId);
-            return window.AskMeAnalyticsConfig;
-        }
-        
-        // Priority 2: Load config from JSON file based on clientId
-        const clientId = window.AskMeAnalyticsClientId || 'askme-analytics-app';
-        const configUrl = `https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/configs/${clientId}.json`;
-        
-        try {
-            const response = await fetch(configUrl);
-            if (!response.ok) {
-                console.warn(`⚠️ Config file not found for ${clientId}, using defaults`);
-                return getDefaultConfig(clientId);
-            }
-            
-            const config = await response.json();
-            console.log('✅ Loaded config from JSON for client:', clientId);
-            return config;
-            
-        } catch (error) {
-            console.warn('⚠️ Failed to load config, using defaults:', error.message);
-            return getDefaultConfig(clientId);
-        }
-    }
-    
-    // Default configuration fallback
-    function getDefaultConfig(clientId) {
-        return {
-            apiKey: 'phc_MN5MXCec7lNZtZakqpRQZqTLaPfcV6CxeE8hfbTUFE2',
-            apiHost: 'https://us.i.posthog.com',
-            clientId: clientId,
-            debug: false,
-            autocapture: true,
-            useBuiltInPageview: true,
-            capture_pageview: true,
-            capture_pageleave: true,
-            enableCustomDomTracking: false,
-            preferCustomOverAutocapture: false,
-            emailSelectors: 'input[type="email"], input[name*="email" i], input[placeholder*="email" i], input[id*="email" i]',
-            analyticsLibraryPath: '/lib/clientAnalytics/ask-me-analytics.min.js',
-            constantsPath: '/lib/clientAnalytics/ph-constants.js',
-            injectorPath: '/lib/clientAnalytics/ph-product-injector.js',
-            productConfig: null,
-            steps: []
-        };
-    }
-
-    // Temporary placeholder (will be replaced after config loads)
+    // Configuration object that clients can override
     window.AskMeAnalyticsConfig = window.AskMeAnalyticsConfig || {
         // Core PostHog settings
         apiKey: 'phc_MN5MXCec7lNZtZakqpRQZqTLaPfcV6CxeE8hfbTUFE2',
         apiHost: 'https://us.i.posthog.com',
-        clientId: 'askme-analytics-app', // Default client ID
+        clientId: 'ask-me-ltp', // ltp client ID
         debug: true, // Set to false in production
         
         // Analytics library settings
@@ -83,13 +27,13 @@
         emailSelectors: 'input[type="email"], input[name*="email" i], input[placeholder*="email" i], input[id*="email" i]',
         
         // Local paths to analytics libraries (served from /public directory)
-        analyticsLibraryPath: '/lib/clientAnalytics/ask-me-analytics.min.js',
+        analyticsLibraryPath: 'https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/ask-me-analytics.min.js',
         
         // Path to constants file
-        constantsPath: '/lib/clientAnalytics/ph-constants.js',
+        constantsPath: 'https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/ph-constants.js',
         
         // Path to product injector
-        injectorPath: '/lib/clientAnalytics/ph-product-injector.js',
+        injectorPath: 'https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/ph-product-injector.js',
         
         // Product tracking configuration (CLIENT-SPECIFIC - configure this in your site)
         // Supports multiple selector strategies for maximum flexibility
@@ -530,7 +474,7 @@
     /* =========================================
      * Main Initialization Function
      * ========================================= */
-    async function initialize() {
+    function initialize() {
         // ✅ CRITICAL: Prevent double initialization
         if (window.__askme_analytics_initialized) {
             console.warn('⚠️ AskMe Analytics already initialized. Skipping duplicate initialization.');
@@ -539,10 +483,6 @@
         window.__askme_analytics_initialized = true;
         
         console.log('🚀 Initializing AskMe Analytics...');
-        
-        // Step 0: Load configuration (dynamic or inline)
-        window.AskMeAnalyticsConfig = await loadClientConfig();
-        console.log('✅ Configuration loaded for client:', window.AskMeAnalyticsConfig.clientId);
         
         // ✅ CRITICAL: Check if analytics library is already loaded
         if (window.GenericAnalytics) {
