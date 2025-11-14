@@ -116,8 +116,16 @@
         return 'other';
     }
 
-    // Load script helper
+    // Load script helper with duplicate prevention
     function loadScript(src, onLoad, onError) {
+        // ✅ CRITICAL: Check if script is already loaded
+        const existingScript = document.querySelector(`script[src="${src}"]`);
+        if (existingScript) {
+            console.log('✅ Script already loaded:', src);
+            if (onLoad) onLoad();
+            return existingScript;
+        }
+        
         const script = document.createElement('script');
         script.src = src;
         script.onload = onLoad;
@@ -130,8 +138,28 @@
     function initAnalytics() {
         const config = window.AskMeAnalyticsConfig;
         
+        // ✅ CRITICAL: Prevent duplicate initialization
+        if (window.__askme_genericanalytics_initialized) {
+            console.warn('⚠️ GenericAnalytics already initialized. Skipping duplicate init.');
+            return;
+        }
+        
         if (window.GenericAnalytics) {
+            // Check if PostHog is already initialized (might be loaded directly on page)
+            if (window.posthog && window.posthog.__loaded) {
+                console.log('✅ PostHog already initialized on page, reusing existing instance');
+                window.__askme_genericanalytics_initialized = true;
+                
+                // Trigger ready event
+                window.dispatchEvent(new CustomEvent('askme:analytics:ready', {
+                    detail: { clientId: config.clientId }
+                }));
+                return;
+            }
+            
             try {
+                window.__askme_genericanalytics_initialized = true;
+                
                 window.GenericAnalytics.init({
                     apiKey: config.apiKey,
                     apiHost: config.apiHost,
@@ -156,19 +184,36 @@
                 
             } catch (error) {
                 console.error('❌ Failed to initialize AskMe Analytics:', error);
+                window.__askme_genericanalytics_initialized = false; // Reset on error
             }
         } else {
-            // Retry if library hasn't loaded yet
-            setTimeout(initAnalytics, 100);
+            // Retry if library hasn't loaded yet (max 10 retries = 1 second)
+            const maxRetries = 10;
+            const currentRetry = (window.__askme_init_retry_count || 0) + 1;
+            window.__askme_init_retry_count = currentRetry;
+            
+            if (currentRetry <= maxRetries) {
+                setTimeout(initAnalytics, 100);
+            } else {
+                console.error('❌ GenericAnalytics library failed to load after', maxRetries, 'retries');
+            }
         }
     }
 
     function setupProductInjector() {
         const config = window.AskMeAnalyticsConfig;
         
+        // ✅ CRITICAL: Prevent duplicate product injector setup
+        if (window.__askme_product_injector_initialized) {
+            console.warn('⚠️ Product injector already initialized. Skipping duplicate setup.');
+            return;
+        }
+        window.__askme_product_injector_initialized = true;
+        
         // Quick verification that constants loaded
         if (!window.PH_DATA_KEYS || !window.PH_KEYS || !window.PH_PRODUCT_DOM || !window.PH_PROPS) {
             console.error('❌ PostHog constants not loaded. Product tracking disabled.');
+            window.__askme_product_injector_initialized = false; // Reset flag on error
             return;
         }
         
@@ -176,9 +221,15 @@
 
         // ✅ Add PostHog group identification
         function setupGroupIdentification() {
+            // ✅ CRITICAL: Prevent duplicate group identification
+            if (window.__askme_group_identified) {
+                return; // Already identified
+            }
+            
             // Wait for PostHog to be ready
             if (window.posthog && typeof window.posthog.groupIdentify === 'function') {
                 try {
+                    window.__askme_group_identified = true;
                     window.posthog.groupIdentify('client', config.clientId, {
                         name: config.clientId,
                         client_type: 'askme_analytics',
@@ -188,10 +239,19 @@
                     console.log('✅ PostHog group identified for client:', config.clientId);
                 } catch (error) {
                     console.warn('⚠️ Failed to identify PostHog group:', error);
+                    window.__askme_group_identified = false; // Reset on error
                 }
             } else {
-                // Retry if PostHog isn't ready yet
-                setTimeout(setupGroupIdentification, 100);
+                // Retry if PostHog isn't ready yet (max 10 retries)
+                const maxRetries = 10;
+                const currentRetry = (window.__askme_group_retry_count || 0) + 1;
+                window.__askme_group_retry_count = currentRetry;
+                
+                if (currentRetry <= maxRetries) {
+                    setTimeout(setupGroupIdentification, 100);
+                } else {
+                    console.warn('⚠️ PostHog groupIdentify not available after', maxRetries, 'retries');
+                }
             }
         }
 
@@ -200,11 +260,18 @@
 
         // ✅ Add user identification functionality
         function setupUserIdentification() {
+            // ✅ CRITICAL: Prevent duplicate user identification setup
+            if (window.__askme_user_identification_initialized) {
+                return; // Already setup
+            }
+            
             // Wait for PostHog to be ready
             if (!window.posthog || typeof window.posthog.identify !== 'function') {
                 setTimeout(setupUserIdentification, 100);
                 return;
             }
+            
+            window.__askme_user_identification_initialized = true;
 
             // Strategy 1: Look for email inputs and identify on blur/submit
             const emailSelectors = config.emailSelectors || 
@@ -408,7 +475,22 @@
      * Main Initialization Function
      * ========================================= */
     function initialize() {
+        // ✅ CRITICAL: Prevent double initialization
+        if (window.__askme_analytics_initialized) {
+            console.warn('⚠️ AskMe Analytics already initialized. Skipping duplicate initialization.');
+            return;
+        }
+        window.__askme_analytics_initialized = true;
+        
         console.log('🚀 Initializing AskMe Analytics...');
+        
+        // ✅ CRITICAL: Check if analytics library is already loaded
+        if (window.GenericAnalytics) {
+            console.log('✅ Analytics library already loaded (from page), skipping script load');
+            initAnalytics();
+            loadConstants();
+            return;
+        }
         
         // Step 1: Load main analytics library
         loadScript(window.AskMeAnalyticsConfig.analyticsLibraryPath, 
