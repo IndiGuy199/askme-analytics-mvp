@@ -12,7 +12,7 @@
         // Core PostHog settings
         apiKey: 'phc_MN5MXCec7lNZtZakqpRQZqTLaPfcV6CxeE8hfbTUFE2',
         apiHost: 'https://us.i.posthog.com',
-        clientId: 'askme-analytics-app', // Default client ID
+        clientId: 'ask-me-ltp', // ltp client ID
         debug: true, // Set to false in production
         
         // Analytics library settings
@@ -27,30 +27,79 @@
         emailSelectors: 'input[type="email"], input[name*="email" i], input[placeholder*="email" i], input[id*="email" i]',
         
         // Local paths to analytics libraries (served from /public directory)
-        analyticsLibraryPath: 'https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/ask-me-analytics.min.js',
+        analyticsLibraryPath: '/lib/clientAnalytics/ask-me-analytics.min.js',
         
         // Path to constants file
-        constantsPath: 'https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/ph-constants.js',
+        constantsPath: '/lib/clientAnalytics/ph-constants.js',
         
         // Path to product injector
-        injectorPath: 'https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/ph-product-injector.js',
+        injectorPath: '/lib/clientAnalytics/ph-product-injector.js',
         
         // Product tracking configuration (CLIENT-SPECIFIC - configure this in your site)
-         productConfig: {
-             eventName: 'renew_click',
-             pageMatch: '/app/renew',
-            panelClass: 'price',
-            titleClass: 'panel-heading',
-           priceClass: 'memberVal',
-            currencyClass: 'memTop',
-            quantityClass: 'quantity, qty, seats', // 🆕 NEW: Classes for quantity inputs/displays
-             quantityAttr: 'data-quantity' // 🆕 NEW: Attribute for quantity value
-         },
+        // Supports multiple selector strategies for maximum flexibility
+        productConfig: {
+            eventName: 'subscription_click',
+            pageMatch: '/pricing',
+            
+            // === PANEL/CONTAINER SELECTORS ===
+            // Use ONE of these (checked in order of precedence):
+            panelSelector: '',  // Full CSS selector (highest priority) - e.g., '.pricing > div[role="article"]'
+            panelClass: 'rounded-xl border bg-card text-card-foreground shadow',  // CSS class names
+            panelAttr: '',      // data-* attribute name - e.g., 'data-pricing-card'
+            panelId: '',        // Element ID - e.g., 'premium-plan-card'
+            panelXPath: '',     // XPath expression - e.g., '//div[@class="pricing-card"]'
+            
+            // === TITLE/PLAN NAME SELECTORS ===
+            // Use ONE of these (checked in order of precedence):
+            titleSelector: '',  // Full CSS selector - e.g., 'h2.plan-name, [itemprop="name"]'
+            titleClass: 'text-2xl',  // CSS class names
+            titleAttr: '',      // data-* attribute - e.g., 'data-plan-name'
+            titleId: '',        // Element ID - e.g., 'plan-title'
+            titleXPath: '',     // XPath expression - e.g., '//h3[contains(@class, "plan-name")]'
+            
+            // === PRICE SELECTORS ===
+            // Use ONE of these (checked in order of precedence):
+            priceSelector: '',  // Full CSS selector - e.g., '.price-value, [itemprop="price"]'
+            priceClass: 'text-4xl font-bold',  // CSS class names
+            priceAttr: '',      // data-* attribute - e.g., 'data-price'
+            priceId: '',        // Element ID - e.g., 'plan-price'
+            priceXPath: '',     // XPath expression - e.g., '//span[@itemprop="price"]'
+            
+            // === CURRENCY SELECTORS ===
+            // Use ONE of these (optional - defaults to USD if all empty):
+            currencySelector: '',  // Full CSS selector - e.g., '[itemprop="priceCurrency"]'
+            currencyClass: '',     // CSS class names - e.g., 'currency-symbol'
+            currencyAttr: '',      // data-* attribute - e.g., 'data-currency'
+            currencyId: '',        // Element ID - e.g., 'currency-code'
+            currencyXPath: '',     // XPath expression - e.g., '//span[@class="currency"]'
+            
+            // === QUANTITY SELECTORS ===
+            // Use ONE of these (for multi-seat pricing, optional):
+            quantitySelector: '',  // Full CSS selector - e.g., 'input[name="seats"], .team-size'
+            quantityClass: '',     // CSS class names - e.g., 'quantity-input, team-size-select'
+            quantityAttr: '',      // data-* attribute - e.g., 'data-quantity'
+            quantityId: '',        // Element ID - e.g., 'seat-count'
+            quantityXPath: '',     // XPath expression - e.g., '//input[@name="quantity"]'
+            
+            // === PRODUCT BUTTON SELECTORS ===
+            // Specify which buttons should be annotated with product data (data-product, data-price, etc.)
+            // This prevents accidentally annotating navigation buttons, close buttons, etc.
+            // Examples:
+            //   - 'button.bg-blue-600, button.bg-gray-900' (specific CSS classes)
+            //   - '[data-pricing-button]' (data attributes - BEST PRACTICE)
+            //   - '.pricing-card button' (buttons inside pricing containers)
+            productButtonSelectors: 'button.bg-blue-600, button.bg-gray-900, button.bg-indigo-600'
+        },
         
         // Step definitions for funnel tracking (CLIENT-SPECIFIC - configure this in your site)
         steps: [
-            {"key":"RENEWAL_STARTED","url":"/app/membership","urlMatch":"contains","selector":"form input[type=submit]"},
-            {"key":"PRODUCT_SELECTED","url":"/app/renew/index","urlMatch":"contains","selector":"form input[type=submit]"}
+            {"key":"INFORMATIONAL_CONTENT_VIEWED","url":"/demo","urlMatch":"contains", "urlMatch": "contains","autoFire": true},
+            {"key":"DASHBOARD_VIEWED","url":"/dashboard","urlMatch":"contains","autoFire": true, "oncePerPath": true },
+            {"key":"SUBSCRIPTION_CONTENT_VIEWED","url":"/pricing","urlMatch":"contains","autoFire": true, "oncePerPath": true },
+            {"key":"SUBSCRIPTION_PRODUCT_SELECTED","url":"/pricing","urlMatch":"contains","autoFire": true, "oncePerPath": true,
+              "selector": ".font-semibold .text-blue-900", "requireSelectorPresent": true },
+            {"key":"SUBSCRIPTION_COMPLETED","url":"/dashboard","urlMatch":"contains","autoFire": false, "oncePerPath": true, 
+             "selector": ".font-semibold .text-blue-900", "requireSelectorPresent": false },
         ]
     };
 
@@ -278,16 +327,50 @@
         if (config.productConfig) {
             script.setAttribute(window.PH_DATA_KEYS.EVENT_NAME, config.productConfig.eventName || 'product_click');
             script.setAttribute(window.PH_DATA_KEYS.PAGE_MATCH, config.productConfig.pageMatch || '');
+            
+            // === PANEL/CONTAINER SELECTORS ===
             script.setAttribute(window.PH_DATA_KEYS.PANEL_CLASS, config.productConfig.panelClass || '');
+            if (config.productConfig.panelSelector) script.setAttribute('data-panel-selector', config.productConfig.panelSelector);
+            if (config.productConfig.panelAttr) script.setAttribute('data-panel-attr', config.productConfig.panelAttr);
+            if (config.productConfig.panelId) script.setAttribute('data-panel-id', config.productConfig.panelId);
+            if (config.productConfig.panelXPath) script.setAttribute('data-panel-xpath', config.productConfig.panelXPath);
+            
+            // === TITLE/PLAN NAME SELECTORS ===
             script.setAttribute(window.PH_DATA_KEYS.TITLE_CLASS, config.productConfig.titleClass || '');
+            script.setAttribute(window.PH_DATA_KEYS.TITLE_ATTR, config.productConfig.titleAttr || '');
+            if (config.productConfig.titleSelector) script.setAttribute('data-title-selector', config.productConfig.titleSelector);
+            if (config.productConfig.titleId) script.setAttribute('data-title-id', config.productConfig.titleId);
+            if (config.productConfig.titleXPath) script.setAttribute('data-title-xpath', config.productConfig.titleXPath);
+            
+            // === PRICE SELECTORS ===
             script.setAttribute(window.PH_DATA_KEYS.PRICE_CLASS, config.productConfig.priceClass || '');
+            script.setAttribute(window.PH_DATA_KEYS.PRICE_ATTR, config.productConfig.priceAttr || '');
+            if (config.productConfig.priceSelector) script.setAttribute('data-price-selector', config.productConfig.priceSelector);
+            if (config.productConfig.priceId) script.setAttribute('data-price-id', config.productConfig.priceId);
+            if (config.productConfig.priceXPath) script.setAttribute('data-price-xpath', config.productConfig.priceXPath);
+            
+            // === CURRENCY SELECTORS ===
             script.setAttribute(window.PH_DATA_KEYS.CURRENCY_CLASS, config.productConfig.currencyClass || '');
-            // 🆕 NEW: Quantity tracking configuration
+            if (config.productConfig.currencySelector) script.setAttribute('data-currency-selector', config.productConfig.currencySelector);
+            if (config.productConfig.currencyAttr) script.setAttribute('data-currency-attr', config.productConfig.currencyAttr);
+            if (config.productConfig.currencyId) script.setAttribute('data-currency-id', config.productConfig.currencyId);
+            if (config.productConfig.currencyXPath) script.setAttribute('data-currency-xpath', config.productConfig.currencyXPath);
+            
+            // === QUANTITY SELECTORS ===
             if (config.productConfig.quantityClass) {
                 script.setAttribute(window.PH_DATA_KEYS.QUANTITY_CLASS, config.productConfig.quantityClass);
             }
             if (config.productConfig.quantityAttr) {
                 script.setAttribute(window.PH_DATA_KEYS.QUANTITY_ATTR, config.productConfig.quantityAttr);
+            }
+            if (config.productConfig.quantitySelector) script.setAttribute('data-quantity-selector', config.productConfig.quantitySelector);
+            if (config.productConfig.quantityId) script.setAttribute('data-quantity-id', config.productConfig.quantityId);
+            if (config.productConfig.quantityXPath) script.setAttribute('data-quantity-xpath', config.productConfig.quantityXPath);
+            
+            // === PRODUCT BUTTON SELECTORS ===
+            // 🆕 NEW: Specific buttons to annotate with product data
+            if (config.productConfig.productButtonSelectors) {
+                script.setAttribute(window.PH_DATA_KEYS.PRODUCT_BUTTON_SELECTORS, config.productConfig.productButtonSelectors);
             }
         }
 
