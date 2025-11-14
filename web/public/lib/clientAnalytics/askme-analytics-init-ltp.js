@@ -27,13 +27,13 @@
         emailSelectors: 'input[type="email"], input[name*="email" i], input[placeholder*="email" i], input[id*="email" i]',
         
         // Local paths to analytics libraries (served from /public directory)
-        analyticsLibraryPath: '/lib/clientAnalytics/ask-me-analytics.min.js',
+        analyticsLibraryPath: 'https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/ask-me-analytics.min.js',
         
         // Path to constants file
-        constantsPath: '/lib/clientAnalytics/ph-constants.js',
+        constantsPath: 'https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/ph-constants.js',
         
         // Path to product injector
-        injectorPath: '/lib/clientAnalytics/ph-product-injector.js',
+        injectorPath: 'https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/ph-product-injector.js',
         
         // Product tracking configuration (CLIENT-SPECIFIC - configure this in your site)
         // Supports multiple selector strategies for maximum flexibility
