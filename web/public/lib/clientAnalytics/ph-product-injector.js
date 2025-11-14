@@ -201,6 +201,113 @@
         );
     }
 
+    /* ---------- 1b) Multi-strategy selector evaluation -------------------- */
+    /**
+     * Evaluate XPath expression and return matching elements
+     * @param {string} xpath - XPath expression
+     * @param {Node} context - Context node (default: document)
+     * @returns {Array<Element>} Array of matching elements
+     */
+    function evaluateXPath(xpath, context = document) {
+        if (!isNonEmptyStr(xpath)) return [];
+        try {
+            const result = document.evaluate(
+                xpath,
+                context,
+                null,
+                XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+                null
+            );
+            const elements = [];
+            for (let i = 0; i < result.snapshotLength; i++) {
+                const node = result.snapshotItem(i);
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    elements.push(node);
+                }
+            }
+            return elements;
+        } catch (e) {
+            console.warn('[ph-injector] Invalid XPath:', xpath, e);
+            return [];
+        }
+    }
+
+    /**
+     * Build a CSS selector from multiple strategy options
+     * Checks in order of precedence: Selector > Class > Attr > Id
+     * @param {Object} options - Selector options {selector, class, attr, id, xpath}
+     * @returns {string} Combined CSS selector or empty string
+     */
+    function buildSelector(options) {
+        const { selector, class: cls, attr, id } = options;
+        
+        // Priority 1: Full CSS selector (highest priority)
+        if (isNonEmptyStr(selector) && isValidSelector(selector)) {
+            return selector;
+        }
+        
+        // Priority 2: CSS classes
+        if (isNonEmptyStr(cls)) {
+            const classSel = classToSelectorCsv(cls);
+            if (classSel && isValidSelector(classSel)) {
+                return classSel;
+            }
+        }
+        
+        // Priority 3: Data attribute
+        if (isNonEmptyStr(attr)) {
+            const attrSel = `[${attr}]`;
+            if (isValidSelector(attrSel)) {
+                return attrSel;
+            }
+        }
+        
+        // Priority 4: Element ID
+        if (isNonEmptyStr(id)) {
+            const idSel = `#${id}`;
+            if (isValidSelector(idSel)) {
+                return idSel;
+            }
+        }
+        
+        return '';
+    }
+
+    /**
+     * Find elements using multi-strategy approach
+     * Tries: selector > class > attr > id > xpath
+     * @param {Object} options - Selector options
+     * @param {Node} context - Context node (default: document)
+     * @returns {Array<Element>} Array of matching elements
+     */
+    function findElements(options, context = document) {
+        // Try CSS-based strategies first
+        const cssSelector = buildSelector(options);
+        if (cssSelector) {
+            const elements = qsa(cssSelector, context);
+            if (elements.length > 0) return elements;
+        }
+        
+        // Priority 5: XPath (last resort)
+        if (isNonEmptyStr(options.xpath)) {
+            const elements = evaluateXPath(options.xpath, context);
+            if (elements.length > 0) return elements;
+        }
+        
+        return [];
+    }
+
+    /**
+     * Find first element using multi-strategy approach
+     * @param {Object} options - Selector options
+     * @param {Node} context - Context node (default: document)
+     * @returns {Element|null} First matching element or null
+     */
+    function findFirstElement(options, context = document) {
+        const elements = findElements(options, context);
+        return elements.length > 0 ? elements[0] : null;
+    }
+
     /* ---------- 2) PostHog queue + dedupe -------------------------------- */
     // 🆕 Enhanced: Load from sessionStorage for persistence across quick reloads
     const sentOncePath = (() => {
@@ -327,20 +434,48 @@
     const DS = {
         eventName     : SCRIPT.getAttribute(K.EVENT_NAME),
         pageMatch     : SCRIPT.getAttribute(K.PAGE_MATCH),
+        
+        // === PANEL/CONTAINER SELECTORS (multiple strategies) ===
         panelClass    : SCRIPT.getAttribute(K.PANEL_CLASS),
-        titleAttr     : SCRIPT.getAttribute(K.TITLE_ATTR),
+        panelSelector : SCRIPT.getAttribute('data-panel-selector'),
+        panelAttr     : SCRIPT.getAttribute('data-panel-attr'),
+        panelId       : SCRIPT.getAttribute('data-panel-id'),
+        panelXPath    : SCRIPT.getAttribute('data-panel-xpath'),
+        
+        // === TITLE SELECTORS (multiple strategies) ===
         titleClass    : SCRIPT.getAttribute(K.TITLE_CLASS),
+        titleAttr     : SCRIPT.getAttribute(K.TITLE_ATTR),
+        titleSelector : SCRIPT.getAttribute('data-title-selector'),
+        titleId       : SCRIPT.getAttribute('data-title-id'),
+        titleXPath    : SCRIPT.getAttribute('data-title-xpath'),
+        
+        // === PRICE SELECTORS (multiple strategies) ===
         priceClass    : SCRIPT.getAttribute(K.PRICE_CLASS),
         priceAttr     : SCRIPT.getAttribute(K.PRICE_ATTR),
+        priceSelector : SCRIPT.getAttribute('data-price-selector'),
+        priceId       : SCRIPT.getAttribute('data-price-id'),
+        priceXPath    : SCRIPT.getAttribute('data-price-xpath'),
+        
+        // === CURRENCY SELECTORS (multiple strategies) ===
         currencyClass : SCRIPT.getAttribute(K.CURRENCY_CLASS),
+        currencySelector : SCRIPT.getAttribute('data-currency-selector'),
+        currencyAttr  : SCRIPT.getAttribute('data-currency-attr'),
+        currencyId    : SCRIPT.getAttribute('data-currency-id'),
+        currencyXPath : SCRIPT.getAttribute('data-currency-xpath'),
+        
+        // === QUANTITY SELECTORS (multiple strategies) ===
+        quantityClass : SCRIPT.getAttribute(K.QUANTITY_CLASS),
+        quantityAttr  : SCRIPT.getAttribute(K.QUANTITY_ATTR),
+        quantitySelector : SCRIPT.getAttribute('data-quantity-selector'),
+        quantityId    : SCRIPT.getAttribute('data-quantity-id'),
+        quantityXPath : SCRIPT.getAttribute('data-quantity-xpath'),
+        
+        // Other configurations
         stepsRaw      : SCRIPT.getAttribute(K.STEPS),
-        // 🆕 NEW: Configurable selectors for dynamic elements
         priceWatchSelectors : SCRIPT.getAttribute(K.PRICE_WATCH_SELECTORS),
         emailSelectors      : SCRIPT.getAttribute(K.EMAIL_SELECTORS),
         buttonSelectors     : SCRIPT.getAttribute(K.BUTTON_SELECTORS),
-        // 🆕 NEW: Quantity tracking configuration
-        quantityClass       : SCRIPT.getAttribute(K.QUANTITY_CLASS),
-        quantityAttr        : SCRIPT.getAttribute(K.QUANTITY_ATTR)
+        productButtonSelectors : SCRIPT.getAttribute(K.PRODUCT_BUTTON_SELECTORS)
     };
 
     /* ---------- 4) Page gating -------------------------------------------- */
@@ -356,38 +491,77 @@
 
     /* ---------- 5) Product annotation ------------------------------------ */
     const hasAnyProductHint =
+        isNonEmptyStr(DS.panelSelector) ||
         isNonEmptyStr(DS.panelClass) ||
-        isNonEmptyStr(DS.titleAttr)  ||
+        isNonEmptyStr(DS.panelAttr) ||
+        isNonEmptyStr(DS.panelId) ||
+        isNonEmptyStr(DS.panelXPath) ||
+        isNonEmptyStr(DS.titleSelector) ||
         isNonEmptyStr(DS.titleClass) ||
+        isNonEmptyStr(DS.titleAttr) ||
+        isNonEmptyStr(DS.titleId) ||
+        isNonEmptyStr(DS.titleXPath) ||
+        isNonEmptyStr(DS.priceSelector) ||
         isNonEmptyStr(DS.priceClass) ||
-        isNonEmptyStr(DS.priceAttr)  ||
-        isNonEmptyStr(DS.currencyClass);
+        isNonEmptyStr(DS.priceAttr) ||
+        isNonEmptyStr(DS.priceId) ||
+        isNonEmptyStr(DS.priceXPath) ||
+        isNonEmptyStr(DS.currencySelector) ||
+        isNonEmptyStr(DS.currencyClass) ||
+        isNonEmptyStr(DS.currencyAttr) ||
+        isNonEmptyStr(DS.currencyId) ||
+        isNonEmptyStr(DS.currencyXPath);
 
     function guessContainer(btn) {
-        // 🆕 Priority 1: Try closest pricing container with specific markers
-        // NOTE: Don't include [data-product] or [data-price] as those are attributes WE set on buttons
+        // 🆕 Priority 1: Try configured panel selector (multi-strategy)
+        const panelSelector = buildSelector({
+            selector: DS.panelSelector,
+            class: DS.panelClass,
+            attr: DS.panelAttr,
+            id: DS.panelId
+        });
+        
+        if (panelSelector) {
+            try {
+                const container = btn.closest(panelSelector);
+                if (container) return container;
+            } catch (e) {
+                console.warn('[ph-injector] Invalid panel selector:', panelSelector, e);
+            }
+        }
+        
+        // Priority 2: XPath for panel (if configured)
+        if (isNonEmptyStr(DS.panelXPath)) {
+            // XPath doesn't have a "closest" equivalent, so we check ancestors
+            let ancestor = btn.parentElement;
+            while (ancestor && ancestor !== document.documentElement) {
+                const matches = evaluateXPath(DS.panelXPath, document);
+                if (matches.includes(ancestor)) return ancestor;
+                ancestor = ancestor.parentElement;
+            }
+        }
+        
+        // Priority 3: Try default pricing container markers
         const directContainer = btn.closest('.price-card, .pricing-card, .pricing-tier, .plan-card, .product-card');
         if (directContainer) return directContainer;
         
-        // Priority 2: optional panel class(es) from configuration
-        const panelSelCsv = classToSelectorCsv(DS.panelClass);
-        if (panelSelCsv) {
-            try { const c = btn.closest(panelSelCsv); if (c) return c; } catch {}
-        }
-        
-        // Priority 3: heuristic scan upward
+        // Priority 4: Heuristic scan upward for price/product hints
         let p = btn.parentElement, hops = 0;
-        const nearPriceSel = [
-            DS.priceAttr ? `[${DS.priceAttr}]` : '',
-            classToSelectorCsv(DS.priceClass)
-        ].filter(Boolean).join(',');
+        const priceSelector = buildSelector({
+            selector: DS.priceSelector,
+            class: DS.priceClass,
+            attr: DS.priceAttr,
+            id: DS.priceId
+        });
+        
         while (p && hops++ < 6) {
             const cls = (p.className || '').toString();
             if (/\b(price|panel|card|plan|tier|product)\b/i.test(cls)) return p;
-            if (nearPriceSel && first(p, nearPriceSel)) return p;
+            if (priceSelector && first(p, priceSelector)) return p;
             if (DS.titleAttr && p.hasAttribute && p.hasAttribute(DS.titleAttr)) return p;
             p = p.parentElement;
         }
+        
         return btn.parentElement || document;
     }
 
@@ -441,41 +615,89 @@
     function extractFrom(container) {
         if (!container) container = document;
 
-        // product
+        // === PRODUCT/TITLE EXTRACTION (multi-strategy) ===
         let product = null;
-        if (isNonEmptyStr(DS.titleAttr) && container.hasAttribute && container.hasAttribute(DS.titleAttr)) {
+        
+        // Try to find title element using multi-strategy selector
+        const titleElement = findFirstElement({
+            selector: DS.titleSelector,
+            class: DS.titleClass,
+            attr: DS.titleAttr,
+            id: DS.titleId,
+            xpath: DS.titleXPath
+        }, container);
+        
+        if (titleElement) {
+            // Priority 1: Check for titleAttr on the found element
+            if (DS.titleAttr && titleElement.hasAttribute && titleElement.hasAttribute(DS.titleAttr)) {
+                product = titleElement.getAttribute(DS.titleAttr);
+            }
+            // Priority 2: Use element's text content
+            if (!product) {
+                product = text(titleElement);
+            }
+        }
+        
+        // Fallback: Check container itself for titleAttr
+        if (!product && DS.titleAttr && container.hasAttribute && container.hasAttribute(DS.titleAttr)) {
             product = container.getAttribute(DS.titleAttr);
         }
-        if (!product) {
-            const titleCsv = classToSelectorCsv(DS.titleClass);
-            const guessTitleSel = (titleCsv ? `${titleCsv},h3,` : 'h3,') + `[${DS.titleAttr || 'data-title'}]`;
-            const tn = first(container, guessTitleSel);
-            if (tn) product = tn.getAttribute('data-title') || text(tn);
-        }
 
-        // price
+        // === PRICE EXTRACTION (multi-strategy) ===
         let price = null;
-        const pCsv = [
-            DS.priceAttr ? `[${DS.priceAttr}]` : '',
-            classToSelectorCsv(DS.priceClass)
-        ].filter(Boolean).join(',');
-        const pn = first(container, pCsv || '.price,.amount,[data-originalfee]');
-        if (pn) {
-            if (DS.priceAttr && pn.hasAttribute && pn.hasAttribute(DS.priceAttr)) price = pn.getAttribute(DS.priceAttr);
-            if (!price) price = parseNum(text(pn));
+        
+        // Try to find price element using multi-strategy selector
+        const priceElement = findFirstElement({
+            selector: DS.priceSelector,
+            class: DS.priceClass,
+            attr: DS.priceAttr,
+            id: DS.priceId,
+            xpath: DS.priceXPath
+        }, container);
+        
+        if (priceElement) {
+            // Priority 1: Check for priceAttr on the found element
+            if (DS.priceAttr && priceElement.hasAttribute && priceElement.hasAttribute(DS.priceAttr)) {
+                price = priceElement.getAttribute(DS.priceAttr);
+            }
+            // Priority 2: Parse from element's text content
+            if (!price) {
+                price = parseNum(text(priceElement));
+            }
+        }
+        
+        // Fallback: Check container itself for priceAttr
+        if (!price && DS.priceAttr && container.hasAttribute && container.hasAttribute(DS.priceAttr)) {
+            price = container.getAttribute(DS.priceAttr);
         }
 
-        // currency
-        const cCsv = classToSelectorCsv(DS.currencyClass);
-        const currencySel = cCsv ? `${cCsv} sup,[data-currency]` : '.currency sup,[data-currency]';
-        const cn = first(container, currencySel);
-        let currency = 'USD';
-        if (cn) {
-            const raw = text(cn).replace('$', '').trim();
-            currency = /^us$/i.test(raw) ? 'USD' : (raw || 'USD').toUpperCase();
-        } else {
-            // 🆕 Fallback: Extract currency from price text itself
-            const priceText = pn ? text(pn) : '';
+        // === CURRENCY EXTRACTION (multi-strategy) ===
+        let currency = 'USD'; // Default to USD
+        
+        // Try to find currency element using multi-strategy selector
+        const currencyElement = findFirstElement({
+            selector: DS.currencySelector,
+            class: DS.currencyClass,
+            attr: DS.currencyAttr,
+            id: DS.currencyId,
+            xpath: DS.currencyXPath
+        }, container);
+        
+        if (currencyElement) {
+            // Priority 1: Check for currencyAttr on the found element
+            if (DS.currencyAttr && currencyElement.hasAttribute && currencyElement.hasAttribute(DS.currencyAttr)) {
+                const raw = currencyElement.getAttribute(DS.currencyAttr).trim().toUpperCase();
+                currency = raw || 'USD';
+            }
+            // Priority 2: Parse from element's text content
+            else {
+                const raw = text(currencyElement).replace('$', '').trim();
+                currency = /^us$/i.test(raw) ? 'USD' : (raw || 'USD').toUpperCase();
+            }
+        }
+        // Fallback 1: Extract currency from price text itself
+        else if (priceElement) {
+            const priceText = text(priceElement);
             const currencyMap = {
                 '€': 'EUR', '£': 'GBP', '¥': 'JPY', '₹': 'INR', 
                 'C$': 'CAD', 'A$': 'AUD', '$': 'USD',
@@ -491,35 +713,42 @@
             }
         }
 
-        // 🆕 quantity - try multiple sources
+        // === QUANTITY EXTRACTION (multi-strategy) ===
         let quantity = '1'; // default to 1
         
-        // 1. Try data-quantity attribute on container
-        if (container.hasAttribute && container.hasAttribute('data-quantity')) {
-            quantity = container.getAttribute('data-quantity');
-        }
+        // Try to find quantity element using multi-strategy selector
+        const quantityElement = findFirstElement({
+            selector: DS.quantitySelector,
+            class: DS.quantityClass,
+            attr: DS.quantityAttr,
+            id: DS.quantityId,
+            xpath: DS.quantityXPath
+        }, container);
         
-        // 2. Try configured quantity attribute
-        if (quantity === '1' && DS.quantityAttr && container.hasAttribute && container.hasAttribute(DS.quantityAttr)) {
-            quantity = container.getAttribute(DS.quantityAttr);
-        }
-        
-        // 3. Try configured quantity classes
-        if (quantity === '1' && DS.quantityClass) {
-            const qCsv = classToSelectorCsv(DS.quantityClass);
-            const qn = first(container, qCsv || '.quantity,.qty,.seats,input[type="number"]');
-            if (qn) {
-                // Handle input/select elements
-                if (qn.tagName === 'INPUT' || qn.tagName === 'SELECT') {
-                    quantity = qn.value || '1';
-                } else {
-                    // Try data-quantity attribute first, then text content
-                    quantity = qn.getAttribute('data-quantity') || parseNum(text(qn)) || '1';
+        if (quantityElement) {
+            // Handle input/select elements
+            if (quantityElement.tagName === 'INPUT' || quantityElement.tagName === 'SELECT') {
+                quantity = quantityElement.value || '1';
+            }
+            // Check for quantity attribute
+            else if (DS.quantityAttr && quantityElement.hasAttribute && quantityElement.hasAttribute(DS.quantityAttr)) {
+                quantity = quantityElement.getAttribute(DS.quantityAttr) || '1';
+            }
+            // Parse from text content
+            else {
+                const parsedQty = parseNum(text(quantityElement));
+                if (parsedQty && parsedQty !== '0.00') {
+                    quantity = parsedQty;
                 }
             }
         }
         
-        // 4. Fallback: Try common quantity input selectors
+        // Fallback 1: Check container for quantity attribute
+        if (quantity === '1' && DS.quantityAttr && container.hasAttribute && container.hasAttribute(DS.quantityAttr)) {
+            quantity = container.getAttribute(DS.quantityAttr);
+        }
+        
+        // Fallback 2: Try common quantity input selectors
         if (quantity === '1') {
             const commonSelectors = 'input[name*="quantity" i], input[name*="qty" i], select[name*="quantity" i], .quantity input, .qty input';
             const qn = first(container, commonSelectors);
@@ -549,8 +778,13 @@
         if (!btn) return;
         
         // Always re-extract to get latest prices (for dynamic changes)
-        const props = extractFrom(guessContainer(btn));
-        if (!props) return;
+        const container = guessContainer(btn);
+        const props = extractFrom(container);
+        
+        if (!props) {
+            console.warn('[ph-injector] Failed to extract product data for button:', btn);
+            return;
+        }
         
         // Update or set attributes (always update for dynamic prices)
         btn.setAttribute(DOM.PRODUCT,  props[P.PRODUCT]);
@@ -558,12 +792,61 @@
         btn.setAttribute(DOM.CURRENCY, props[P.CURRENCY]);
         btn.setAttribute(DOM.QUANTITY, String(props[P.QUANTITY] || '1'));
         
+        console.log('[ph-injector] ✅ Annotated button with product data:', {
+            button: btn,
+            product: props[P.PRODUCT],
+            price: props[P.PRICE],
+            currency: props[P.CURRENCY],
+            container: container
+        });
+        
         sentButtons.add(btn);
     }
 
     function scanAndAnnotate() {
-        if (!hasAnyProductHint) return;
-        document.querySelectorAll('input[type="submit"], button[type="submit"]').forEach(annotateSubmit);
+        if (!hasAnyProductHint) {
+            console.warn('[ph-injector] No product hints configured. Skipping annotation.');
+            return;
+        }
+        
+        // 🆕 FIXED: Use specific button selectors instead of scanning ALL buttons
+        let buttonSelector = DS.productButtonSelectors;
+        
+        // Fallback: If no specific selector provided, use intelligent defaults for PRICING buttons only
+        if (!isNonEmptyStr(buttonSelector)) {
+            buttonSelector = [
+                'input[type="submit"]',
+                'button[type="submit"]',
+                // Only target buttons that look like pricing CTAs
+                'button:not([type])',  // Buttons without type (common in React)
+                'button[type="button"]'
+            ].join(', ');
+            
+            console.warn('[ph-injector] No productButtonSelectors configured. Using default:', buttonSelector);
+            console.warn('[ph-injector] Consider configuring productButtonSelectors for more precise targeting.');
+        }
+        
+        try {
+            const buttons = document.querySelectorAll(buttonSelector);
+            console.log(`[ph-injector] Found ${buttons.length} buttons matching selector: "${buttonSelector}"`);
+            
+            // Additional filtering: only annotate buttons within pricing containers
+            const pricingButtons = Array.from(buttons).filter(btn => {
+                const container = guessContainer(btn);
+                // Only annotate if button is inside a container that has pricing info
+                const hasContainer = container && container !== document && container !== btn.parentElement;
+                if (!hasContainer) {
+                    console.log('[ph-injector] Skipping button (no valid container):', btn);
+                }
+                return hasContainer;
+            });
+            
+            console.log(`[ph-injector] Annotating ${pricingButtons.length} buttons with product data`);
+            pricingButtons.forEach(annotateSubmit);
+            
+        } catch (e) {
+            console.error('[ph-injector] Invalid productButtonSelectors:', buttonSelector, e);
+        }
     }
 
     // 🆕 UPDATED: Configurable price change listeners - no hardcoding
@@ -1011,6 +1294,18 @@
 
     /* ---------- 11) Boot -------------------------------------------------- */
     function boot() {
+        console.log('[ph-injector] 🚀 Booting product injector...');
+        console.log('[ph-injector] Current page:', location.pathname);
+        console.log('[ph-injector] Page match pattern:', DS.pageMatch);
+        console.log('[ph-injector] Page matches?', pageMatches(DS.pageMatch));
+        console.log('[ph-injector] Has product hints?', hasAnyProductHint);
+        console.log('[ph-injector] Dataset:', {
+            panelClass: DS.panelClass,
+            titleClass: DS.titleClass,
+            priceClass: DS.priceClass,
+            eventName: DS.eventName
+        });
+        
         // 🆕 Capture UTM parameters to sessionStorage on initial load
         try {
             const urlParams = new URLSearchParams(window.location.search);
@@ -1029,8 +1324,11 @@
         
         applyAllRules();
         if (pageMatches(DS.pageMatch)) {
+            console.log('[ph-injector] ✅ Page matches! Running scanAndAnnotate...');
             scanAndAnnotate();
             bindPriceChangeListeners(); // 🆕 Initial binding of price change listeners
+        } else {
+            console.log('[ph-injector] ❌ Page does not match pattern. Skipping product annotation.');
         }
         bindGlobalClick();
         scanForEmailInputs(); // ✅ Initial scan for email inputs

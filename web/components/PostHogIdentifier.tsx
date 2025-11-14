@@ -6,8 +6,9 @@ import { createClient } from '@/lib/supabase/client';
 /**
  * PostHogIdentifier Component
  * 
- * Automatically identifies authenticated users in PostHog on every page load.
+ * Automatically identifies authenticated users using AMA analytics on every page load.
  * This ensures proper user tracking even if they skip email fields during onboarding.
+ * Uses AMA.afterLoginIdentify() to merge pre-login and post-login sessions.
  * 
  * Usage: Add once in your root layout or protected pages layout
  * <PostHogIdentifier />
@@ -16,9 +17,9 @@ export default function PostHogIdentifier() {
   useEffect(() => {
     const identifyUser = async () => {
       try {
-        // Wait for PostHog to be fully loaded and ready
-        if (!window.posthog || typeof window.posthog.identify !== 'function') {
-          console.debug('[PostHogIdentifier] PostHog not yet loaded, retrying...');
+        // Wait for AMA analytics to be fully loaded and ready
+        if (!window.AMA || typeof window.AMA.afterLoginIdentify !== 'function') {
+          console.debug('[PostHogIdentifier] AMA not yet loaded, retrying...');
           setTimeout(identifyUser, 500);
           return;
         }
@@ -84,23 +85,17 @@ export default function PostHogIdentifier() {
           }
         }
 
-        // Identify user in PostHog with error handling
+        // 📊 Use AMA.afterLoginIdentify to properly merge pre-login and post-login sessions
         try {
-          window.posthog.identify(user.id, identifyProps);
+          window.AMA.afterLoginIdentify(user, identifyProps);
 
-          // Track identification event for debugging
-          window.posthog.capture('USER_IDENTIFIED', {
-            identification_method: 'auto',
-            page: window.location.pathname
-          });
-
-          console.log('[PostHogIdentifier] ✅ User identified:', {
+          console.log('[PostHogIdentifier] ✅ User identified via AMA:', {
             user_id: user.id,
             email: user.email,
             company: userData?.companies && userData.companies.length > 0 ? userData.companies[0].name : null
           });
         } catch (identifyError) {
-          console.error('[PostHogIdentifier] Error during identify call:', identifyError);
+          console.error('[PostHogIdentifier] Error during AMA identify call:', identifyError);
         }
 
       } catch (error) {

@@ -26,6 +26,8 @@ window.PH_DATA_KEYS = Object.freeze({
     PRICE_WATCH_SELECTORS: 'data-price-watch-selectors',
     EMAIL_SELECTORS: 'data-email-selectors',
     BUTTON_SELECTORS: 'data-button-selectors',
+    // 🆕 NEW: Specific selector for product annotation buttons
+    PRODUCT_BUTTON_SELECTORS: 'data-product-button-selectors',
     // 🆕 NEW: Quantity tracking configuration
     QUANTITY_CLASS: 'data-quantity-class',
     QUANTITY_ATTR: 'data-quantity-attr'

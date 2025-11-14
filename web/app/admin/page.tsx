@@ -40,6 +40,15 @@ export default function SuperAdminDashboard() {
 
   const handleLogout = async () => {
     try {
+      // Get user ID before signing out
+      const { data: { user } } = await supabase.auth.getUser()
+      const userId = user?.id
+      
+      // 📊 Track logout in analytics before clearing session
+      if (userId && typeof window !== 'undefined' && window.AMA?.onLogoutCleanup) {
+        window.AMA.onLogoutCleanup(userId)
+      }
+      
       await supabase.auth.signOut()
       router.push('/login')
     } catch (error) {

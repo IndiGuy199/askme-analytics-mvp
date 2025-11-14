@@ -21,6 +21,11 @@ export default function LoginPage() {
     setIsLoading(true)
     setError('')
 
+    // 📊 Track pre-auth anonymous ID for session merging
+    if (typeof window !== 'undefined' && window.AMA?.preAuthMark) {
+      window.AMA.preAuthMark()
+    }
+
     const supabase = createClient()
     
     const { error } = await supabase.auth.signInWithOtp({

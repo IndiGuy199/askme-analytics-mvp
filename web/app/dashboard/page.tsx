@@ -189,8 +189,14 @@ export default function DashboardPage() {
   }
 
   const handleSignOut = async () => {
-    // Clear PostHog identification key from localStorage
     const userId = user?.id;
+    
+    // 📊 Track logout in analytics before clearing session
+    if (userId && typeof window !== 'undefined' && window.AMA?.onLogoutCleanup) {
+      window.AMA.onLogoutCleanup(userId)
+    }
+    
+    // Clear PostHog identification key from localStorage
     if (userId) {
       const localStorageKey = `posthog_identified_${userId}`;
       localStorage.removeItem(localStorageKey);
