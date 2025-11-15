@@ -382,20 +382,110 @@
                 props[P.PRODUCT_ID] = props[P.PRODUCT];
             }
             
-            // Extract UTM parameters from URL
+            // Extract UTM parameters with fallback chain: URL → sessionStorage → localStorage
             try {
                 const urlParams = new URLSearchParams(window.location.search);
+                
+                // Priority 1: Get from current URL (fresh campaign click)
                 if (urlParams.has('utm_source')) props[P.UTM_SOURCE] = urlParams.get('utm_source');
                 if (urlParams.has('utm_medium')) props[P.UTM_MEDIUM] = urlParams.get('utm_medium');
                 if (urlParams.has('utm_campaign')) props[P.UTM_CAMPAIGN] = urlParams.get('utm_campaign');
                 
-                // Try to get UTM from sessionStorage if not in current URL
+                // Priority 2: Get from sessionStorage (same browsing session)
                 if (!props[P.UTM_SOURCE]) {
-                    const storedSource = sessionStorage.getItem('ph_utm_source');
-                    if (storedSource) props[P.UTM_SOURCE] = storedSource;
+                    const sessionSource = sessionStorage.getItem('ph_utm_source');
+                    const sessionMedium = sessionStorage.getItem('ph_utm_medium');
+                    const sessionCampaign = sessionStorage.getItem('ph_utm_campaign');
+                    
+                    if (sessionSource) props[P.UTM_SOURCE] = sessionSource;
+                    if (sessionMedium) props[P.UTM_MEDIUM] = sessionMedium;
+                    if (sessionCampaign) props[P.UTM_CAMPAIGN] = sessionCampaign;
                 }
+                
+                // Priority 3: Get from localStorage (persistent across sessions)
+                if (!props[P.UTM_SOURCE]) {
+                    const localSource = localStorage.getItem('ph_utm_source');
+                    const localMedium = localStorage.getItem('ph_utm_medium');
+                    const localCampaign = localStorage.getItem('ph_utm_campaign');
+                    
+                    if (localSource) {
+                        props[P.UTM_SOURCE] = localSource;
+                        console.log('[ph-injector] 🔄 Restored utm_source from localStorage:', localSource);
+                    }
+                    if (localMedium) props[P.UTM_MEDIUM] = localMedium;
+                    if (localCampaign) props[P.UTM_CAMPAIGN] = localCampaign;
+                }
+                
+                // Add attribution timestamp if available
+                const utmTimestamp = localStorage.getItem('ph_utm_timestamp');
+                if (utmTimestamp) {
+                    const attributionDate = new Date(parseInt(utmTimestamp));
+                    props['attribution_timestamp'] = attributionDate.toISOString();
+                    
+                    // Calculate days since first attribution
+                    const daysSinceAttribution = Math.floor((Date.now() - parseInt(utmTimestamp)) / (1000 * 60 * 60 * 24));
+                    props['days_since_attribution'] = daysSinceAttribution;
+                }
+                
+                console.log('[ph-injector] 💰 Revenue event with attribution:', {
+                    event: name,
+                    revenue: props[P.REVENUE],
+                    utm_source: props[P.UTM_SOURCE],
+                    utm_medium: props[P.UTM_MEDIUM],
+                    utm_campaign: props[P.UTM_CAMPAIGN],
+                    days_since_attribution: props['days_since_attribution']
+                });
+                
             } catch (e) {
                 console.warn('[ph-injector] Failed to extract UTM parameters:', e);
+            }
+        }
+        
+        // 🆕 Attach UTM parameters to ALL events (not just revenue events)
+        // This ensures complete channel attribution throughout the user journey
+        if (!purchaseEvents.includes(name)) {
+            try {
+                // Check if UTM params are already set (avoid overwriting)
+                if (!props[P.UTM_SOURCE]) {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    
+                    // Priority 1: URL
+                    if (urlParams.has('utm_source')) {
+                        props[P.UTM_SOURCE] = urlParams.get('utm_source');
+                    }
+                    // Priority 2: sessionStorage
+                    else if (sessionStorage.getItem('ph_utm_source')) {
+                        props[P.UTM_SOURCE] = sessionStorage.getItem('ph_utm_source');
+                    }
+                    // Priority 3: localStorage
+                    else if (localStorage.getItem('ph_utm_source')) {
+                        props[P.UTM_SOURCE] = localStorage.getItem('ph_utm_source');
+                    }
+                }
+                
+                if (!props[P.UTM_MEDIUM]) {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    if (urlParams.has('utm_medium')) {
+                        props[P.UTM_MEDIUM] = urlParams.get('utm_medium');
+                    } else if (sessionStorage.getItem('ph_utm_medium')) {
+                        props[P.UTM_MEDIUM] = sessionStorage.getItem('ph_utm_medium');
+                    } else if (localStorage.getItem('ph_utm_medium')) {
+                        props[P.UTM_MEDIUM] = localStorage.getItem('ph_utm_medium');
+                    }
+                }
+                
+                if (!props[P.UTM_CAMPAIGN]) {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    if (urlParams.has('utm_campaign')) {
+                        props[P.UTM_CAMPAIGN] = urlParams.get('utm_campaign');
+                    } else if (sessionStorage.getItem('ph_utm_campaign')) {
+                        props[P.UTM_CAMPAIGN] = sessionStorage.getItem('ph_utm_campaign');
+                    } else if (localStorage.getItem('ph_utm_campaign')) {
+                        props[P.UTM_CAMPAIGN] = localStorage.getItem('ph_utm_campaign');
+                    }
+                }
+            } catch (e) {
+                console.warn('[ph-injector] Failed to attach UTM to event:', e);
             }
         }
 
@@ -957,6 +1047,13 @@
         // autoFire independent of selector
         if (rule.autoFire) {
             const props = { [P.PATH]: location.pathname, ...rule.metadata };
+            
+            // 🆕 REVENUE TRACKING: For checkout_completed events, extract revenue data
+            if (rule.key === EK.CHECKOUT_COMPLETED || rule.key === EK.SUBSCRIPTION_COMPLETED) {
+                const revenueData = extractRevenueData(document.body);
+                Object.assign(props, revenueData);
+            }
+            
             captureOnce(rule.key, props, { scopePath: rule.oncePerPath });
         }
 
@@ -1035,6 +1132,13 @@
 
                     // Fire the event once
                     const props = { [P.PATH]: location.pathname, matched: 'selector', ...rule.metadata };
+                    
+                    // 🆕 REVENUE TRACKING: For checkout_completed events, extract revenue data
+                    if (rule.key === EK.CHECKOUT_COMPLETED || rule.key === EK.SUBSCRIPTION_COMPLETED) {
+                        const revenueData = extractRevenueData(targets[0]);
+                        Object.assign(props, revenueData);
+                    }
+                    
                     captureOnce(rule.key, props, { scopePath: rule.oncePerPath });
                     console.log(`[DEBUG] Rule "${rule.key}" created hidden element (requireSelectorPresent)`);
                 }
@@ -1138,6 +1242,190 @@
             if (a3 && b3 && c3) return { [P.PRODUCT]: a3, [P.PRICE]: b3, [P.CURRENCY]: c3, [P.QUANTITY]: q3 || '1' };
             p = p.parentElement;
         }
+
+        return null;
+    }
+
+    /* ---------- 8.5) Revenue extraction for checkout completion events ---- */
+    /**
+     * Extracts revenue data for checkout_completed and subscription_completed events.
+     * Uses multi-tier fallback strategy:
+     * 1. Data attributes on page (data-revenue, data-product-name, etc.)
+     * 2. sessionStorage from earlier product selection
+     * 3. Page element extraction using client config
+     * 
+     * Returns object with: revenue, product_name, currency, quantity
+     */
+    function extractRevenueData(container) {
+        const data = {};
+        
+        // Priority 1: Check for explicit data attributes on container or nearby elements
+        const checkElement = (el) => {
+            if (!el) return false;
+            
+            // Check for data-revenue, data-total, data-amount, etc.
+            const revenue = el.getAttribute('data-revenue') || 
+                           el.getAttribute('data-total') || 
+                           el.getAttribute('data-amount') ||
+                           el.getAttribute('data-order-total');
+            if (revenue) {
+                data[P.REVENUE] = parseNum(revenue) || revenue;
+                data[P.PRICE] = data[P.REVENUE]; // unit_price same as total for single item
+            }
+            
+            // Check for data-product-name, data-product, data-item-name
+            const productName = el.getAttribute('data-product-name') || 
+                               el.getAttribute('data-product') ||
+                               el.getAttribute('data-item-name') ||
+                               el.getAttribute('data-plan-name');
+            if (productName) {
+                data[P.PRODUCT] = productName;
+                data[P.PRODUCT_NAME] = productName;
+            }
+            
+            // Check for data-currency
+            const currency = el.getAttribute('data-currency');
+            if (currency) {
+                data[P.CURRENCY] = currency;
+            }
+            
+            // Check for data-quantity
+            const quantity = el.getAttribute('data-quantity');
+            if (quantity) {
+                data[P.QUANTITY] = quantity;
+            }
+            
+            return !!(revenue || productName);
+        };
+        
+        // Check container and walk up parents
+        let foundData = checkElement(container);
+        if (!foundData) {
+            let parent = container?.parentElement;
+            let hops = 0;
+            while (parent && hops++ < 5 && !foundData) {
+                foundData = checkElement(parent);
+                parent = parent.parentElement;
+            }
+        }
+        
+        // Priority 2: Check sessionStorage from earlier product selection
+        if (!data[P.REVENUE] || !data[P.PRODUCT]) {
+            try {
+                const storedProduct = sessionStorage.getItem('ph_last_product');
+                const storedPrice = sessionStorage.getItem('ph_last_price');
+                const storedCurrency = sessionStorage.getItem('ph_last_currency');
+                const storedQuantity = sessionStorage.getItem('ph_last_quantity');
+                
+                if (!data[P.PRODUCT] && storedProduct) {
+                    data[P.PRODUCT] = storedProduct;
+                    data[P.PRODUCT_NAME] = storedProduct;
+                }
+                if (!data[P.REVENUE] && storedPrice) {
+                    data[P.PRICE] = storedPrice;
+                    data[P.REVENUE] = storedPrice; // If no quantity, revenue = price
+                }
+                if (!data[P.CURRENCY] && storedCurrency) {
+                    data[P.CURRENCY] = storedCurrency;
+                }
+                if (!data[P.QUANTITY] && storedQuantity) {
+                    data[P.QUANTITY] = storedQuantity;
+                }
+                
+                console.log('[ph-injector] 🔄 Restored revenue data from sessionStorage:', {
+                    product: data[P.PRODUCT],
+                    revenue: data[P.REVENUE],
+                    currency: data[P.CURRENCY]
+                });
+            } catch (e) {
+                console.warn('[ph-injector] Failed to retrieve from sessionStorage:', e);
+            }
+        }
+        
+        // Priority 3: Extract from page elements using client configuration
+        if (!data[P.REVENUE] || !data[P.PRODUCT]) {
+            // Try to find revenue/total element
+            if (!data[P.REVENUE]) {
+                const revenueSelectors = [
+                    DS.revenueSelector,
+                    DS.totalSelector,
+                    '[data-revenue]',
+                    '[data-total]',
+                    '.order-total',
+                    '.total-amount',
+                    '.checkout-total',
+                    '#order-total',
+                    '#total-amount'
+                ].filter(Boolean);
+                
+                for (const selector of revenueSelectors) {
+                    try {
+                        const el = document.querySelector(selector);
+                        if (el) {
+                            const revenueAttr = el.getAttribute('data-revenue') || 
+                                               el.getAttribute('data-total') ||
+                                               el.getAttribute('data-amount');
+                            if (revenueAttr) {
+                                data[P.REVENUE] = parseNum(revenueAttr) || revenueAttr;
+                                data[P.PRICE] = data[P.REVENUE];
+                                break;
+                            } else {
+                                // Parse from text content
+                                const extracted = parseNum(text(el));
+                                if (extracted) {
+                                    data[P.REVENUE] = extracted;
+                                    data[P.PRICE] = extracted;
+                                    break;
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        // Invalid selector, continue
+                    }
+                }
+            }
+            
+            // Try to find product name
+            if (!data[P.PRODUCT]) {
+                // Use existing extractFrom logic for product extraction
+                const extracted = extractFrom(container || document.body);
+                if (extracted.product) {
+                    data[P.PRODUCT] = extracted.product;
+                    data[P.PRODUCT_NAME] = extracted.product;
+                }
+                if (!data[P.REVENUE] && extracted.price) {
+                    data[P.REVENUE] = extracted.price;
+                    data[P.PRICE] = extracted.price;
+                }
+                if (!data[P.CURRENCY] && extracted.currency) {
+                    data[P.CURRENCY] = extracted.currency;
+                }
+            }
+        }
+        
+        // Calculate final revenue = price × quantity if needed
+        if (data[P.PRICE] && data[P.QUANTITY]) {
+            const price = parseFloat(data[P.PRICE]) || 0;
+            const quantity = parseInt(data[P.QUANTITY], 10) || 1;
+            data[P.REVENUE] = (price * quantity).toFixed(2);
+        }
+        
+        // Set defaults
+        if (!data[P.CURRENCY]) {
+            data[P.CURRENCY] = 'USD';
+        }
+        if (!data[P.QUANTITY]) {
+            data[P.QUANTITY] = '1';
+        }
+        
+        console.log('[ph-injector] 💰 Extracted revenue data:', {
+            revenue: data[P.REVENUE],
+            product: data[P.PRODUCT],
+            currency: data[P.CURRENCY],
+            quantity: data[P.QUANTITY]
+        });
+        
+        return data;
         return null;
     }
 
@@ -1154,6 +1442,13 @@
                 const name = stepEl.getAttribute('data-ph');
                 if (isNonEmptyStr(name)) {
                     const extras = productPropsFrom(stepEl) || {};
+                    
+                    // 🆕 REVENUE TRACKING: For checkout_completed events, extract revenue data
+                    if (name === EK.CHECKOUT_COMPLETED || name === EK.SUBSCRIPTION_COMPLETED) {
+                        const revenueData = extractRevenueData(stepEl);
+                        Object.assign(extras, revenueData);
+                    }
+                    
                     captureOnce(name, { [P.PATH]: location.pathname, ...extras }, { scopePath: true });
                     sentStepEls.add(stepEl);
                 }
@@ -1306,20 +1601,89 @@
             eventName: DS.eventName
         });
         
-        // 🆕 Capture UTM parameters to sessionStorage on initial load
+        // 🆕 Enhanced channel tracking: Capture UTM parameters + referrer fallback
         try {
             const urlParams = new URLSearchParams(window.location.search);
+            
+            // Priority 1: UTM parameters from URL (marketing campaigns)
             if (urlParams.has('utm_source')) {
-                sessionStorage.setItem('ph_utm_source', urlParams.get('utm_source'));
+                const utmSource = urlParams.get('utm_source');
+                sessionStorage.setItem('ph_utm_source', utmSource);
+                localStorage.setItem('ph_utm_source', utmSource); // ✅ Persist across sessions
+                localStorage.setItem('ph_utm_timestamp', Date.now().toString()); // Track freshness
+                console.log('[ph-injector] 📊 Captured utm_source:', utmSource);
             }
             if (urlParams.has('utm_medium')) {
-                sessionStorage.setItem('ph_utm_medium', urlParams.get('utm_medium'));
+                const utmMedium = urlParams.get('utm_medium');
+                sessionStorage.setItem('ph_utm_medium', utmMedium);
+                localStorage.setItem('ph_utm_medium', utmMedium);
+                console.log('[ph-injector] 📊 Captured utm_medium:', utmMedium);
             }
             if (urlParams.has('utm_campaign')) {
-                sessionStorage.setItem('ph_utm_campaign', urlParams.get('utm_campaign'));
+                const utmCampaign = urlParams.get('utm_campaign');
+                sessionStorage.setItem('ph_utm_campaign', utmCampaign);
+                localStorage.setItem('ph_utm_campaign', utmCampaign);
+                console.log('[ph-injector] 📊 Captured utm_campaign:', utmCampaign);
             }
+            
+            // Priority 2: Extract channel from referrer if no UTM present
+            if (!sessionStorage.getItem('ph_utm_source') && !localStorage.getItem('ph_utm_source')) {
+                const referrer = document.referrer;
+                if (referrer) {
+                    try {
+                        const referrerUrl = new URL(referrer);
+                        const referrerHost = referrerUrl.hostname;
+                        
+                        // Map common referrers to channels
+                        let channel = 'referral';
+                        if (referrerHost.includes('google.')) channel = 'google';
+                        else if (referrerHost.includes('facebook.') || referrerHost.includes('fb.')) channel = 'facebook';
+                        else if (referrerHost.includes('twitter.') || referrerHost.includes('t.co')) channel = 'twitter';
+                        else if (referrerHost.includes('linkedin.')) channel = 'linkedin';
+                        else if (referrerHost.includes('instagram.')) channel = 'instagram';
+                        else if (referrerHost.includes('youtube.')) channel = 'youtube';
+                        else if (referrerHost.includes('bing.')) channel = 'bing';
+                        else if (referrerHost.includes('yahoo.')) channel = 'yahoo';
+                        else if (referrerUrl.hostname === window.location.hostname) {
+                            // Same domain - not a new acquisition
+                            channel = null;
+                        }
+                        
+                        if (channel) {
+                            sessionStorage.setItem('ph_utm_source', channel);
+                            sessionStorage.setItem('ph_utm_medium', 'referral');
+                            localStorage.setItem('ph_attribution_source', 'referrer'); // Mark as referrer-based
+                            console.log('[ph-injector] 📊 Inferred channel from referrer:', channel);
+                        }
+                    } catch (e) {
+                        console.warn('[ph-injector] Failed to parse referrer:', e);
+                    }
+                } else {
+                    // No referrer = direct traffic
+                    sessionStorage.setItem('ph_utm_source', 'direct');
+                    sessionStorage.setItem('ph_utm_medium', 'none');
+                    console.log('[ph-injector] 📊 Direct traffic detected (no referrer)');
+                }
+            }
+            
+            // ✅ Also capture any custom tracking parameters (fbclid, gclid, etc.)
+            if (urlParams.has('fbclid')) {
+                sessionStorage.setItem('ph_fbclid', urlParams.get('fbclid'));
+                if (!sessionStorage.getItem('ph_utm_source')) {
+                    sessionStorage.setItem('ph_utm_source', 'facebook');
+                    sessionStorage.setItem('ph_utm_medium', 'cpc');
+                }
+            }
+            if (urlParams.has('gclid')) {
+                sessionStorage.setItem('ph_gclid', urlParams.get('gclid'));
+                if (!sessionStorage.getItem('ph_utm_source')) {
+                    sessionStorage.setItem('ph_utm_source', 'google');
+                    sessionStorage.setItem('ph_utm_medium', 'cpc');
+                }
+            }
+            
         } catch (e) {
-            console.warn('[ph-injector] Failed to store UTM parameters:', e);
+            console.warn('[ph-injector] Failed to capture channel tracking parameters:', e);
         }
         
         applyAllRules();

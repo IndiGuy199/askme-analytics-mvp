@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Channel Attribution Tracking Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #555;
+            margin-top: 30px;
+            border-left: 4px solid #28a745;
+            padding-left: 10px;
+        }
+        .test-section {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+        .storage-display {
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+        .storage-display pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button.danger {
+            background: #dc3545;
+        }
+        button.danger:hover {
+            background: #c82333;
+        }
+        button.success {
+            background: #28a745;
+        }
+        button.success:hover {
+            background: #218838;
+        }
+        .test-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .test-links a {
+            display: inline-block;
+            padding: 10px 15px;
+            background: #6c757d;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+        .test-links a:hover {
+            background: #5a6268;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .code-snippet {
+            background: #282c34;
+            color: #abb2bf;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        .code-snippet code {
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background: #007bff;
+            color: white;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        .emoji {
+            font-size: 20px;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Channel Attribution Tracking Test Suite</h1>
+        <p><strong>Purpose:</strong> Test the enhanced channel tracking system to ensure UTM parameters persist throughout the user journey from landing to subscription completion.</p>
+
+        <!-- Current URL Status -->
+        <h2>🌐 Current URL Parameters</h2>
+        <div class="test-section">
+            <div id="url-params" class="storage-display"></div>
+        </div>
+
+        <!-- Storage Display -->
+        <h2>💾 Storage Status</h2>
+        <div class="test-section">
+            <h3>sessionStorage (current session only)</h3>
+            <div id="session-storage" class="storage-display"></div>
+            
+            <h3>localStorage (persists across sessions)</h3>
+            <div id="local-storage" class="storage-display"></div>
+            
+            <button onclick="refreshStorage()">🔄 Refresh Storage Display</button>
+            <button class="danger" onclick="clearAllStorage()">🗑️ Clear All Storage</button>
+        </div>
+
+        <!-- Test Scenarios -->
+        <h2>🧪 Test Scenarios</h2>
+        <div class="test-section">
+            <p>Click these links to test different channel attribution scenarios:</p>
+            
+            <div class="test-links">
+                <a href="?utm_source=facebook&utm_medium=cpc&utm_campaign=spring_sale">
+                    📘 Facebook Campaign
+                </a>
+                <a href="?utm_source=google&utm_medium=cpc&utm_campaign=brand">
+                    🔍 Google Ads
+                </a>
+                <a href="?utm_source=twitter&utm_medium=social&utm_campaign=product_launch">
+                    🐦 Twitter Campaign
+                </a>
+                <a href="?utm_source=linkedin&utm_medium=sponsored&utm_campaign=b2b">
+                    💼 LinkedIn Sponsored
+                </a>
+                <a href="?utm_source=email&utm_medium=newsletter&utm_campaign=weekly">
+                    📧 Email Newsletter
+                </a>
+                <a href="?fbclid=IwAR1234567890">
+                    📘 Facebook Click ID
+                </a>
+                <a href="?gclid=EAIaIQobChMI1234567890">
+                    🔍 Google Click ID
+                </a>
+                <a href="test-channel-tracking.html">
+                    🏠 Direct Traffic (no params)
+                </a>
+            </div>
+        </div>
+
+        <!-- Simulate Events -->
+        <h2>🎯 Simulate Analytics Events</h2>
+        <div class="test-section">
+            <p>Simulate user journey events to verify channel attribution persists:</p>
+            
+            <button class="success" onclick="simulateEvent('page_view')">
+                👁️ Page View
+            </button>
+            <button class="success" onclick="simulateEvent('button_click')">
+                🖱️ Button Click
+            </button>
+            <button class="success" onclick="simulateEvent('form_submit')">
+                📝 Form Submit
+            </button>
+            <button class="success" onclick="simulateEvent('subscription_click')">
+                💳 Subscription Click
+            </button>
+            <button class="success" onclick="simulateEvent('checkout_completed', {price: 29.99, product: 'Premium Plan', quantity: 1})">
+                💰 Checkout Completed ($29.99)
+            </button>
+            
+            <div id="event-log" style="margin-top: 15px;"></div>
+        </div>
+
+        <!-- Attribution Report -->
+        <h2>📈 Attribution Report</h2>
+        <div class="test-section">
+            <table id="attribution-table">
+                <thead>
+                    <tr>
+                        <th>Property</th>
+                        <th>Value</th>
+                        <th>Source</th>
+                    </tr>
+                </thead>
+                <tbody id="attribution-body"></tbody>
+            </table>
+            
+            <button onclick="generateReport()">📊 Generate Report</button>
+        </div>
+
+        <!-- Expected Results -->
+        <h2>✅ Expected Results</h2>
+        <div class="test-section">
+            <h3>Test 1: UTM Parameters from URL</h3>
+            <ul>
+                <li>✅ UTM params captured in both sessionStorage and localStorage</li>
+                <li>✅ Timestamp recorded in localStorage</li>
+                <li>✅ Console logs show capture confirmation</li>
+            </ul>
+
+            <h3>Test 2: Click ID Detection</h3>
+            <ul>
+                <li>✅ fbclid → utm_source='facebook', utm_medium='cpc'</li>
+                <li>✅ gclid → utm_source='google', utm_medium='cpc'</li>
+            </ul>
+
+            <h3>Test 3: Storage Persistence</h3>
+            <ul>
+                <li>✅ Navigate to direct traffic link → UTM persists from previous visit</li>
+                <li>✅ Close tab and reopen → localStorage preserves attribution</li>
+                <li>✅ Open in incognito → No stored attribution (clean slate)</li>
+            </ul>
+
+            <h3>Test 4: Event Attribution</h3>
+            <ul>
+                <li>✅ ALL events include utm_source, utm_medium, utm_campaign</li>
+                <li>✅ Revenue events include days_since_attribution</li>
+                <li>✅ Console shows event properties with UTM data</li>
+            </ul>
+        </div>
+
+        <!-- Console Log Instructions -->
+        <h2>🔍 Console Debugging</h2>
+        <div class="test-section">
+            <p>Open browser DevTools (F12) and check for these console logs:</p>
+            
+            <div class="code-snippet">
+                <code>
+[ph-injector] 📊 Captured utm_source: facebook<br>
+[ph-injector] 📊 Captured utm_medium: cpc<br>
+[ph-injector] 📊 Captured utm_campaign: spring_sale<br>
+[ph-injector] 📊 Attribution source: url_params<br>
+[ph-injector] 💰 Revenue event with attribution: {<br>
+&nbsp;&nbsp;event: "checkout_completed",<br>
+&nbsp;&nbsp;revenue: "29.99",<br>
+&nbsp;&nbsp;utm_source: "facebook",<br>
+&nbsp;&nbsp;utm_medium: "cpc",<br>
+&nbsp;&nbsp;utm_campaign: "spring_sale",<br>
+&nbsp;&nbsp;days_since_attribution: 0<br>
+}
+                </code>
+            </div>
+
+            <p><strong>Manual Checks:</strong></p>
+            <div class="code-snippet">
+                <code>
+// Check sessionStorage<br>
+sessionStorage.getItem('ph_utm_source')<br>
+sessionStorage.getItem('ph_utm_medium')<br>
+sessionStorage.getItem('ph_utm_campaign')<br>
+<br>
+// Check localStorage<br>
+localStorage.getItem('ph_utm_source')<br>
+localStorage.getItem('ph_utm_medium')<br>
+localStorage.getItem('ph_utm_campaign')<br>
+localStorage.getItem('ph_utm_timestamp')<br>
+localStorage.getItem('ph_attribution_source')
+                </code>
+            </div>
+        </div>
+
+        <!-- PostHog Verification -->
+        <h2>📡 PostHog Verification</h2>
+        <div class="test-section">
+            <p>After running tests, verify in PostHog dashboard:</p>
+            <ol>
+                <li>Go to PostHog → Events → checkout_completed</li>
+                <li>Check event properties include: utm_source, utm_medium, utm_campaign</li>
+                <li>Go to Insights → Revenue by Channel</li>
+                <li>Verify revenue is aggregated by utm_source correctly</li>
+            </ol>
+            
+            <div class="status warning">
+                <strong>⚠️ Note:</strong> It may take a few minutes for events to appear in PostHog dashboard.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Display current URL parameters
+        function displayURLParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const params = {};
+            
+            urlParams.forEach((value, key) => {
+                params[key] = value;
+            });
+            
+            const paramsDiv = document.getElementById('url-params');
+            if (Object.keys(params).length === 0) {
+                paramsDiv.innerHTML = '<pre>No URL parameters present (Direct traffic)</pre>';
+            } else {
+                paramsDiv.innerHTML = '<pre>' + JSON.stringify(params, null, 2) + '</pre>';
+            }
+        }
+
+        // Display storage contents
+        function refreshStorage() {
+            // sessionStorage
+            const sessionData = {
+                ph_utm_source: sessionStorage.getItem('ph_utm_source'),
+                ph_utm_medium: sessionStorage.getItem('ph_utm_medium'),
+                ph_utm_campaign: sessionStorage.getItem('ph_utm_campaign'),
+                ph_fbclid: sessionStorage.getItem('ph_fbclid'),
+                ph_gclid: sessionStorage.getItem('ph_gclid')
+            };
+            
+            // Remove null values
+            Object.keys(sessionData).forEach(key => {
+                if (sessionData[key] === null) delete sessionData[key];
+            });
+            
+            document.getElementById('session-storage').innerHTML = 
+                Object.keys(sessionData).length > 0 
+                    ? '<pre>' + JSON.stringify(sessionData, null, 2) + '</pre>'
+                    : '<pre>Empty (no data in current session)</pre>';
+            
+            // localStorage
+            const localData = {
+                ph_utm_source: localStorage.getItem('ph_utm_source'),
+                ph_utm_medium: localStorage.getItem('ph_utm_medium'),
+                ph_utm_campaign: localStorage.getItem('ph_utm_campaign'),
+                ph_utm_timestamp: localStorage.getItem('ph_utm_timestamp'),
+                ph_attribution_source: localStorage.getItem('ph_attribution_source')
+            };
+            
+            // Remove null values
+            Object.keys(localData).forEach(key => {
+                if (localData[key] === null) delete localData[key];
+            });
+            
+            // Format timestamp
+            if (localData.ph_utm_timestamp) {
+                const timestamp = new Date(parseInt(localData.ph_utm_timestamp));
+                localData.ph_utm_timestamp_formatted = timestamp.toLocaleString();
+            }
+            
+            document.getElementById('local-storage').innerHTML = 
+                Object.keys(localData).length > 0 
+                    ? '<pre>' + JSON.stringify(localData, null, 2) + '</pre>'
+                    : '<pre>Empty (no persistent attribution data)</pre>';
+        }
+
+        // Clear all storage
+        function clearAllStorage() {
+            if (confirm('Clear all attribution data from storage?')) {
+                sessionStorage.clear();
+                localStorage.clear();
+                refreshStorage();
+                alert('✅ All storage cleared!');
+            }
+        }
+
+        // Simulate analytics event
+        function simulateEvent(eventName, props = {}) {
+            // Check if analytics is loaded
+            if (typeof window.posthog === 'undefined') {
+                logEvent('❌ PostHog not loaded. This is a static test page.', 'error');
+                logEvent('💡 To test properly, integrate this test into your app or load analytics library.', 'warning');
+                return;
+            }
+            
+            try {
+                // Capture event (would normally go through ph-product-injector)
+                window.posthog.capture(eventName, props);
+                logEvent(`✅ Event captured: ${eventName}`, 'success');
+                logEvent(`📦 Properties: ${JSON.stringify(props)}`, 'success');
+            } catch (e) {
+                logEvent(`❌ Error capturing event: ${e.message}`, 'error');
+            }
+        }
+
+        // Log event to page
+        function logEvent(message, type = 'info') {
+            const logDiv = document.getElementById('event-log');
+            const timestamp = new Date().toLocaleTimeString();
+            const statusClass = type === 'success' ? 'success' : type === 'error' ? 'error' : 'warning';
+            
+            logDiv.innerHTML = `<div class="status ${statusClass}">[${timestamp}] ${message}</div>` + logDiv.innerHTML;
+        }
+
+        // Generate attribution report
+        function generateReport() {
+            const tbody = document.getElementById('attribution-body');
+            tbody.innerHTML = '';
+            
+            const data = [
+                {
+                    property: 'utm_source',
+                    value: localStorage.getItem('ph_utm_source') || sessionStorage.getItem('ph_utm_source') || 'Not set',
+                    source: localStorage.getItem('ph_utm_source') ? 'localStorage' : sessionStorage.getItem('ph_utm_source') ? 'sessionStorage' : '-'
+                },
+                {
+                    property: 'utm_medium',
+                    value: localStorage.getItem('ph_utm_medium') || sessionStorage.getItem('ph_utm_medium') || 'Not set',
+                    source: localStorage.getItem('ph_utm_medium') ? 'localStorage' : sessionStorage.getItem('ph_utm_medium') ? 'sessionStorage' : '-'
+                },
+                {
+                    property: 'utm_campaign',
+                    value: localStorage.getItem('ph_utm_campaign') || sessionStorage.getItem('ph_utm_campaign') || 'Not set',
+                    source: localStorage.getItem('ph_utm_campaign') ? 'localStorage' : sessionStorage.getItem('ph_utm_campaign') ? 'sessionStorage' : '-'
+                },
+                {
+                    property: 'attribution_source',
+                    value: localStorage.getItem('ph_attribution_source') || 'Not set',
+                    source: localStorage.getItem('ph_attribution_source') ? 'localStorage' : '-'
+                },
+                {
+                    property: 'attribution_timestamp',
+                    value: localStorage.getItem('ph_utm_timestamp') 
+                        ? new Date(parseInt(localStorage.getItem('ph_utm_timestamp'))).toLocaleString()
+                        : 'Not set',
+                    source: localStorage.getItem('ph_utm_timestamp') ? 'localStorage' : '-'
+                }
+            ];
+            
+            // Calculate days since attribution
+            if (localStorage.getItem('ph_utm_timestamp')) {
+                const days = Math.floor((Date.now() - parseInt(localStorage.getItem('ph_utm_timestamp'))) / (1000 * 60 * 60 * 24));
+                data.push({
+                    property: 'days_since_attribution',
+                    value: `${days} day(s)`,
+                    source: 'Calculated'
+                });
+            }
+            
+            data.forEach(item => {
+                const row = tbody.insertRow();
+                row.insertCell(0).textContent = item.property;
+                row.insertCell(1).textContent = item.value;
+                row.insertCell(2).textContent = item.source;
+            });
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            displayURLParams();
+            refreshStorage();
+            generateReport();
+            
+            // Auto-refresh every 2 seconds
+            setInterval(() => {
+                refreshStorage();
+            }, 2000);
+        });
+
+        console.log('%c🧪 Channel Tracking Test Page Loaded', 'color: #007bff; font-size: 16px; font-weight: bold;');
+        console.log('%cOpen DevTools Console to see attribution capture logs', 'color: #666; font-style: italic;');
+    </script>
+
+    <!-- Load Analytics Library for Testing -->
+    <script>
+        // Configure analytics for test client
+        window.AskMeAnalyticsConfig = {
+            clientId: 'test-channel-tracking',
+            debug: true,
+            analyticsLibraryPath: './ask-me-analytics.min.js',
+            constantsPath: './ph-constants.js',
+            injectorPath: './ph-product-injector.js'
+        };
+    </script>
+    <script src="./askme-analytics-init.js"></script>
+</body>
+</html>

@@ -21,10 +21,14 @@ export default function RootLayout({
              
         {/* AskMe Analytics - Configuration and Initialization */}
        
-        <Script 
-          src="/lib/clientAnalytics/askme-analytics-init.js" 
-          strategy="afterInteractive"
-        />
+       <script>
+         window.AskMeAnalyticsClientId = 'askme-analytics-app';
+        </script>
+      <script 
+        src="/lib/clientAnalytics/askme-analytics-init.js"
+        async 
+        defer>
+      </script>
       </head>
       <body className={inter.className}>
         <div className="flex flex-col min-h-screen">
