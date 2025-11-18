@@ -269,7 +269,7 @@ export default function DashboardPage() {
                 variant="outline"
                 size="sm"
                 onClick={handleSignOut}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 ph-track-auth-logout"
               >
                 <LogOut className="h-4 w-4" />
                 Sign Out
@@ -281,7 +281,7 @@ export default function DashboardPage() {
 
       {/* Success Message Banner */}
       {showSuccessMessage && (
-        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-200">
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-200 ph-track-checkout-complete">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">

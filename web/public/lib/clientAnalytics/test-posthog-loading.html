@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PostHog Loading Diagnostic</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .status-box {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status-item {
+            padding: 10px;
+            margin: 5px 0;
+            border-left: 4px solid #ccc;
+            background: #f9f9f9;
+        }
+        .status-item.success {
+            border-left-color: #22c55e;
+            background: #f0fdf4;
+        }
+        .status-item.error {
+            border-left-color: #ef4444;
+            background: #fef2f2;
+        }
+        .status-item.waiting {
+            border-left-color: #f59e0b;
+            background: #fffbeb;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        #console-log {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 PostHog Loading Diagnostic Tool</h1>
+    
+    <div class="status-box">
+        <h2>Initialization Status</h2>
+        <div id="status-container"></div>
+    </div>
+
+    <div class="status-box">
+        <h2>Actions</h2>
+        <button onclick="sendTestEvent()">Send Test Event</button>
+        <button onclick="checkStatus()">Refresh Status</button>
+        <button onclick="openNetworkTab()">View Network Tab Instructions</button>
+    </div>
+
+    <div class="status-box">
+        <h2>Console Log</h2>
+        <div id="console-log"></div>
+    </div>
+
+    <div class="status-box">
+        <h2>Fix Instructions</h2>
+        <ol>
+            <li>Check Network tab for failed requests to <code>us.i.posthog.com</code></li>
+            <li>Verify API key is correct: <code>phc_MN5MXCec7lNZtZakqpRQZqTLaPfcV6CxeE8hfbTUFE2</code></li>
+            <li>Check browser console for JavaScript errors</li>
+            <li>Try disabling ad blockers or privacy extensions</li>
+            <li>Check if PostHog domain is blocked by firewall</li>
+        </ol>
+    </div>
+
+    <!-- PostHog Configuration -->
+    <script>
+        window.AskMeAnalyticsClientId = 'askme-analytics-app';
+        
+        // Intercept console logs
+        const consoleLog = document.getElementById('console-log');
+        const originalLog = console.log;
+        const originalWarn = console.warn;
+        const originalError = console.error;
+        
+        function addToConsole(type, ...args) {
+            const msg = args.map(arg => {
+                if (typeof arg === 'object') {
+                    try {
+                        return JSON.stringify(arg, null, 2);
+                    } catch {
+                        return String(arg);
+                    }
+                }
+                return String(arg);
+            }).join(' ');
+            
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'warn' ? '⚠️' : '📝';
+            consoleLog.textContent += `[${timestamp}] ${prefix} ${msg}\n`;
+            consoleLog.scrollTop = consoleLog.scrollHeight;
+        }
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addToConsole('log', ...args);
+        };
+        
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            addToConsole('warn', ...args);
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addToConsole('error', ...args);
+        };
+        
+        console.log('🚀 Diagnostic tool started');
+    </script>
+
+    <!-- Load Analytics Scripts -->
+    <script src="/lib/clientAnalytics/askme-analytics-init.js" defer></script>
+
+    <script>
+        let statusCheckInterval;
+        
+        function updateStatus() {
+            const container = document.getElementById('status-container');
+            const checks = [
+                {
+                    name: 'PostHog object exists',
+                    status: !!window.posthog,
+                    details: window.posthog ? 'window.posthog is defined' : 'window.posthog is undefined'
+                },
+                {
+                    name: 'PostHog capture function',
+                    status: !!(window.posthog && typeof window.posthog.capture === 'function'),
+                    details: window.posthog ? `capture is ${typeof window.posthog.capture}` : 'N/A'
+                },
+                {
+                    name: 'PostHog __loaded flag',
+                    status: !!(window.posthog && window.posthog.__loaded),
+                    details: window.posthog ? `__loaded = ${window.posthog.__loaded}` : 'N/A'
+                },
+                {
+                    name: 'GenericAnalytics loaded',
+                    status: !!window.GenericAnalytics,
+                    details: window.GenericAnalytics ? 'GenericAnalytics is available' : 'GenericAnalytics not found'
+                },
+                {
+                    name: 'GenericAnalytics initialized',
+                    status: !!(window.GenericAnalytics && window.GenericAnalytics.initialized),
+                    details: window.GenericAnalytics ? `initialized = ${window.GenericAnalytics.initialized}` : 'N/A'
+                }
+            ];
+            
+            container.innerHTML = checks.map(check => `
+                <div class="status-item ${check.status ? 'success' : 'error'}">
+                    <strong>${check.status ? '✅' : '❌'} ${check.name}</strong>
+                    <div style="font-size: 14px; color: #666; margin-top: 5px;">${check.details}</div>
+                </div>
+            `).join('');
+            
+            // Stop checking if PostHog is fully loaded
+            if (checks.every(c => c.status)) {
+                clearInterval(statusCheckInterval);
+                console.log('✅ All systems operational!');
+            }
+        }
+        
+        function checkStatus() {
+            updateStatus();
+            console.log('📊 Status check performed');
+        }
+        
+        function sendTestEvent() {
+            if (!window.posthog || typeof window.posthog.capture !== 'function') {
+                console.error('❌ PostHog not ready, cannot send event');
+                alert('PostHog is not initialized yet. Please wait.');
+                return;
+            }
+            
+            console.log('🧪 Sending test event...');
+            try {
+                window.posthog.capture('diagnostic_test_event', {
+                    test_type: 'manual_diagnostic',
+                    timestamp: new Date().toISOString(),
+                    page_url: window.location.href
+                });
+                console.log('✅ Test event sent successfully!');
+                alert('Test event sent! Check PostHog activity feed in ~30 seconds.');
+            } catch (error) {
+                console.error('❌ Failed to send test event:', error);
+                alert('Error sending test event: ' + error.message);
+            }
+        }
+        
+        function openNetworkTab() {
+            alert('To open Network tab:\n\n1. Press F12 or Ctrl+Shift+I\n2. Click "Network" tab\n3. Refresh the page (F5)\n4. Look for requests to "us.i.posthog.com"\n5. Check if any requests failed (red color)');
+        }
+        
+        // Start checking status every second
+        statusCheckInterval = setInterval(updateStatus, 1000);
+        updateStatus();
+        
+        // Listen for analytics ready event
+        window.addEventListener('askme:analytics:ready', function(e) {
+            console.log('🎉 Analytics ready event received:', e.detail);
+        });
+    </script>
+</body>
+</html>

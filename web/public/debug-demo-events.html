@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Demo Page Events</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .debug-box {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #console-log {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 600px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .highlight {
+            background: yellow;
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+    </style>
+</head>
+<body>
+    <h1>🐛 Debug: /demo Page Events</h1>
+    
+    <div class="debug-box">
+        <h2>Current Page Info</h2>
+        <p><strong>Path:</strong> <span class="highlight" id="current-path"></span></p>
+        <p><strong>URL:</strong> <span id="current-url"></span></p>
+    </div>
+
+    <div class="debug-box">
+        <h2>Injector Script Attributes</h2>
+        <div id="script-attributes"></div>
+    </div>
+
+    <div class="debug-box">
+        <h2>Step Configuration</h2>
+        <div id="steps-config"></div>
+    </div>
+
+    <div class="debug-box">
+        <h2>Actions</h2>
+        <button onclick="manuallyFireEvent()">Manually Fire INFORMATIONAL_CONTENT_VIEWED</button>
+        <button onclick="checkSteps()">Check Step Rules</button>
+        <button onclick="window.location.reload()">Reload Page</button>
+    </div>
+
+    <div class="debug-box">
+        <h2>Console Log (Filtered for ph-injector)</h2>
+        <div id="console-log"></div>
+    </div>
+
+    <!-- Configuration -->
+    <script>
+        window.AskMeAnalyticsClientId = 'askme-analytics-app';
+        
+        // Display current page info
+        document.getElementById('current-path').textContent = window.location.pathname;
+        document.getElementById('current-url').textContent = window.location.href;
+        
+        // Intercept console logs
+        const consoleLog = document.getElementById('console-log');
+        const originalLog = console.log;
+        const originalWarn = console.warn;
+        const originalError = console.error;
+        
+        function addToConsole(type, ...args) {
+            // Filter for ph-injector messages only
+            const msgString = args.join(' ');
+            if (!msgString.includes('[ph-injector]') && !msgString.includes('[init]')) {
+                return; // Skip non-injector logs
+            }
+            
+            const msg = args.map(arg => {
+                if (typeof arg === 'object') {
+                    try {
+                        return JSON.stringify(arg, null, 2);
+                    } catch {
+                        return String(arg);
+                    }
+                }
+                return String(arg);
+            }).join(' ');
+            
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'warn' ? '⚠️' : '📝';
+            consoleLog.textContent += `[${timestamp}] ${prefix} ${msg}\n`;
+            consoleLog.scrollTop = consoleLog.scrollHeight;
+        }
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addToConsole('log', ...args);
+        };
+        
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            addToConsole('warn', ...args);
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addToConsole('error', ...args);
+        };
+        
+        console.log('[ph-injector] 🐛 Debug page loaded - simulating /demo path');
+        
+        // Wait for scripts to load
+        setTimeout(() => {
+            // Check script attributes
+            const script = document.getElementById('ph-product-injector');
+            const attrsDiv = document.getElementById('script-attributes');
+            
+            if (script) {
+                const attrs = Array.from(script.attributes);
+                attrsDiv.innerHTML = '<ul>' + attrs.map(attr => {
+                    const value = attr.value.length > 100 ? attr.value.substring(0, 100) + '...' : attr.value;
+                    return `<li><strong>${attr.name}:</strong> ${value}</li>`;
+                }).join('') + '</ul>';
+                
+                // Display steps
+                const stepsAttr = script.getAttribute('data-steps');
+                const stepsDiv = document.getElementById('steps-config');
+                if (stepsAttr) {
+                    try {
+                        const steps = JSON.parse(stepsAttr);
+                        stepsDiv.innerHTML = '<pre>' + JSON.stringify(steps, null, 2) + '</pre>';
+                    } catch (e) {
+                        stepsDiv.innerHTML = '<p style="color: red;">Failed to parse steps: ' + e.message + '</p>';
+                    }
+                } else {
+                    stepsDiv.innerHTML = '<p style="color: red;">⚠️ No steps attribute found on script!</p>';
+                }
+            } else {
+                attrsDiv.innerHTML = '<p style="color: red;">⚠️ Script #ph-product-injector not found!</p>';
+            }
+        }, 2000);
+        
+        function manuallyFireEvent() {
+            if (!window.posthog || typeof window.posthog.capture !== 'function') {
+                alert('PostHog not ready!');
+                return;
+            }
+            
+            console.log('[ph-injector] 🧪 Manually firing INFORMATIONAL_CONTENT_VIEWED event');
+            window.posthog.capture('INFORMATIONAL_CONTENT_VIEWED', {
+                path: window.location.pathname,
+                manual_trigger: true,
+                timestamp: new Date().toISOString()
+            });
+            alert('Event manually fired! Check PostHog activity feed.');
+        }
+        
+        function checkSteps() {
+            const script = document.getElementById('ph-product-injector');
+            if (!script) {
+                alert('Injector script not found!');
+                return;
+            }
+            
+            const stepsAttr = script.getAttribute('data-steps');
+            if (!stepsAttr) {
+                alert('No steps configured!');
+                return;
+            }
+            
+            try {
+                const steps = JSON.parse(stepsAttr);
+                const demoSteps = steps.filter(s => s.url && s.url.includes('/demo'));
+                
+                console.log('[ph-injector] 🔍 Total steps:', steps.length);
+                console.log('[ph-injector] 🔍 Demo-related steps:', demoSteps.length);
+                console.log('[ph-injector] 🔍 Demo steps:', demoSteps);
+                
+                alert(`Found ${steps.length} total steps, ${demoSteps.length} for /demo`);
+            } catch (e) {
+                alert('Error parsing steps: ' + e.message);
+            }
+        }
+    </script>
+
+    <!-- Load Analytics Scripts -->
+    <script src="/lib/clientAnalytics/askme-analytics-init.js" defer></script>
+</body>
+</html>

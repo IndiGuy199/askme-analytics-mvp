@@ -21,11 +21,11 @@ export default function RootLayout({
              
         {/* AskMe Analytics - Configuration and Initialization */}
        
-       <script>
+       <script dangerouslySetInnerHTML={{__html: `
          window.AskMeAnalyticsClientId = 'askme-analytics-app';
-        </script>
+       `}} />
       <script 
-        src="/lib/clientAnalytics/askme-analytics-init.js"
+        src="/lib/clientAnalytics/askme-analytics-init.js?v=3"
         async 
         defer>
       </script>

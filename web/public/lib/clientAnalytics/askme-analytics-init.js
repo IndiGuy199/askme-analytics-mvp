@@ -14,27 +14,22 @@
 
     // ✅ Dynamic configuration loading
     async function loadClientConfig() {
-        // Priority 1: Check for inline config override
-        if (window.AskMeAnalyticsConfig && window.AskMeAnalyticsConfig.clientId) {
-            console.log('✅ Using inline config for client:', window.AskMeAnalyticsConfig.clientId);
-            return window.AskMeAnalyticsConfig;
-        }
-        
-        // Priority 2: Load config from JSON file based on clientId
+        // Load config from JSON file based on clientId
         const clientId = window.AskMeAnalyticsClientId || 'askme-analytics-app';
-        const configUrl = `https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/configs/${clientId}.json`;
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const configUrl = isLocalhost 
+            ? `/lib/clientAnalytics/configs/${clientId}.json`
+            : `https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/configs/${clientId}.json`;
         
+        console.log('[init] 🔍 Loading config from:', configUrl);
         try {
             const response = await fetch(configUrl);
             if (!response.ok) {
-                console.warn(`⚠️ Config file not found for ${clientId}, using defaults`);
                 return getDefaultConfig(clientId);
             }
             
             const config = await response.json();
-            console.log('✅ Loaded config from JSON for client:', clientId);
             return config;
-            
         } catch (error) {
             console.warn('⚠️ Failed to load config, using defaults:', error.message);
             return getDefaultConfig(clientId);
@@ -231,8 +226,6 @@
                     workflows: []
                 });
                 
-                console.log('✅ AskMe Analytics initialized successfully');
-                
                 // Trigger custom event for successful initialization
                 window.dispatchEvent(new CustomEvent('askme:analytics:ready', {
                     detail: { clientId: config.clientId }
@@ -261,7 +254,6 @@
         
         // ✅ CRITICAL: Prevent duplicate product injector setup
         if (window.__askme_product_injector_initialized) {
-            console.warn('⚠️ Product injector already initialized. Skipping duplicate setup.');
             return;
         }
         window.__askme_product_injector_initialized = true;
@@ -272,8 +264,6 @@
             window.__askme_product_injector_initialized = false; // Reset flag on error
             return;
         }
-        
-        console.log('✅ PostHog constants verified, setting up product injector...');
 
         // ✅ Add PostHog group identification
         function setupGroupIdentification() {
@@ -308,13 +298,20 @@
                 } else {
                     console.warn('⚠️ PostHog groupIdentify not available after', maxRetries, 'retries');
                 }
+                if (currentRetry <= maxRetries) {
+                    setTimeout(setupGroupIdentification, 100);
+                }
             }
         }
 
         // Call group identification
-        setupGroupIdentification();
+        // ⚠️ DISABLED: Group identification causing console spam
+        // setupGroupIdentification();
 
         // ✅ Add user identification functionality
+        // ⚠️ DISABLED: Email-based user identification is commented out to prevent errors
+        // Uncomment when ready to enable automatic user identification
+        /*
         function setupUserIdentification() {
             // ✅ CRITICAL: Prevent duplicate user identification setup
             if (window.__askme_user_identification_initialized) {
@@ -434,12 +431,11 @@
             
             // Expose identify function globally for manual calls
             window.AskMeAnalytics.identify = identifyFromEmail;
-            
-            console.log('✅ User identification setup complete');
         }
         
         // Setup user identification
         setupUserIdentification();
+        */
 
         const script = document.createElement('script');
         script.id = 'ph-product-injector';
@@ -499,10 +495,12 @@
 
         // Convert step keys to actual enum values (only if steps exist)
         if (config.steps && Array.isArray(config.steps) && config.steps.length > 0) {
+            console.log('[init] 🔍 Config has', config.steps.length, 'steps');
             const resolvedSteps = config.steps.map(step => ({
                 ...step,
                 key: window.PH_KEYS[step.key] || step.key
             }));
+            console.log('[init] 🔍 Resolved to', resolvedSteps.length, 'steps');
             script.setAttribute(window.PH_DATA_KEYS.STEPS, JSON.stringify(resolvedSteps));
         } else {
             script.setAttribute(window.PH_DATA_KEYS.STEPS, JSON.stringify([]));
@@ -533,20 +531,15 @@
     async function initialize() {
         // ✅ CRITICAL: Prevent double initialization
         if (window.__askme_analytics_initialized) {
-            console.warn('⚠️ AskMe Analytics already initialized. Skipping duplicate initialization.');
             return;
         }
         window.__askme_analytics_initialized = true;
         
-        console.log('🚀 Initializing AskMe Analytics...');
-        
         // Step 0: Load configuration (dynamic or inline)
         window.AskMeAnalyticsConfig = await loadClientConfig();
-        console.log('✅ Configuration loaded for client:', window.AskMeAnalyticsConfig.clientId);
         
         // ✅ CRITICAL: Check if analytics library is already loaded
         if (window.GenericAnalytics) {
-            console.log('✅ Analytics library already loaded (from page), skipping script load');
             initAnalytics();
             loadConstants();
             return;
@@ -555,7 +548,6 @@
         // Step 1: Load main analytics library
         loadScript(window.AskMeAnalyticsConfig.analyticsLibraryPath, 
             function() {
-                console.log('✅ Analytics library loaded');
                 initAnalytics();
             },
             function() {

@@ -1,9 +1,9 @@
 {
   "clientId": "askme-analytics-app",
-  "debug": true,
+  "debug": false,
   "apiKey": "phc_MN5MXCec7lNZtZakqpRQZqTLaPfcV6CxeE8hfbTUFE2",
   "apiHost": "https://us.i.posthog.com",
-  "autocapture": true,
+  "autocapture": false,
   "useBuiltInPageview": true,
   "capture_pageview": true,
   "capture_pageleave": true,
@@ -16,17 +16,46 @@
   "productConfig": {
     "eventName": "subscription_click",
     "pageMatch": "/pricing",
-    "panelClass": "rounded-xl border bg-card text-card-foreground shadow",
+    "panelClass": "ph-track-product-item",
     "titleClass": "text-2xl",
     "priceClass": "text-4xl font-bold",
-    "productButtonSelectors": "button.bg-blue-600, button.bg-gray-900, button.bg-indigo-600"
+    "productButtonSelectors": ".ph-track-product-select"
   },
   "steps": [
+    {
+      "key": "LANDING_PAGE_VIEWED",
+      "url": "/",
+      "urlMatch": "exact",
+      "autoFire": true,
+      "oncePerPath": true
+    },
     {
       "key": "INFORMATIONAL_CONTENT_VIEWED",
       "url": "/demo",
       "urlMatch": "contains",
-      "autoFire": true
+      "autoFire": true,
+      "oncePerPath": true
+    },
+    {
+      "key": "FAQ_VIEWED",
+      "url": "/faq",
+      "urlMatch": "contains",
+      "autoFire": true,
+      "oncePerPath": true
+    },
+    {
+      "key": "CONTACT_US_VIEWED",
+      "url": "/contact",
+      "urlMatch": "contains",
+      "autoFire": true,
+      "oncePerPath": true
+    },
+    {
+      "key": "LOGIN_CONTENT_VIEWED",
+      "url": "/login",
+      "urlMatch": "contains",
+      "autoFire": true,
+      "oncePerPath": true
     },
     {
       "key": "DASHBOARD_VIEWED",
@@ -36,29 +65,49 @@
       "oncePerPath": true
     },
     {
-      "key": "SUBSCRIPTION_CONTENT_VIEWED",
+      "key": "PRICING_PAGE_VIEWED",
       "url": "/pricing",
       "urlMatch": "contains",
+      "selector": ".ph-track-pricing-view",
+      "requireSelectorPresent": true,
       "autoFire": true,
       "oncePerPath": true
     },
     {
-      "key": "SUBSCRIPTION_PRODUCT_SELECTED",
-      "url": "/pricing",
+      "key": "PRODUCT_SELECTED",
+      "selector": ".ph-track-product-select",
+      "extractData": true
+    },
+     {
+      "key": "CHECKOUT_STARTED",
+      "selector": ".ph-track-product-select",
+      "extractData": true
+    },
+    {
+      "key": "CHECKOUT_COMPLETED",
+      "url": "/dashboard",
       "urlMatch": "contains",
+      "selector": ".ph-track-checkout-complete",
+      "requireSelectorPresent": true,
       "autoFire": true,
-      "oncePerPath": true,
-      "selector": ".font-semibold .text-blue-900",
-      "requireSelectorPresent": true
+      "oncePerPath": true
     },
     {
       "key": "SUBSCRIPTION_COMPLETED",
       "url": "/dashboard",
       "urlMatch": "contains",
-      "autoFire": false,
-      "oncePerPath": true,
-      "selector": ".font-semibold .text-blue-900",
-      "requireSelectorPresent": false
+      "selector": ".ph-track-checkout-complete",
+      "requireSelectorPresent": true,
+      "autoFire": true,
+      "oncePerPath": true
+    },
+    {
+      "key": "LOGIN_ATTEMPTED",
+      "selector": ".ph-track-auth-login"
+    },
+    {
+      "key": "LOGOUT_CLICKED",
+      "selector": ".ph-track-auth-logout"
     }
   ]
 }

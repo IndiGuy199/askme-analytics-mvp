@@ -242,7 +242,7 @@ export default function PricingPage() {
   })
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 ph-track-pricing-view">
       <div className="max-w-7xl mx-auto">
         {/* Navigation Header */}
         <div className="flex justify-between items-center mb-8">
@@ -321,9 +321,12 @@ export default function PricingPage() {
             return (
               <Card
                 key={plan.id}
-                className={`relative ${
+                className={`relative ph-track-product-item ${
                   plan.is_popular ? 'border-indigo-500 shadow-lg scale-105' : ''
                 } ${isCurrentPlan ? 'border-green-500' : ''}`}
+                data-product={plan.name}
+                data-price={(plan.price_cents / 100).toFixed(2)}
+                data-currency="USD"
               >
                 {plan.is_popular && (
                   <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
@@ -356,10 +359,14 @@ export default function PricingPage() {
 
                 <CardContent className="pt-0">
                   <Button
-                    className="w-full mb-6"
+                    className="w-full mb-6 ph-track-product-select"
                     variant={plan.is_popular ? 'default' : 'outline'}
                     disabled={(isCurrentPlan && subscriptionStatus === 'active') || checkoutLoading === plan.id}
                     onClick={() => handleCheckout(plan.id)}
+                    data-product={plan.name}
+                    data-price={(plan.price_cents / 100).toFixed(2)}
+                    data-currency="USD"
+                    data-interval={plan.interval}
                   >
                     {checkoutLoading === plan.id ? (
                       <div className="flex items-center">

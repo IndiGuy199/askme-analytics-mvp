@@ -132,7 +132,7 @@ export default function LoginPage() {
                 <Button
                   type="submit"
                   disabled={isLoading || !email}
-                  className="w-full h-12 text-base bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 border-0 shadow-lg hover:shadow-xl transition-all duration-200"
+                  className="w-full h-12 text-base bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 border-0 shadow-lg hover:shadow-xl transition-all duration-200 ph-track-auth-login"
                 >
                   {isLoading ? (
                     <>

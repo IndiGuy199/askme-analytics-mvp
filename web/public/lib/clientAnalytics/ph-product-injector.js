@@ -327,20 +327,48 @@
     const blockedRules = new Set();      // 🆕 Track which rules are currently blocked
     const queue = [];
     let phReady = false;
+    let pollCount = 0;
+    const MAX_POLL_ATTEMPTS = 100; // 15 seconds total (100 * 150ms)
 
     function flushPH() {
         if (window.posthog && typeof window.posthog.capture === 'function') {
             phReady = true;
+            console.log(`[ph-injector] ✅ PostHog is ready! Flushing ${queue.length} queued events`);
             while (queue.length) {
                 const { name, props } = queue.shift();
-                try { window.posthog.capture(name, props); } catch (e) { console.warn('[ph-injector] capture failed', e); }
+                try { 
+                    window.posthog.capture(name, props);
+                    console.log(`[ph-injector] ✅ Successfully sent queued event: ${name}`);
+                } catch (e) { 
+                    console.warn('[ph-injector] ❌ capture failed', e); 
+                }
             }
         }
     }
     (function pollPH() {
         if (!phReady) {
+            pollCount++;
+            
+            // Debug logging every 10 attempts
+            if (pollCount % 10 === 0) {
+                console.log(`[ph-injector] ⏳ Waiting for PostHog... Attempt ${pollCount}/${MAX_POLL_ATTEMPTS}`);
+                console.log('[ph-injector] 🔍 window.posthog exists:', !!window.posthog);
+                console.log('[ph-injector] 🔍 window.posthog.capture exists:', !!(window.posthog && typeof window.posthog.capture === 'function'));
+            }
+            
             flushPH();
-            if (!phReady) setTimeout(pollPH, 150);
+            
+            if (!phReady && pollCount < MAX_POLL_ATTEMPTS) {
+                setTimeout(pollPH, 150);
+            } else if (pollCount >= MAX_POLL_ATTEMPTS) {
+                console.error('[ph-injector] ❌ PostHog failed to initialize after', MAX_POLL_ATTEMPTS, 'attempts');
+                console.error('[ph-injector] ❌ Queue has', queue.length, 'unsent events');
+                console.error('[ph-injector] 🔍 Debug info:', {
+                    posthogExists: !!window.posthog,
+                    captureExists: !!(window.posthog && typeof window.posthog.capture === 'function'),
+                    queueLength: queue.length
+                });
+            }
         }
     })();
 
@@ -348,6 +376,7 @@
         if (!isNonEmptyStr(name)) return;
         const key = scopePath ? `${name}::${location.pathname}` : name;
         if (scopePath && sentOncePath.has(key)) return;
+        
         if (scopePath) {
             sentOncePath.add(key);
             // 🆕 Persist to sessionStorage to survive quick reloads
@@ -357,6 +386,11 @@
                 // Silent fail if sessionStorage is not available
             }
         }
+        
+        const phStatus = window.posthog ? 
+            (typeof window.posthog.capture === 'function' ? 'ready' : 'loading') : 
+            'not-loaded';
+        console.log(`[ph-injector] 📊 Capturing event: ${name} (PostHog: ${phStatus}, Queue: ${queue.length})`, props);
 
         // 🆕 Enhanced revenue tracking for purchase completion events
         const purchaseEvents = [EK.SUBSCRIPTION_COMPLETED, EK.CHECKOUT_COMPLETED];
@@ -408,10 +442,7 @@
                     const localMedium = localStorage.getItem('ph_utm_medium');
                     const localCampaign = localStorage.getItem('ph_utm_campaign');
                     
-                    if (localSource) {
-                        props[P.UTM_SOURCE] = localSource;
-                        console.log('[ph-injector] 🔄 Restored utm_source from localStorage:', localSource);
-                    }
+                    if (localSource) props[P.UTM_SOURCE] = localSource;
                     if (localMedium) props[P.UTM_MEDIUM] = localMedium;
                     if (localCampaign) props[P.UTM_CAMPAIGN] = localCampaign;
                 }
@@ -426,15 +457,6 @@
                     const daysSinceAttribution = Math.floor((Date.now() - parseInt(utmTimestamp)) / (1000 * 60 * 60 * 24));
                     props['days_since_attribution'] = daysSinceAttribution;
                 }
-                
-                console.log('[ph-injector] 💰 Revenue event with attribution:', {
-                    event: name,
-                    revenue: props[P.REVENUE],
-                    utm_source: props[P.UTM_SOURCE],
-                    utm_medium: props[P.UTM_MEDIUM],
-                    utm_campaign: props[P.UTM_CAMPAIGN],
-                    days_since_attribution: props['days_since_attribution']
-                });
                 
             } catch (e) {
                 console.warn('[ph-injector] Failed to extract UTM parameters:', e);
@@ -490,9 +512,15 @@
         }
 
         if (phReady) {
-            try { window.posthog.capture(name, props); } catch (e) { console.warn('[ph-injector] capture failed', e); }
+            try { 
+                window.posthog.capture(name, props);
+                console.log(`[ph-injector] ✅ Event sent to PostHog: ${name}`, props);
+            } catch (e) { 
+                console.warn('[ph-injector] ❌ capture failed', e); 
+            }
         } else {
             queue.push({ name, props });
+            console.log(`[ph-injector] 📦 Event queued (PostHog not ready): ${name}`, props);
         }
     }
 
@@ -882,14 +910,6 @@
         btn.setAttribute(DOM.CURRENCY, props[P.CURRENCY]);
         btn.setAttribute(DOM.QUANTITY, String(props[P.QUANTITY] || '1'));
         
-        console.log('[ph-injector] ✅ Annotated button with product data:', {
-            button: btn,
-            product: props[P.PRODUCT],
-            price: props[P.PRICE],
-            currency: props[P.CURRENCY],
-            container: container
-        });
-        
         sentButtons.add(btn);
     }
 
@@ -911,27 +931,18 @@
                 'button:not([type])',  // Buttons without type (common in React)
                 'button[type="button"]'
             ].join(', ');
-            
-            console.warn('[ph-injector] No productButtonSelectors configured. Using default:', buttonSelector);
-            console.warn('[ph-injector] Consider configuring productButtonSelectors for more precise targeting.');
         }
         
         try {
             const buttons = document.querySelectorAll(buttonSelector);
-            console.log(`[ph-injector] Found ${buttons.length} buttons matching selector: "${buttonSelector}"`);
             
             // Additional filtering: only annotate buttons within pricing containers
             const pricingButtons = Array.from(buttons).filter(btn => {
                 const container = guessContainer(btn);
                 // Only annotate if button is inside a container that has pricing info
-                const hasContainer = container && container !== document && container !== btn.parentElement;
-                if (!hasContainer) {
-                    console.log('[ph-injector] Skipping button (no valid container):', btn);
-                }
-                return hasContainer;
+                return container && container !== document && container !== btn.parentElement;
             });
             
-            console.log(`[ph-injector] Annotating ${pricingButtons.length} buttons with product data`);
             pricingButtons.forEach(annotateSubmit);
             
         } catch (e) {
@@ -995,9 +1006,18 @@
 
         let raw = [];
         try { raw = JSON.parse(DS.stepsRaw); } catch { raw = []; }
+        
+        console.log('[ph-injector] 🔍 Raw steps before filter:', raw.length);
+        const filtered = raw.filter(r => {
+            const valid = r && typeof r === 'object' && r.key && Object.values(EK).includes(r.key);
+            if (!valid && r?.key) {
+                console.warn('[ph-injector] ⚠️ Filtered out step:', r.key, '- not in PH_KEYS');
+            }
+            return valid;
+        });
+        console.log('[ph-injector] 🔍 Steps after filter:', filtered.length);
 
-        return raw
-            .filter(r => r && typeof r === 'object' && r.key && Object.values(EK).includes(r.key))
+        return filtered
             .map(r => {
                 const rawSel = isNonEmptyStr(r.selector) ? r.selector.trim() : '';
                 const list = selectorListFrom(rawSel);
@@ -1025,6 +1045,14 @@
     function urlMatches(rule) {
         if (!rule || !isNonEmptyStr(rule.url)) return true;
         const u = (location.pathname + location.search) || '';
+        
+        // 🐛 DEBUG: Allow debug-demo-events.html to match /demo rules for testing
+        const isDebugPage = location.pathname.includes('debug-demo-events.html');
+        if (isDebugPage && rule.url.includes('/demo')) {
+            console.log('[ph-injector] 🐛 DEBUG MODE: Treating debug page as /demo');
+            return true;
+        }
+        
         switch (rule.urlMatch) {
             case 'exact':   return u === rule.url;
             case 'regex':   { const rx = ciRegex(rule.url) || new RegExp(rule.url); return rx.test(u); }
@@ -1035,17 +1063,43 @@
 
    /* ---------- 7) Apply a single rule (respects selector fallback) ------- */
     function tagElementsForRule(rule) {
-        if (!rule || !rule.key) return;
-        if (!urlMatches(rule)) return;
+        if (!rule || !rule.key) {
+            console.log('[ph-injector] ⚠️ Rule skipped: no rule or no key');
+            return;
+        }
+        
+        const urlMatchResult = urlMatches(rule);
+        console.log('[ph-injector] 🔍 Checking rule:', rule.key, {
+            currentPath: location.pathname,
+            ruleUrl: rule.url,
+            urlMatch: rule.urlMatch,
+            urlMatches: urlMatchResult,
+            autoFire: rule.autoFire,
+            blocked: blockedRules.has(rule.key)
+        });
+        
+        if (!urlMatchResult) {
+            console.log('[ph-injector] ⏭️ Rule skipped (URL mismatch):', rule.key);
+            return;
+        }
 
         // 🆕 CHECK: Skip if this rule is blocked by another rule
         if (blockedRules.has(rule.key)) {
-            console.log(`[DEBUG] Rule "${rule.key}" is blocked by another rule`);
+            console.log('[ph-injector] 🚫 Rule blocked:', rule.key);
             return;
         }
 
         // autoFire independent of selector
         if (rule.autoFire) {
+            // Check if already fired for this path (oncePerPath)
+            const key = rule.oncePerPath ? `${rule.key}::${location.pathname}` : rule.key;
+            if (rule.oncePerPath && sentOncePath.has(key)) {
+                console.log('[ph-injector] ⏭️ Skipping already-fired event:', rule.key, 'on path:', location.pathname);
+                return; // Already fired, skip
+            }
+            
+            console.log('[ph-injector] 🔥 AutoFire event:', rule.key, 'on path:', location.pathname);
+            console.log('[ph-injector] 🔍 Rule details:', { url: rule.url, urlMatch: rule.urlMatch, oncePerPath: rule.oncePerPath });
             const props = { [P.PATH]: location.pathname, ...rule.metadata };
             
             // 🆕 REVENUE TRACKING: For checkout_completed events, extract revenue data
@@ -1054,7 +1108,9 @@
                 Object.assign(props, revenueData);
             }
             
+            console.log('[ph-injector] 🚀 Calling captureOnce for:', rule.key);
             captureOnce(rule.key, props, { scopePath: rule.oncePerPath });
+            console.log('[ph-injector] ✅ captureOnce completed for:', rule.key);
         }
 
         // --- Collect all visible elements across all selectors (no hidden fields) ---
@@ -1067,20 +1123,16 @@
 
         for (const sel of sels) {
             const allMatches = qsa(sel);
-            console.log(`[DEBUG] Selector "${sel}" found ${allMatches.length} elements`);
             
-            allMatches.forEach((el, index) => {
+            allMatches.forEach((el) => {
                 const visible = isVisible(el);
                 const isHiddenInput = el.tagName === 'INPUT' && el.type === 'hidden';
-                console.log(`[DEBUG] Element ${index + 1}: visible=${visible}, hiddenInput=${isHiddenInput}`, el);
                 
                 if (visible && !isHiddenInput) {
                     bucket.add(el);
                 }
             });
         }
-
-        console.log(`[DEBUG] Rule "${rule.key}" tagged ${Array.from(bucket).length} visible elements`);
 
         // 2) 🆕 UPDATED: Configurable textRegex fallback - no hardcoding
         if (!bucket.size && isNonEmptyStr(rule.textRegex)) {
@@ -1183,6 +1235,7 @@
 
     function applyAllRules() {
         const rules = parseSteps();
+        console.log('[ph-injector] 🔍 applyAllRules called, found', rules?.length || 0, 'rules on path:', location.pathname);
         if (!Array.isArray(rules) || !rules.length) return;
 
         // 🛡️ Disconnect MutationObserver to prevent infinite loop
@@ -1429,7 +1482,74 @@
         return null;
     }
 
-    /* ---------- 9) Global click capture (steps + product event) ----------- */
+    /* ---------- 8.5) Extract event name from ph-track-* CSS classes ----------- */
+    /**
+     * Converts ph-track-* CSS class to event name
+     * Examples:
+     *   ph-track-auth-signup          -> AUTH_SIGNUP
+     *   ph-track-checkout-complete    -> CHECKOUT_COMPLETED
+     *   ph-track-product-select       -> PRODUCT_SELECTED
+     */
+    function extractEventNameFromClass(element) {
+        if (!element || !element.className) return null;
+        
+        const classList = element.className.split(' ');
+        
+        for (const className of classList) {
+            if (className.startsWith('ph-track-')) {
+                // Remove prefix: ph-track-auth-signup -> auth-signup
+                let eventName = className.replace('ph-track-', '');
+                
+                // Convert kebab-case to SCREAMING_SNAKE_CASE
+                eventName = eventName.toUpperCase().replace(/-/g, '_');
+                
+                // Map common variations to standard event names
+                const eventMap = {
+                    'AUTH_SIGNUP': 'SIGNUP_STARTED',
+                    'AUTH_SIGNUP_COMPLETE': 'SIGNUP_COMPLETED',
+                    'AUTH_LOGIN': 'LOGIN_ATTEMPTED',
+                    'AUTH_LOGIN_COMPLETE': 'LOGIN_COMPLETED',
+                    'AUTH_LOGOUT': 'LOGOUT_CLICKED',
+                    'CHECKOUT_START': 'CHECKOUT_STARTED',
+                    'CHECKOUT_COMPLETE': 'CHECKOUT_COMPLETED',
+                    'CHECKOUT_SUBMIT': 'CHECKOUT_SUBMITTED',
+                    'SUBSCRIPTION_START': 'SUBSCRIPTION_STARTED',
+                    'SUBSCRIPTION_COMPLETE': 'SUBSCRIPTION_COMPLETED',
+                    'PRODUCT_SELECT': 'PRODUCT_SELECTED',
+                    'PRODUCT_SELECT_BASIC': 'PRODUCT_SELECTED',
+                    'PRODUCT_SELECT_PREMIUM': 'PRODUCT_SELECTED',
+                    'PRODUCT_SELECT_ENTERPRISE': 'PRODUCT_SELECTED',
+                    'PRODUCT_VIEW': 'PRODUCT_CATALOGUE_VIEWED',
+                    'PRICING_VIEW': 'PRICING_PAGE_VIEWED',
+                    'ONBOARD_STEP1': 'ONBOARDING_STEP1_COMPLETED',
+                    'ONBOARD_STEP2': 'ONBOARDING_STEP2_COMPLETED',
+                    'ONBOARD_STEP3': 'ONBOARDING_STEP3_COMPLETED',
+                    'ONBOARD_COMPLETE': 'ONBOARDING_COMPLETED',
+                    'ONBOARD_SKIP': 'ONBOARDING_SKIPPED',
+                    'HELP_VIEW': 'HELP_CENTER_VIEWED',
+                    'HELP_SEARCH': 'HELP_SEARCHED',
+                    'HELP_ARTICLE': 'HELP_ARTICLE_VIEWED',
+                    'CONTACT_VIEW': 'CONTACT_US_VIEWED',
+                    'CONTACT_SUBMIT': 'CONTACT_US_ATTEMPTED',
+                    'SUPPORT_CHAT': 'SUPPORT_CHAT_OPENED',
+                    'CONTENT_VIEW': 'CONTENT_VIEWED',
+                    'CONTENT_SHARE': 'CONTENT_SHARED',
+                    'CONTENT_DOWNLOAD': 'CONTENT_DOWNLOADED',
+                    'VIDEO_PLAY': 'VIDEO_PLAYED',
+                    'VIDEO_COMPLETE': 'VIDEO_COMPLETED',
+                    'CTA_CLICK': 'CTA_CLICKED'
+                };
+                
+                // Use mapped name if available, otherwise use converted name
+                const mappedName = eventMap[eventName] || eventName;
+                return mappedName;
+            }
+        }
+        
+        return null;
+    }
+
+    /* ---------- 9) Global click capture (steps + product event + ph-track-* classes) ----------- */
     function bindGlobalClick() {
         const productEventName = DS.eventName || EV.DEFAULT_NAME || 'product_click';
 
@@ -1451,6 +1571,25 @@
                     
                     captureOnce(name, { [P.PATH]: location.pathname, ...extras }, { scopePath: true });
                     sentStepEls.add(stepEl);
+                }
+            }
+            
+            // (A2) 🆕 ph-track-* CSS class convention
+            const phTrackEl = target.closest && target.closest('[class*="ph-track-"]');
+            if (phTrackEl && !sentStepEls.has(phTrackEl)) {
+                const eventName = extractEventNameFromClass(phTrackEl);
+                if (eventName) {
+                    const extras = productPropsFrom(phTrackEl) || {};
+                    
+                    // Extract revenue data for checkout/subscription events
+                    if (eventName === EK.CHECKOUT_COMPLETED || eventName === EK.SUBSCRIPTION_COMPLETED ||
+                        eventName === 'CHECKOUT_STARTED' || eventName === 'SUBSCRIPTION_STARTED') {
+                        const revenueData = extractRevenueData(phTrackEl);
+                        Object.assign(extras, revenueData);
+                    }
+                    
+                    captureOnce(eventName, { [P.PATH]: location.pathname, ...extras }, { scopePath: true });
+                    sentStepEls.add(phTrackEl);
                 }
             }
 
@@ -1553,6 +1692,75 @@
         }
     }
 
+    /* ---------- 9.8) Scan for ph-track-* CSS classes on page load ----------- */
+    /**
+     * Auto-detect and fire events for ph-track-* elements present on page load
+     * Examples:
+     *   <div class="ph-track-checkout-complete"> → fires CHECKOUT_COMPLETED
+     *   <body class="ph-track-auth-login-complete"> → fires LOGIN_COMPLETED
+     */
+    function scanForPhTrackClasses() {
+        try {
+            // Find all elements with ph-track-* classes
+            const trackElements = document.querySelectorAll('[class*="ph-track-"]');
+            
+            trackElements.forEach((element) => {
+                // Skip if already processed
+                if (sentStepEls.has(element)) return;
+                
+                const eventName = extractEventNameFromClass(element);
+                if (!eventName) return;
+                
+                // Auto-fire events for certain classes (page load detection)
+                const autoFireEvents = [
+                    'CHECKOUT_COMPLETED',
+                    'SUBSCRIPTION_COMPLETED',
+                    'SIGNUP_COMPLETED',
+                    'LOGIN_COMPLETED',
+                    'ONBOARDING_COMPLETED',
+                    'ONBOARDING_STEP1_COMPLETED',
+                    'ONBOARDING_STEP2_COMPLETED',
+                    'ONBOARDING_STEP3_COMPLETED',
+                    'PASSWORD_RESET_COMPLETED',
+                    'PRICING_PAGE_VIEWED',
+                    'PRODUCT_CATALOGUE_VIEWED',
+                    'HELP_CENTER_VIEWED',
+                    'CONTACT_US_VIEWED',
+                    'CONTENT_VIEWED'
+                ];
+                
+                if (autoFireEvents.includes(eventName)) {
+                    const extras = productPropsFrom(element) || {};
+                    
+                    // Extract revenue for checkout/subscription completion
+                    if (eventName === 'CHECKOUT_COMPLETED' || eventName === 'SUBSCRIPTION_COMPLETED') {
+                        const revenueData = extractRevenueData(element);
+                        Object.assign(extras, revenueData);
+                    }
+                    
+                    // Extract content metadata for content events
+                    if (eventName === 'CONTENT_VIEWED') {
+                        if (element.hasAttribute('data-content-title')) {
+                            extras.content_title = element.getAttribute('data-content-title');
+                        }
+                        if (element.hasAttribute('data-content-category')) {
+                            extras.content_category = element.getAttribute('data-content-category');
+                        }
+                        if (element.hasAttribute('data-content-author')) {
+                            extras.content_author = element.getAttribute('data-content-author');
+                        }
+                    }
+                    
+                    captureOnce(eventName, { [P.PATH]: location.pathname, ...extras }, { scopePath: true });
+                    sentStepEls.add(element);
+                }
+                // For click events (buttons, links), they'll be handled by bindGlobalClick
+            });
+        } catch (e) {
+            console.warn('[ph-injector] Failed to scan for ph-track-* classes:', e);
+        }
+    }
+
     /* ---------- 10) SPA hooks + observers -------------------------------- */
     function hookSPA() {
         const wrap = (t) => {
@@ -1573,7 +1781,8 @@
             scanAndAnnotate();
             bindPriceChangeListeners(); // 🆕 Bind listeners on route change
         }
-        scanForEmailInputs(); // ✅ Scan for email inputs on route change
+        // scanForEmailInputs(); // ⚠️ DISABLED - Email identification commented out
+        scanForPhTrackClasses(); // 🆕 Scan for ph-track-* classes on route change (SPA)
     }
 
     function onMutations(muts) {
@@ -1583,90 +1792,28 @@
                scanAndAnnotate();
                bindPriceChangeListeners(); // 🆕 Bind listeners when DOM changes
            }
-           scanForEmailInputs(); // ✅ Scan for email inputs when DOM changes
+           // scanForEmailInputs(); // ⚠️ DISABLED - Email identification commented out
         }
     }
 
     /* ---------- 11) Boot -------------------------------------------------- */
     function boot() {
-        console.log('[ph-injector] 🚀 Booting product injector...');
-        console.log('[ph-injector] Current page:', location.pathname);
-        console.log('[ph-injector] Page match pattern:', DS.pageMatch);
-        console.log('[ph-injector] Page matches?', pageMatches(DS.pageMatch));
-        console.log('[ph-injector] Has product hints?', hasAnyProductHint);
-        console.log('[ph-injector] Dataset:', {
-            panelClass: DS.panelClass,
-            titleClass: DS.titleClass,
-            priceClass: DS.priceClass,
-            eventName: DS.eventName
-        });
-        
-        // 🆕 Enhanced channel tracking: Capture UTM parameters + referrer fallback
+        console.log('[ph-injector] 🚀 Boot function called');
         try {
             const urlParams = new URLSearchParams(window.location.search);
             
-            // Priority 1: UTM parameters from URL (marketing campaigns)
+            // Capture UTM parameters from URL
             if (urlParams.has('utm_source')) {
-                const utmSource = urlParams.get('utm_source');
-                sessionStorage.setItem('ph_utm_source', utmSource);
-                localStorage.setItem('ph_utm_source', utmSource); // ✅ Persist across sessions
-                localStorage.setItem('ph_utm_timestamp', Date.now().toString()); // Track freshness
-                console.log('[ph-injector] 📊 Captured utm_source:', utmSource);
+                sessionStorage.setItem('ph_utm_source', urlParams.get('utm_source'));
             }
             if (urlParams.has('utm_medium')) {
-                const utmMedium = urlParams.get('utm_medium');
-                sessionStorage.setItem('ph_utm_medium', utmMedium);
-                localStorage.setItem('ph_utm_medium', utmMedium);
-                console.log('[ph-injector] 📊 Captured utm_medium:', utmMedium);
+                sessionStorage.setItem('ph_utm_medium', urlParams.get('utm_medium'));
             }
             if (urlParams.has('utm_campaign')) {
-                const utmCampaign = urlParams.get('utm_campaign');
-                sessionStorage.setItem('ph_utm_campaign', utmCampaign);
-                localStorage.setItem('ph_utm_campaign', utmCampaign);
-                console.log('[ph-injector] 📊 Captured utm_campaign:', utmCampaign);
+                sessionStorage.setItem('ph_utm_campaign', urlParams.get('utm_campaign'));
             }
             
-            // Priority 2: Extract channel from referrer if no UTM present
-            if (!sessionStorage.getItem('ph_utm_source') && !localStorage.getItem('ph_utm_source')) {
-                const referrer = document.referrer;
-                if (referrer) {
-                    try {
-                        const referrerUrl = new URL(referrer);
-                        const referrerHost = referrerUrl.hostname;
-                        
-                        // Map common referrers to channels
-                        let channel = 'referral';
-                        if (referrerHost.includes('google.')) channel = 'google';
-                        else if (referrerHost.includes('facebook.') || referrerHost.includes('fb.')) channel = 'facebook';
-                        else if (referrerHost.includes('twitter.') || referrerHost.includes('t.co')) channel = 'twitter';
-                        else if (referrerHost.includes('linkedin.')) channel = 'linkedin';
-                        else if (referrerHost.includes('instagram.')) channel = 'instagram';
-                        else if (referrerHost.includes('youtube.')) channel = 'youtube';
-                        else if (referrerHost.includes('bing.')) channel = 'bing';
-                        else if (referrerHost.includes('yahoo.')) channel = 'yahoo';
-                        else if (referrerUrl.hostname === window.location.hostname) {
-                            // Same domain - not a new acquisition
-                            channel = null;
-                        }
-                        
-                        if (channel) {
-                            sessionStorage.setItem('ph_utm_source', channel);
-                            sessionStorage.setItem('ph_utm_medium', 'referral');
-                            localStorage.setItem('ph_attribution_source', 'referrer'); // Mark as referrer-based
-                            console.log('[ph-injector] 📊 Inferred channel from referrer:', channel);
-                        }
-                    } catch (e) {
-                        console.warn('[ph-injector] Failed to parse referrer:', e);
-                    }
-                } else {
-                    // No referrer = direct traffic
-                    sessionStorage.setItem('ph_utm_source', 'direct');
-                    sessionStorage.setItem('ph_utm_medium', 'none');
-                    console.log('[ph-injector] 📊 Direct traffic detected (no referrer)');
-                }
-            }
-            
-            // ✅ Also capture any custom tracking parameters (fbclid, gclid, etc.)
+            // Capture custom tracking parameters (fbclid, gclid)
             if (urlParams.has('fbclid')) {
                 sessionStorage.setItem('ph_fbclid', urlParams.get('fbclid'));
                 if (!sessionStorage.getItem('ph_utm_source')) {
@@ -1688,14 +1835,12 @@
         
         applyAllRules();
         if (pageMatches(DS.pageMatch)) {
-            console.log('[ph-injector] ✅ Page matches! Running scanAndAnnotate...');
             scanAndAnnotate();
-            bindPriceChangeListeners(); // 🆕 Initial binding of price change listeners
-        } else {
-            console.log('[ph-injector] ❌ Page does not match pattern. Skipping product annotation.');
+            bindPriceChangeListeners();
         }
+        
         bindGlobalClick();
-        scanForEmailInputs(); // ✅ Initial scan for email inputs
+        scanForPhTrackClasses();
 
         // Ensure hidden one-time inputs (if already inserted) get captured once
         document

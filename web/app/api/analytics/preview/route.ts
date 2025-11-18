@@ -26,11 +26,29 @@ const getDateRangeFilter = (dateRange: string) => {
 };
 
 // Create dynamic queries with date range injection and comparison support
-const createQueryWithDateRange = (baseQuery: any, dateRange: any, enableComparison = false) => {
+const createQueryWithDateRange = (baseQuery: any, dateRange: any, enableComparison = false, clientId?: string) => {
   const query = JSON.parse(JSON.stringify(baseQuery));
   
   if (query.kind === 'InsightVizNode' && query.source) {
     query.source.dateRange = dateRange;
+    
+    // 🆕 CRITICAL: Add client_id filter to prevent cross-client data leakage
+    if (clientId) {
+      // Initialize properties filter if it doesn't exist or is not an array
+      if (!query.source.properties || !Array.isArray(query.source.properties)) {
+        query.source.properties = [];
+      }
+      
+      // Add client_id filter as first property (highest priority)
+      query.source.properties.unshift({
+        key: 'client_id',
+        value: [clientId],
+        operator: 'exact',
+        type: 'event'
+      });
+      
+      console.log(`🔒 Added client_id filter: ${clientId}`);
+    }
     
     // 🆕 Add compareFilter if comparison is enabled
     // ⚠️ IMPORTANT: Only add comparison for supported query types
@@ -58,12 +76,51 @@ const createQueryWithDateRange = (baseQuery: any, dateRange: any, enableComparis
   } else if (query.kind === 'FunnelsQuery') {
     query.dateRange = dateRange;
     
+    // 🆕 Add client_id filter to FunnelsQuery
+    if (clientId) {
+      if (!query.properties || !Array.isArray(query.properties)) {
+        query.properties = [];
+      }
+      query.properties.unshift({
+        key: 'client_id',
+        value: [clientId],
+        operator: 'exact',
+        type: 'event'
+      });
+      console.log(`🔒 Added client_id filter to FunnelsQuery: ${clientId}`);
+    }
+    
     // ⚠️ FunnelsQuery does NOT support compareFilter - causes 400 errors
     // Just set the date range and skip comparison
     console.log(`⚠️ FunnelsQuery does NOT support comparison - rendering without comparison`);
   } else if (query.kind === 'HogQLQuery') {
-    // HogQL queries have date ranges directly in the SQL WHERE clause
-    // No need to modify, just return as-is
+    // 🆕 Add client_id filter to HogQL WHERE clause
+    if (clientId) {
+      // For HogQL, we need to modify the SQL query to add client_id filter
+      if (query.query && typeof query.query === 'string') {
+        // Check if WHERE clause exists
+        if (query.query.toLowerCase().includes('where')) {
+          // Add to existing WHERE clause
+          query.query = query.query.replace(
+            /where\s+/i,
+            `WHERE properties.client_id = '${clientId}' AND `
+          );
+        } else {
+          // Add new WHERE clause before any GROUP BY, ORDER BY, or LIMIT
+          const insertPoint = query.query.search(/\b(group by|order by|limit)\b/i);
+          if (insertPoint > -1) {
+            query.query = 
+              query.query.substring(0, insertPoint) +
+              `WHERE properties.client_id = '${clientId}' ` +
+              query.query.substring(insertPoint);
+          } else {
+            // Append to end
+            query.query += ` WHERE properties.client_id = '${clientId}'`;
+          }
+        }
+        console.log(`🔒 Added client_id filter to HogQLQuery: ${clientId}`);
+      }
+    }
     return query;
   }
   
@@ -806,6 +863,56 @@ export async function GET(request: NextRequest) {
     console.log(`🆔 Client ID: ${effectiveClientId}`);
     console.log(`⚙️ Using client config: ${clientConfig?.name || effectiveClientId}`);
 
+    // 🆕 Check if this client has ANY events in PostHog
+    // Query for ANY event with this client_id in the last 90 days
+    const eventCheckQuery = {
+      kind: 'HogQLQuery',
+      query: `
+        SELECT count() as total
+        FROM events
+        WHERE properties.client_id = '${effectiveClientId}'
+          AND timestamp >= now() - INTERVAL 90 DAY
+        LIMIT 1
+      `
+    };
+
+    try {
+      console.log(`🔍 Checking for events with query:`, JSON.stringify(eventCheckQuery, null, 2));
+      
+      const checkResponse = await fetch(`https://us.i.posthog.com/api/projects/${projectId}/query/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(eventCheckQuery)
+      });
+
+      console.log(`🔍 Event check response status: ${checkResponse.status}`);
+
+      if (checkResponse.ok) {
+        const checkData = await checkResponse.json();
+        console.log(`🔍 Event check response data:`, JSON.stringify(checkData, null, 2));
+        
+        const eventCount = checkData?.results?.[0]?.[0] || 0;
+        
+        console.log(`📊 Event count check for ${effectiveClientId}: ${eventCount} events`);
+        
+        if (eventCount === 0) {
+          console.log(`⚠️ No events found for client ${effectiveClientId} - returning not configured message`);
+          return NextResponse.json({ error: 'PostHog not configured for this company' }, { status: 400 });
+        } else {
+          console.log(`✅ Found ${eventCount} events for client ${effectiveClientId} - proceeding with analytics`);
+        }
+      } else {
+        const errorText = await checkResponse.text();
+        console.error(`⚠️ Event check failed with status ${checkResponse.status}:`, errorText);
+      }
+    } catch (checkError) {
+      console.error('⚠️ Error checking event count (continuing anyway):', checkError);
+      // Don't fail the request, just continue - worst case they see empty charts
+    }
+
     // Get date filter
     const dateFilter = getDateRangeFilter(dateRange);
     console.log(`📅 Date Filter:`, dateFilter);
@@ -818,7 +925,7 @@ export async function GET(request: NextRequest) {
     
     // Create queries with date range injection and comparison support
     const trafficQuery = baseQueries.traffic ? 
-      createQueryWithDateRange(baseQueries.traffic.query, dateFilter, compare) : null;
+      createQueryWithDateRange(baseQueries.traffic.query, dateFilter, compare, effectiveClientId) : null;
     if (trafficQuery) logFinalQuery('TRAFFIC', trafficQuery, effectiveClientId);
 
     // Dynamically detect funnel query names and derive funnel types
@@ -832,7 +939,7 @@ export async function GET(request: NextRequest) {
       // Extract the funnel type from the query name
       // e.g., "profileFunnel" -> "profile", "renewalFunnel" -> "renewal", "funnel" -> "funnel"
       const funnelType = queryName.toLowerCase().replace('funnel', '') || 'funnel';
-      funnelQueries[funnelType] = createQueryWithDateRange((baseQueries as any)[queryName].query, dateFilter, compare);
+      funnelQueries[funnelType] = createQueryWithDateRange((baseQueries as any)[queryName].query, dateFilter, compare, effectiveClientId);
       logFinalQuery(`FUNNEL_${funnelType.toUpperCase()}`, funnelQueries[funnelType], effectiveClientId);
     });
 
@@ -842,43 +949,43 @@ export async function GET(request: NextRequest) {
 
 
     const lifecycleQuery = baseQueries.lifecycle ? 
-      createQueryWithDateRange(baseQueries.lifecycle.query, dateFilter, compare) : null;
+      createQueryWithDateRange(baseQueries.lifecycle.query, dateFilter, compare, effectiveClientId) : null;
     if (lifecycleQuery) logFinalQuery('LIFECYCLE', lifecycleQuery, effectiveClientId);
 
     const deviceQuery = baseQueries.deviceMix ? 
-      createQueryWithDateRange(baseQueries.deviceMix.query, dateFilter, compare) : null;
+      createQueryWithDateRange(baseQueries.deviceMix.query, dateFilter, compare, effectiveClientId) : null;
     if (deviceQuery) logFinalQuery('DEVICE', deviceQuery, effectiveClientId);
 
     const geographyQuery = baseQueries.geography ?
-      createQueryWithDateRange(baseQueries.geography.query, dateFilter, compare) : null;
+      createQueryWithDateRange(baseQueries.geography.query, dateFilter, compare, effectiveClientId) : null;
     if (geographyQuery) logFinalQuery('GEOGRAPHY', geographyQuery, effectiveClientId);
 
     const cityGeographyQuery = baseQueries.cityGeography ?
-      createQueryWithDateRange(baseQueries.cityGeography.query, dateFilter, compare) : null;
+      createQueryWithDateRange(baseQueries.cityGeography.query, dateFilter, compare, effectiveClientId) : null;
     if (cityGeographyQuery) logFinalQuery('CITY_GEOGRAPHY', cityGeographyQuery, effectiveClientId);
 
     // 🆕 NEW: Session metrics queries
     const sessionsQuery = baseQueries.sessions ?
-      createQueryWithDateRange(baseQueries.sessions.query, dateFilter, compare) : null;
+      createQueryWithDateRange(baseQueries.sessions.query, dateFilter, compare, effectiveClientId) : null;
     if (sessionsQuery) logFinalQuery('SESSIONS', sessionsQuery, effectiveClientId);
 
     const sessionDurationQuery = baseQueries.sessionDuration ?
-      createQueryWithDateRange(baseQueries.sessionDuration.query, dateFilter, compare) : null;
+      createQueryWithDateRange(baseQueries.sessionDuration.query, dateFilter, compare, effectiveClientId) : null;
     if (sessionDurationQuery) logFinalQuery('SESSION_DURATION', sessionDurationQuery, effectiveClientId);
 
     // 🆕 Bounce rate uses a single query with 2 series (sessions and pageviews)
     const bounceRateQuery = baseQueries.bounceRate ?
-      createQueryWithDateRange(baseQueries.bounceRate.query, dateFilter, compare) : null;
+      createQueryWithDateRange(baseQueries.bounceRate.query, dateFilter, compare, effectiveClientId) : null;
     if (bounceRateQuery) logFinalQuery('BOUNCE_RATE', bounceRateQuery, effectiveClientId);
 
     // Top Pages query
     const topPagesQuery = baseQueries.topPages ?
-      createQueryWithDateRange(baseQueries.topPages.query, dateFilter, compare) : null;
+      createQueryWithDateRange(baseQueries.topPages.query, dateFilter, compare, effectiveClientId) : null;
     if (topPagesQuery) logFinalQuery('TOP_PAGES', topPagesQuery, effectiveClientId);
 
     // Referring Domains query
     const referringDomainsQuery = baseQueries.referringDomains ?
-      createQueryWithDateRange(baseQueries.referringDomains.query, dateFilter, compare) : null;
+      createQueryWithDateRange(baseQueries.referringDomains.query, dateFilter, compare, effectiveClientId) : null;
     if (referringDomainsQuery) logFinalQuery('REFERRING_DOMAINS', referringDomainsQuery, effectiveClientId);
 
     // Dynamically detect retention queries (similar to funnel detection)
@@ -891,7 +998,7 @@ export async function GET(request: NextRequest) {
       // Extract the retention type from the query name
       // e.g., "dailyRetention" -> "daily", "cumulativeRetention" -> "cumulative", "retention" -> "retention"
       const retentionType = queryName.toLowerCase().replace('retention', '') || 'retention';
-      retentionQueries[retentionType] = createQueryWithDateRange((baseQueries as any)[queryName].query, dateFilter, compare);
+      retentionQueries[retentionType] = createQueryWithDateRange((baseQueries as any)[queryName].query, dateFilter, compare, effectiveClientId);
       logFinalQuery(`RETENTION_${retentionType.toUpperCase()}`, retentionQueries[retentionType], effectiveClientId);
     });
 
