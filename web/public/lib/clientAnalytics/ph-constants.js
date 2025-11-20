@@ -75,7 +75,10 @@ window.PH_KEYS = Object.freeze({
     PRODUCT_CATALOGUE_VIEWED : 'PRODUCT_CATALOGUE_VIEWED', // 🆕 NEW: Viewing the product catalogue
     PRODUCT_SEARCHED : 'PRODUCT_SEARCHED', // 🆕 NEW: Searching for a product
     PRODUCT_VIEWED :    'PRODUCT_VIEWED', // 🆕 NEW: Viewing a specific product
-    PRODUCT_SELECTED : 'PRODUCT_SELECTED', // 🆕 NEW: Selecting a specific product
+    PRODUCT_SELECTED : 'PRODUCT_SELECTED', // 🆕 NEW: Selecting a specific product (add to cart)
+    PRODUCT_REMOVED : 'PRODUCT_REMOVED', // 🆕 NEW: Removing a product from cart
+    CART_ITEM_QUANTITY_CHANGED : 'CART_ITEM_QUANTITY_CHANGED', // 🆕 NEW: Changing quantity of cart item
+    PURCHASE_CART_ADDED : 'PURCHASE_CART_ADDED', // 🆕 NEW: Adding a product to the purchase cart
     // Generic checkout events (optional)
     CHECKOUT_STARTED    : 'CHECKOUT_STARTED',
     CHECKOUT_COMPLETED : 'CHECKOUT_COMPLETED',
@@ -116,6 +119,9 @@ window.PH_PROPS = Object.freeze({
     UNIT_PRICE : 'unit_price',
     PRODUCT_NAME : 'product_name',
     PRODUCT_ID : 'product_id',
+    SUB_SELECTIONS : 'sub_selections',
+    ADD_ONS : 'add_ons',
+    ITEM_TOTAL : 'item_total',
     UTM_SOURCE : 'utm_source',
     UTM_MEDIUM : 'utm_medium',
     UTM_CAMPAIGN : 'utm_campaign'

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Confirmation - Test E-Commerce</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
+        
+        header { background: #fff; padding: 1rem 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .header-content { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: #d62828; }
+        
+        .container { max-width: 800px; margin: 4rem auto; padding: 0 2rem; }
+        
+        .confirmation-card { background: white; padding: 3rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center; }
+        
+        .success-icon { font-size: 4rem; margin-bottom: 1rem; }
+        h1 { color: #28a745; margin-bottom: 1rem; }
+        .order-number { color: #666; margin-bottom: 2rem; }
+        .order-number strong { color: #333; }
+        
+        .order-details { text-align: left; margin: 2rem 0; padding: 2rem; background: #f9f9f9; border-radius: 8px; }
+        h2 { margin-bottom: 1rem; color: #333; font-size: 1.2rem; }
+        
+        .order-item { padding: 1rem 0; border-bottom: 1px solid #ddd; }
+        .order-item:last-child { border-bottom: none; }
+        .item-header { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
+        .item-name { font-weight: 600; }
+        .item-price { color: #d62828; font-weight: bold; }
+        .item-details { color: #666; font-size: 0.9rem; }
+        
+        .order-totals { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 2px solid #ddd; }
+        .total-row { display: flex; justify-content: space-between; padding: 0.5rem 0; }
+        .total-row.grand-total { font-size: 1.2rem; font-weight: bold; margin-top: 0.5rem; padding-top: 1rem; border-top: 2px solid #333; }
+        
+        .actions { margin-top: 2rem; display: flex; gap: 1rem; justify-content: center; }
+        .btn { padding: 0.75rem 2rem; border: none; border-radius: 4px; font-size: 1rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #d62828; color: white; }
+        .btn-primary:hover { background: #b41f1f; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover { background: #545b62; }
+        
+        /* Tracking elements */
+        .ph-track-order-complete { display: none; }
+    </style>
+</head>
+<body>
+    <!-- Order completion tracking -->
+    <div class="ph-track-order-complete" 
+         data-ph="checkout_completed"
+         data-extract-cart="true"></div>
+    
+    <header>
+        <div class="header-content">
+            <div class="logo">🍴 Test Restaurant</div>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="confirmation-card">
+            <div class="success-icon">✅</div>
+            <h1>Order Confirmed!</h1>
+            <p class="order-number">Order Number: <strong id="order-number">ORD-123456</strong></p>
+            <p>Thank you for your order. We'll send you a confirmation email shortly.</p>
+            
+            <div class="order-details">
+                <h2>Order Summary</h2>
+                <div id="order-items"></div>
+                
+                <div class="order-totals">
+                    <div class="total-row">
+                        <span>Subtotal:</span>
+                        <span id="total-subtotal">$0.00</span>
+                    </div>
+                    <div class="total-row">
+                        <span>Tax:</span>
+                        <span id="total-tax">$0.00</span>
+                    </div>
+                    <div class="total-row">
+                        <span>Delivery Fee:</span>
+                        <span id="total-delivery">$0.00</span>
+                    </div>
+                    <div class="total-row grand-total">
+                        <span>Total Paid:</span>
+                        <span id="total-grand">$0.00</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="actions">
+                <a href="index.html" class="btn btn-primary">Continue Shopping</a>
+                <button class="btn btn-secondary" onclick="window.print()">Print Receipt</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Analytics Scripts -->
+    <script>
+        window.AskMeAnalyticsClientId = 'test-ecommerce';
+    </script>
+    <script src="/lib/clientAnalytics/ask-me-analytics.min.js"></script>
+    <script src="/lib/clientAnalytics/askme-analytics-init-v2.js"></script>
+    
+    <script>
+        function displayOrderConfirmation() {
+            const order = JSON.parse(localStorage.getItem('last-order'));
+            
+            if (!order) {
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            // Generate order number
+            const orderNumber = 'ORD-' + Math.floor(100000 + Math.random() * 900000);
+            document.getElementById('order-number').textContent = orderNumber;
+            
+            // Display order items
+            const orderItems = document.getElementById('order-items');
+            orderItems.innerHTML = order.items.map(item => {
+                const itemTotal = item.price * item.quantity;
+                return `
+                    <div class="order-item">
+                        <div class="item-header">
+                            <span class="item-name">${item.name}</span>
+                            <span class="item-price">$${itemTotal.toFixed(2)}</span>
+                        </div>
+                        <div class="item-details">
+                            Quantity: ${item.quantity} × $${item.price.toFixed(2)}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            // Display totals
+            document.getElementById('total-subtotal').textContent = `$${order.subtotal.toFixed(2)}`;
+            document.getElementById('total-tax').textContent = `$${order.tax.toFixed(2)}`;
+            document.getElementById('total-delivery').textContent = `$${order.delivery.toFixed(2)}`;
+            document.getElementById('total-grand').textContent = `$${order.total.toFixed(2)}`;
+            
+            console.log('📊 Order confirmation displayed:', {
+                orderNumber,
+                total: order.total,
+                items: order.items.length
+            });
+        }
+        
+        // Initialize
+        displayOrderConfirmation();
+    </script>
+</body>
+</html>

@@ -12,14 +12,16 @@
   "emailSelectors": "input[type=\"email\"], input[name*=\"email\" i], input[placeholder*=\"email\" i], input[id*=\"email\" i]",
   "analyticsLibraryPath": "/lib/clientAnalytics/ask-me-analytics.min.js",
   "constantsPath": "/lib/clientAnalytics/ph-constants.js",
-  "injectorPath": "/lib/clientAnalytics/ph-product-injector.js",
-  "productConfig": {
-    "eventName": "subscription_click",
-    "pageMatch": "/pricing",
-    "panelClass": "ph-track-product-item",
-    "titleClass": "text-2xl",
-    "priceClass": "text-4xl font-bold",
-    "productButtonSelectors": ".ph-track-product-select"
+  "injectorPath": "/lib/clientAnalytics/ph-product-injector-refactored.js",
+
+  "cartExtractorConfig": {
+    "cartContainerSelector": ".pricing-page, main, body",
+    "cartItemSelector": ".ph-track-product-item, [class*='pricing-card']",
+    "cartItemNameSelector": ".text-2xl, h2, h3, [class*='plan-name']",
+    "cartItemPriceSelector": ".text-4xl, [class*='price']",
+    "cartItemQuantitySelector": "[data-quantity]",
+    "currencySelector": ".currency, [class*='currency']",
+    "singleItemMode": true
   },
   "steps": [
     {
@@ -76,12 +78,12 @@
     {
       "key": "PRODUCT_SELECTED",
       "selector": ".ph-track-product-select",
-      "extractData": true
+      "extractCart": true
     },
      {
       "key": "CHECKOUT_STARTED",
       "selector": ".ph-track-product-select",
-      "extractData": true
+      "extractCart": true
     },
     {
       "key": "CHECKOUT_COMPLETED",

@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout - Test E-Commerce</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
+        
+        header { background: #fff; padding: 1rem 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .header-content { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: #d62828; }
+        .back-link { color: #666; text-decoration: none; }
+        .back-link:hover { color: #d62828; }
+        
+        .container { max-width: 1200px; margin: 2rem auto; padding: 0 2rem; display: grid; grid-template-columns: 1fr 400px; gap: 2rem; }
+        
+        .checkout-form { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        h1 { margin-bottom: 2rem; color: #333; }
+        h2 { margin: 1.5rem 0 1rem; color: #333; font-size: 1.2rem; }
+        
+        .form-group { margin-bottom: 1.5rem; }
+        label { display: block; margin-bottom: 0.5rem; color: #333; font-weight: 500; }
+        input[type="text"],
+        input[type="email"],
+        input[type="tel"],
+        select { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; }
+        input:focus, select:focus { outline: none; border-color: #d62828; }
+        
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        
+        .order-summary { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); align-self: start; position: sticky; top: 2rem; }
+        
+        .cart-item { padding: 1rem 0; border-bottom: 1px solid #eee; }
+        .cart-item:last-child { border-bottom: none; }
+        .item-header { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
+        .item-name { font-weight: 600; }
+        .item-price { color: #d62828; font-weight: bold; }
+        .item-details { display: flex; justify-content: space-between; color: #666; font-size: 0.9rem; }
+        
+        .sub-selections { margin-top: 0.5rem; padding-left: 1rem; }
+        .sub-selection { display: flex; justify-content: space-between; color: #666; font-size: 0.85rem; margin: 0.25rem 0; }
+        
+        .add-ons { margin-top: 0.5rem; padding-left: 1rem; }
+        .add-on { display: flex; justify-content: space-between; color: #666; font-size: 0.85rem; margin: 0.25rem 0; }
+        
+        .summary-row { display: flex; justify-content: space-between; padding: 0.75rem 0; }
+        .summary-row.total { border-top: 2px solid #ddd; margin-top: 1rem; padding-top: 1rem; font-size: 1.2rem; font-weight: bold; }
+        
+        .btn-place-order { width: 100%; padding: 1rem; background: #28a745; color: white; border: none; border-radius: 4px; font-size: 1.1rem; font-weight: 600; cursor: pointer; margin-top: 1rem; }
+        .btn-place-order:hover { background: #218838; }
+        
+        .payment-methods { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
+        .payment-method { flex: 1; padding: 1rem; border: 2px solid #ddd; border-radius: 4px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .payment-method:hover { border-color: #d62828; }
+        .payment-method.active { border-color: #d62828; background: #fff5f5; }
+        
+        /* Tracking elements */
+        .ph-track-checkout-start { display: none; }
+    </style>
+</head>
+<body>
+    <!-- Checkout start tracking -->
+    <div class="ph-track-checkout-start"></div>
+    
+    <header>
+        <div class="header-content">
+            <div class="logo">🍴 Test Restaurant</div>
+            <a href="index.html" class="back-link">← Back to Menu</a>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="checkout-form">
+            <h1>Checkout</h1>
+            
+            <h2>Contact Information</h2>
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" value="test@example.com" required>
+            </div>
+            
+            <h2>Delivery Information</h2>
+            <div class="form-group">
+                <label for="name">Full Name</label>
+                <input type="text" id="name" value="John Test" required>
+            </div>
+            <div class="form-group">
+                <label for="address">Street Address</label>
+                <input type="text" id="address" value="123 Test Street" required>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="city">City</label>
+                    <input type="text" id="city" value="New York" required>
+                </div>
+                <div class="form-group">
+                    <label for="zip">ZIP Code</label>
+                    <input type="text" id="zip" value="10001" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="phone">Phone</label>
+                <input type="tel" id="phone" value="(555) 123-4567" required>
+            </div>
+            
+            <h2>Payment Method</h2>
+            <div class="payment-methods">
+                <div class="payment-method active" data-method="card">
+                    💳 Card
+                </div>
+                <div class="payment-method" data-method="paypal">
+                    🅿️ PayPal
+                </div>
+                <div class="payment-method" data-method="cash">
+                    💵 Cash
+                </div>
+            </div>
+            
+            <div id="card-details">
+                <div class="form-group">
+                    <label for="card-number">Card Number</label>
+                    <input type="text" id="card-number" value="4242 4242 4242 4242">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="card-expiry">Expiry Date</label>
+                        <input type="text" id="card-expiry" value="12/28">
+                    </div>
+                    <div class="form-group">
+                        <label for="card-cvc">CVC</label>
+                        <input type="text" id="card-cvc" value="123">
+                    </div>
+                </div>
+            </div>
+            
+            <button class="btn-place-order" onclick="placeOrder()">Place Order</button>
+        </div>
+        
+        <div class="order-summary">
+            <h2>Order Summary</h2>
+            <div id="order-items"></div>
+            
+            <div class="summary-row">
+                <span>Subtotal:</span>
+                <span id="summary-subtotal">$0.00</span>
+            </div>
+            <div class="summary-row">
+                <span>Tax (8%):</span>
+                <span id="summary-tax">$0.00</span>
+            </div>
+            <div class="summary-row">
+                <span>Delivery Fee:</span>
+                <span id="summary-delivery">$3.99</span>
+            </div>
+            <div class="summary-row total">
+                <span>Total:</span>
+                <span id="summary-total">$0.00</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Analytics Scripts -->
+    <script>
+        window.AskMeAnalyticsClientId = 'test-ecommerce';
+    </script>
+    <script src="/lib/clientAnalytics/ask-me-analytics.min.js"></script>
+    <script src="/lib/clientAnalytics/askme-analytics-init-v2.js"></script>
+    
+    <script>
+        let cart = JSON.parse(localStorage.getItem('test-cart')) || [];
+        const TAX_RATE = 0.08;
+        const DELIVERY_FEE = 3.99;
+        
+        function displayOrderSummary() {
+            const orderItems = document.getElementById('order-items');
+            
+            if (cart.length === 0) {
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            let subtotal = 0;
+            
+            orderItems.innerHTML = cart.map(item => {
+                const itemTotal = item.price * item.quantity;
+                subtotal += itemTotal;
+                
+                let subSelectionsHTML = '';
+                if (item.sub_selections && item.sub_selections.length > 0) {
+                    subSelectionsHTML = `
+                        <div class="sub-selections">
+                            ${item.sub_selections.map(sub => `
+                                <div class="sub-selection">
+                                    <span>• ${sub.name}</span>
+                                    ${sub.price > 0 ? `<span>+$${sub.price.toFixed(2)}</span>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+                
+                let addOnsHTML = '';
+                if (item.add_ons && item.add_ons.length > 0) {
+                    addOnsHTML = `
+                        <div class="add-ons">
+                            ${item.add_ons.map(addon => `
+                                <div class="add-on">
+                                    <span>+ ${addon.name}</span>
+                                    <span>+$${addon.price.toFixed(2)}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+                
+                return `
+                    <div class="cart-item" data-cart-item="${item.id}">
+                        <div class="item-header">
+                            <span class="item-name">${item.name}</span>
+                            <span class="item-price">$${itemTotal.toFixed(2)}</span>
+                        </div>
+                        <div class="item-details">
+                            <span>Quantity: ${item.quantity}</span>
+                            <span>$${item.price.toFixed(2)} each</span>
+                        </div>
+                        ${subSelectionsHTML}
+                        ${addOnsHTML}
+                    </div>
+                `;
+            }).join('');
+            
+            const tax = subtotal * TAX_RATE;
+            const total = subtotal + tax + DELIVERY_FEE;
+            
+            document.getElementById('summary-subtotal').textContent = `$${subtotal.toFixed(2)}`;
+            document.getElementById('summary-tax').textContent = `$${tax.toFixed(2)}`;
+            document.getElementById('summary-total').textContent = `$${total.toFixed(2)}`;
+        }
+        
+        // Payment method selection
+        document.querySelectorAll('.payment-method').forEach(method => {
+            method.addEventListener('click', function() {
+                document.querySelectorAll('.payment-method').forEach(m => m.classList.remove('active'));
+                this.classList.add('active');
+                
+                const cardDetails = document.getElementById('card-details');
+                if (this.dataset.method === 'card') {
+                    cardDetails.style.display = 'block';
+                } else {
+                    cardDetails.style.display = 'none';
+                }
+            });
+        });
+        
+        function placeOrder() {
+            // Validate form
+            const email = document.getElementById('email').value;
+            const name = document.getElementById('name').value;
+            const address = document.getElementById('address').value;
+            
+            if (!email || !name || !address) {
+                alert('Please fill in all required fields');
+                return;
+            }
+            
+            console.log('🎉 Order placed successfully!');
+            console.log('📦 Order details:', {
+                customer: { email, name, address },
+                cart: cart,
+                totals: {
+                    subtotal: parseFloat(document.getElementById('summary-subtotal').textContent.replace('$', '')),
+                    tax: parseFloat(document.getElementById('summary-tax').textContent.replace('$', '')),
+                    delivery: DELIVERY_FEE,
+                    total: parseFloat(document.getElementById('summary-total').textContent.replace('$', ''))
+                }
+            });
+            
+            // Store order for confirmation page
+            localStorage.setItem('last-order', JSON.stringify({
+                items: cart,
+                subtotal: parseFloat(document.getElementById('summary-subtotal').textContent.replace('$', '')),
+                tax: parseFloat(document.getElementById('summary-tax').textContent.replace('$', '')),
+                delivery: DELIVERY_FEE,
+                total: parseFloat(document.getElementById('summary-total').textContent.replace('$', '')),
+                timestamp: new Date().toISOString()
+            }));
+            
+            // Clear cart
+            localStorage.removeItem('test-cart');
+            
+            // Redirect to confirmation
+            window.location.href = 'confirmation.html';
+        }
+        
+        // Initialize
+        displayOrderSummary();
+    </script>
+</body>
+</html>

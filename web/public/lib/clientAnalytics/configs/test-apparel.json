@@ -1,0 +1,48 @@
+{
+  "clientId": "test-apparel",
+  "debug": true,
+  "apiKey": "phc_MN5MXCec7lNZtZakqpRQZqTLaPfcV6CxeE8hfbTUFE2",
+  "apiHost": "https://us.i.posthog.com",
+  "autocapture": false,
+  "useBuiltInPageview": true,
+  "capture_pageview": true,
+  "capture_pageleave": true,
+  "enableCustomDomTracking": false,
+  "preferCustomOverAutocapture": false,
+  "emailSelectors": "input[type=\"email\"], input[name*=\"email\" i], input[placeholder*=\"email\" i], input[id*=\"email\" i]",
+  "analyticsLibraryPath": "/lib/clientAnalytics/ask-me-analytics.min.js",
+  "constantsPath": "/lib/clientAnalytics/ph-constants.js",
+  "injectorPath": "/lib/clientAnalytics/ph-product-injector-refactored.js",
+  
+  "cartExtractorConfig": {
+    "cartContainerSelector": "#cart-items",
+    "cartItemSelector": ".cart-item, [data-cart-item]",
+    "cartItemNameSelector": ".item-name, [data-product-name]",
+    "cartItemPriceSelector": ".item-price, [data-price]",
+    "cartItemQuantitySelector": ".item-quantity, [data-quantity]",
+    "currencySelector": "[data-currency]",
+    "cartItemAttributesSelector": ".item-attribute, [data-attribute-name]"
+  },
+  
+  "steps": [
+    {
+      "key": "PRICING_PAGE_VIEWED",
+      "url": "/test-ecommerce/apparel.html",
+      "urlMatch": "contains",
+      "selector": ".ph-track-pricing-view",
+      "requireSelectorPresent": true,
+      "autoFire": true,
+      "oncePerPath": true
+    },
+    {
+      "key": "PRODUCT_SELECTED",
+      "selector": ".ph-track-add-to-cart, [data-ph*='product_selected']",
+      "extractCart": true
+    },
+    {
+      "key": "PRODUCT_REMOVED",
+      "selector": ".btn-remove-item, [data-ph*='product_removed']",
+      "extractCart": true
+    }
+  ]
+}

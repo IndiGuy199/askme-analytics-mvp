@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tour of Italy - Test E-Commerce</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
+        
+        header { background: #fff; padding: 1rem 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .header-content { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: #d62828; }
+        .back-link { color: #666; text-decoration: none; }
+        .back-link:hover { color: #d62828; }
+        
+        .container { max-width: 1200px; margin: 2rem auto; padding: 0 2rem; display: grid; grid-template-columns: 1fr 400px; gap: 2rem; }
+        
+        .product-detail { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        
+        .product-image { width: 100%; height: 400px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 5rem; margin-bottom: 2rem; }
+        
+        h1 { color: #333; margin-bottom: 0.5rem; }
+        .product-meta { display: flex; gap: 2rem; margin-bottom: 1rem; color: #666; }
+        .product-price { font-size: 2rem; color: #d62828; font-weight: bold; margin-bottom: 1.5rem; }
+        .product-description { color: #666; line-height: 1.6; margin-bottom: 2rem; }
+        
+        .customization-section { margin-bottom: 2rem; }
+        .section-title { font-size: 1.2rem; color: #333; margin-bottom: 1rem; font-weight: 600; }
+        .section-description { color: #666; font-size: 0.9rem; margin-bottom: 1rem; }
+        
+        .sub-selections { display: grid; gap: 0.75rem; }
+        .sub-selection-option { padding: 1rem; border: 2px solid #ddd; border-radius: 4px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; }
+        .sub-selection-option:hover { border-color: #d62828; }
+        .sub-selection-option.selected { border-color: #d62828; background: #fff5f5; }
+        .sub-selection-option input[type="radio"] { margin-right: 1rem; }
+        .option-details { flex: 1; }
+        .option-name { font-weight: 600; display: block; margin-bottom: 0.25rem; }
+        .option-description { color: #666; font-size: 0.85rem; }
+        .option-price { color: #d62828; font-weight: bold; }
+        
+        .add-ons { display: grid; gap: 0.75rem; }
+        .add-on-option { padding: 1rem; border: 2px solid #ddd; border-radius: 4px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; }
+        .add-on-option:hover { border-color: #d62828; }
+        .add-on-option.selected { border-color: #d62828; background: #fff5f5; }
+        .add-on-option input[type="checkbox"] { margin-right: 1rem; }
+        
+        .quantity-selector { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
+        .quantity-label { font-weight: 600; }
+        .quantity-controls { display: flex; align-items: center; gap: 0.5rem; }
+        .quantity-btn { width: 40px; height: 40px; border: 2px solid #ddd; background: white; border-radius: 4px; font-size: 1.2rem; cursor: pointer; }
+        .quantity-btn:hover { border-color: #d62828; color: #d62828; }
+        .quantity-value { width: 60px; text-align: center; font-size: 1.2rem; font-weight: 600; }
+        
+        .btn-add-to-cart { width: 100%; padding: 1rem; background: #d62828; color: white; border: none; border-radius: 4px; font-size: 1.1rem; font-weight: 600; cursor: pointer; }
+        .btn-add-to-cart:hover { background: #b41f1f; }
+        
+        .cart-summary { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); align-self: start; position: sticky; top: 2rem; }
+        .cart-total { display: flex; justify-content: space-between; font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem; padding: 1rem 0; border-top: 2px solid #ddd; }
+        .btn-view-cart { width: 100%; padding: 1rem; background: #28a745; color: white; border: none; border-radius: 4px; font-size: 1.1rem; font-weight: 600; cursor: pointer; }
+        .btn-view-cart:hover { background: #218838; }
+        
+        /* Tracking elements */
+        .ph-track-product-view { display: none; }
+    </style>
+</head>
+<body>
+    <!-- Product view tracking -->
+    <div class="ph-track-product-view"></div>
+    
+    <header>
+        <div class="header-content">
+            <div class="logo">🍴 Test Restaurant</div>
+            <a href="index.html" class="back-link">← Back to Menu</a>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="product-detail">
+            <div class="product-image">🍝</div>
+            
+            <h1 id="product-name">Tour of Italy</h1>
+            <div class="product-meta">
+                <span>⭐ 4.8 (245 reviews)</span>
+                <span>🔥 Popular Choice</span>
+                <span>🕒 35-40 min</span>
+            </div>
+            <div class="product-price" id="total-price" data-base-price="24.99">$24.99</div>
+            <p class="product-description">
+                Experience three Italian favorites on one plate. Our homemade Lasagna Classico, 
+                lightly breaded chicken parmigiana, and creamy fettuccine Alfredo - all with homemade 
+                marinara and signature Alfredo sauces.
+            </p>
+            
+            <!-- Sub-Selections (Choose One) -->
+            <div class="customization-section">
+                <div class="section-title">Choose Your Side (Select One)</div>
+                <div class="section-description">Includes your choice of soup or salad</div>
+                <div class="sub-selections">
+                    <label class="sub-selection-option selected" data-sub-selection-group="side">
+                        <input type="radio" name="side" value="garden-salad" checked data-sub-selection-name="Garden Salad" data-sub-selection-price="0">
+                        <div class="option-details">
+                            <span class="option-name">Garden Salad</span>
+                            <span class="option-description">Fresh greens with Italian dressing</span>
+                        </div>
+                        <span class="option-price">Included</span>
+                    </label>
+                    <label class="sub-selection-option" data-sub-selection-group="side">
+                        <input type="radio" name="side" value="caesar-salad" data-sub-selection-name="Caesar Salad" data-sub-selection-price="2.99">
+                        <div class="option-details">
+                            <span class="option-name">Caesar Salad</span>
+                            <span class="option-description">Romaine lettuce, parmesan, croutons</span>
+                        </div>
+                        <span class="option-price">+$2.99</span>
+                    </label>
+                    <label class="sub-selection-option" data-sub-selection-group="side">
+                        <input type="radio" name="side" value="minestrone-soup" data-sub-selection-name="Minestrone Soup" data-sub-selection-price="1.99">
+                        <div class="option-details">
+                            <span class="option-name">Minestrone Soup</span>
+                            <span class="option-description">Italian vegetable soup</span>
+                        </div>
+                        <span class="option-price">+$1.99</span>
+                    </label>
+                    <label class="sub-selection-option" data-sub-selection-group="side">
+                        <input type="radio" name="side" value="soup-of-day" data-sub-selection-name="Soup of the Day" data-sub-selection-price="1.99">
+                        <div class="option-details">
+                            <span class="option-name">Soup of the Day</span>
+                            <span class="option-description">Ask your server</span>
+                        </div>
+                        <span class="option-price">+$1.99</span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Add-Ons (Choose Multiple) -->
+            <div class="customization-section">
+                <div class="section-title">Add Extras (Optional)</div>
+                <div class="section-description">Enhance your meal with these delicious add-ons</div>
+                <div class="add-ons">
+                    <label class="add-on-option">
+                        <input type="checkbox" value="breadsticks" data-add-on-name="Breadsticks" data-add-on-price="4.99">
+                        <div class="option-details">
+                            <span class="option-name">Unlimited Breadsticks</span>
+                            <span class="option-description">Freshly baked with garlic butter</span>
+                        </div>
+                        <span class="option-price">+$4.99</span>
+                    </label>
+                    <label class="add-on-option">
+                        <input type="checkbox" value="extra-sauce" data-add-on-name="Extra Sauce" data-add-on-price="1.99">
+                        <div class="option-details">
+                            <span class="option-name">Extra Sauce</span>
+                            <span class="option-description">Marinara or Alfredo</span>
+                        </div>
+                        <span class="option-price">+$1.99</span>
+                    </label>
+                    <label class="add-on-option">
+                        <input type="checkbox" value="tiramisu" data-add-on-name="Tiramisu" data-add-on-price="7.99">
+                        <div class="option-details">
+                            <span class="option-name">Tiramisu</span>
+                            <span class="option-description">Classic Italian dessert</span>
+                        </div>
+                        <span class="option-price">+$7.99</span>
+                    </label>
+                    <label class="add-on-option">
+                        <input type="checkbox" value="italian-soda" data-add-on-name="Italian Soda" data-add-on-price="3.49">
+                        <div class="option-details">
+                            <span class="option-name">Italian Soda</span>
+                            <span class="option-description">Choice of flavors</span>
+                        </div>
+                        <span class="option-price">+$3.49</span>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="quantity-selector">
+                <span class="quantity-label">Quantity:</span>
+                <div class="quantity-controls">
+                    <button class="quantity-btn" onclick="changeQuantity(-1)">-</button>
+                    <span class="quantity-value" id="quantity">1</span>
+                    <button class="quantity-btn" onclick="changeQuantity(1)">+</button>
+                </div>
+            </div>
+            
+            <button class="btn-add-to-cart" onclick="addToCart()">Add to Cart - <span id="add-to-cart-price">$24.99</span></button>
+        </div>
+        
+        <div class="cart-summary">
+            <h2>Your Configuration</h2>
+            <div id="config-summary"></div>
+            <div class="cart-total">
+                <span>Total:</span>
+                <span id="config-total">$24.99</span>
+            </div>
+            <button class="btn-view-cart" onclick="goToCheckout()">View Cart & Checkout</button>
+        </div>
+    </div>
+    
+    <!-- Analytics Scripts -->
+    <script>
+        window.AskMeAnalyticsClientId = 'test-ecommerce';
+    </script>
+    <script src="/lib/clientAnalytics/ask-me-analytics.min.js"></script>
+    <script src="/lib/clientAnalytics/askme-analytics-init-v2.js"></script>
+    
+    <script>
+        const BASE_PRICE = 24.99;
+        let quantity = 1;
+        
+        // Initialize sub-selection listeners
+        document.querySelectorAll('.sub-selection-option').forEach(option => {
+            option.addEventListener('click', function() {
+                const group = this.dataset.subSelectionGroup;
+                document.querySelectorAll(`[data-sub-selection-group="${group}"]`).forEach(opt => {
+                    opt.classList.remove('selected');
+                });
+                this.classList.add('selected');
+                this.querySelector('input').checked = true;
+                updatePrice();
+            });
+        });
+        
+        // Initialize add-on listeners
+        document.querySelectorAll('.add-on-option').forEach(option => {
+            option.addEventListener('click', function() {
+                const checkbox = this.querySelector('input[type="checkbox"]');
+                checkbox.checked = !checkbox.checked;
+                this.classList.toggle('selected', checkbox.checked);
+                updatePrice();
+            });
+        });
+        
+        function changeQuantity(delta) {
+            quantity = Math.max(1, quantity + delta);
+            document.getElementById('quantity').textContent = quantity;
+            updatePrice();
+        }
+        
+        function updatePrice() {
+            let total = BASE_PRICE;
+            
+            // Add sub-selection prices
+            const selectedSubSelections = document.querySelectorAll('.sub-selection-option.selected input');
+            selectedSubSelections.forEach(input => {
+                total += parseFloat(input.dataset.subSelectionPrice || 0);
+            });
+            
+            // Add add-on prices
+            const selectedAddOns = document.querySelectorAll('.add-on-option input:checked');
+            selectedAddOns.forEach(input => {
+                total += parseFloat(input.dataset.addOnPrice || 0);
+            });
+            
+            // Multiply by quantity
+            const finalTotal = total * quantity;
+            
+            document.getElementById('total-price').textContent = `$${total.toFixed(2)}`;
+            document.getElementById('add-to-cart-price').textContent = `$${finalTotal.toFixed(2)}`;
+            document.getElementById('config-total').textContent = `$${finalTotal.toFixed(2)}`;
+            
+            updateConfigSummary(total);
+        }
+        
+        function updateConfigSummary(unitPrice) {
+            const summary = [];
+            
+            // Base item
+            summary.push(`<div style="padding: 0.5rem 0; border-bottom: 1px solid #eee;">
+                <strong>Tour of Italy</strong><br>
+                <span style="color: #666;">Base Price: $${BASE_PRICE.toFixed(2)}</span>
+            </div>`);
+            
+            // Sub-selections
+            const selectedSide = document.querySelector('.sub-selection-option.selected input');
+            if (selectedSide) {
+                const price = parseFloat(selectedSide.dataset.subSelectionPrice || 0);
+                summary.push(`<div style="padding: 0.5rem 0; border-bottom: 1px solid #eee;">
+                    <strong>Side:</strong> ${selectedSide.dataset.subSelectionName}<br>
+                    <span style="color: #666;">${price > 0 ? '+$' + price.toFixed(2) : 'Included'}</span>
+                </div>`);
+            }
+            
+            // Add-ons
+            const selectedAddOns = document.querySelectorAll('.add-on-option input:checked');
+            if (selectedAddOns.length > 0) {
+                selectedAddOns.forEach(addon => {
+                    const price = parseFloat(addon.dataset.addOnPrice || 0);
+                    summary.push(`<div style="padding: 0.5rem 0; border-bottom: 1px solid #eee;">
+                        <strong>Add-on:</strong> ${addon.dataset.addOnName}<br>
+                        <span style="color: #666;">+$${price.toFixed(2)}</span>
+                    </div>`);
+                });
+            }
+            
+            // Quantity
+            summary.push(`<div style="padding: 0.5rem 0; color: #666;">
+                Quantity: ${quantity}
+            </div>`);
+            
+            document.getElementById('config-summary').innerHTML = summary.join('');
+        }
+        
+        function addToCart() {
+            const cart = JSON.parse(localStorage.getItem('test-cart')) || [];
+            
+            // Calculate unit price with customizations
+            let unitPrice = BASE_PRICE;
+            
+            // Get sub-selections
+            const subSelections = [];
+            const selectedSide = document.querySelector('.sub-selection-option.selected input');
+            if (selectedSide) {
+                const price = parseFloat(selectedSide.dataset.subSelectionPrice || 0);
+                subSelections.push({
+                    name: selectedSide.dataset.subSelectionName,
+                    price: price
+                });
+                unitPrice += price;
+            }
+            
+            // Get add-ons
+            const addOns = [];
+            const selectedAddOns = document.querySelectorAll('.add-on-option input:checked');
+            selectedAddOns.forEach(addon => {
+                const price = parseFloat(addon.dataset.addOnPrice || 0);
+                addOns.push({
+                    name: addon.dataset.addOnName,
+                    price: price
+                });
+                unitPrice += price;
+            });
+            
+            // Create cart item
+            const item = {
+                id: 'tour-of-italy-' + Date.now(),
+                name: 'Tour of Italy',
+                price: unitPrice,
+                currency: 'USD',
+                quantity: quantity,
+                sub_selections: subSelections,
+                add_ons: addOns
+            };
+            
+            cart.push(item);
+            localStorage.setItem('test-cart', JSON.stringify(cart));
+            
+            console.log('✅ Added to cart:', item);
+            alert(`Added ${quantity}x Tour of Italy to cart!\nTotal: $${(unitPrice * quantity).toFixed(2)}`);
+        }
+        
+        function goToCheckout() {
+            window.location.href = 'checkout.html';
+        }
+        
+        // Initialize
+        updatePrice();
+    </script>
+</body>
+</html>

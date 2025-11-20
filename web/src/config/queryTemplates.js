@@ -223,7 +223,7 @@ export const QUERY_TEMPLATES = {
         breakdown: '$device_type',
         breakdown_type: 'event'
       },
-      filterTestAccounts: true
+      filterTestAccounts: false
     },
     full: true
   }),
@@ -543,7 +543,7 @@ export const QUERY_TEMPLATES = {
         breakdown_type: "event"
       },
       interval: "day",
-      filterTestAccounts: true
+      filterTestAccounts: false
     },
     full: true
   })

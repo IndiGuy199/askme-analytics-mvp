@@ -25,7 +25,7 @@ export default function RootLayout({
          window.AskMeAnalyticsClientId = 'askme-analytics-app';
        `}} />
       <script 
-        src="/lib/clientAnalytics/askme-analytics-init.js?v=3"
+        src="/lib/clientAnalytics/askme-analytics-init-v2.js"
         async 
         defer>
       </script>

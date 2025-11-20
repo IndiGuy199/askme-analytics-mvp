@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apparel Store - Test E-Commerce</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
+        
+        header { background: #fff; padding: 1rem 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .header-content { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: #2563eb; }
+        
+        .container { max-width: 1200px; margin: 2rem auto; padding: 0 2rem; display: grid; grid-template-columns: 1fr 350px; gap: 2rem; }
+        
+        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; }
+        
+        .product-card { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.2s; }
+        .product-card:hover { transform: translateY(-4px); }
+        
+        .product-image { width: 100%; height: 280px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; font-size: 4rem; }
+        
+        .product-info { padding: 1.5rem; }
+        .product-name { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; }
+        .product-price { font-size: 1.5rem; color: #2563eb; font-weight: bold; margin-bottom: 1rem; }
+        
+        .attribute-selector { margin-bottom: 1rem; }
+        .attribute-label { font-weight: 500; margin-bottom: 0.5rem; display: block; }
+        .attribute-options { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .attribute-option { padding: 0.5rem 1rem; border: 2px solid #ddd; border-radius: 4px; cursor: pointer; background: white; }
+        .attribute-option.selected { border-color: #2563eb; background: #eff6ff; }
+        
+        .btn-add { width: 100%; padding: 0.75rem; background: #2563eb; color: white; border: none; border-radius: 4px; font-weight: 600; cursor: pointer; }
+        .btn-add:hover { background: #1d4ed8; }
+        
+        .cart-sidebar { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); align-self: start; position: sticky; top: 2rem; }
+        .cart-header { font-size: 1.3rem; font-weight: bold; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 2px solid #eee; }
+        
+        .cart-item { padding: 1rem 0; border-bottom: 1px solid #eee; }
+        .cart-item-name { font-weight: 600; margin-bottom: 0.25rem; }
+        .cart-item-attributes { font-size: 0.85rem; color: #666; margin-bottom: 0.5rem; }
+        .cart-item-details { display: flex; justify-content: space-between; align-items: center; }
+        .cart-item-price { font-weight: bold; color: #2563eb; }
+        .btn-remove { padding: 0.25rem 0.75rem; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+        
+        .cart-total { margin-top: 1rem; padding-top: 1rem; border-top: 2px solid #ddd; font-size: 1.2rem; font-weight: bold; display: flex; justify-content: space-between; }
+        .btn-checkout { width: 100%; padding: 1rem; background: #10b981; color: white; border: none; border-radius: 4px; font-size: 1.1rem; font-weight: 600; cursor: pointer; margin-top: 1rem; }
+        .btn-checkout:hover { background: #059669; }
+        
+        .ph-track-pricing-view { display: none; }
+    </style>
+</head>
+<body>
+    <div class="ph-track-pricing-view"></div>
+    
+    <header>
+        <div class="header-content">
+            <div class="logo">👕 Apparel Store</div>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="product-grid" id="products"></div>
+        
+        <div class="cart-sidebar">
+            <div class="cart-header">Shopping Cart</div>
+            <div id="cart-items">
+                <p style="color: #999; text-align: center; padding: 2rem 0;">Your cart is empty</p>
+            </div>
+            <div class="cart-total">
+                <span>Total:</span>
+                <span id="cart-total">$0.00</span>
+            </div>
+            <button class="btn-checkout" onclick="goToCheckout()" style="display: none;" id="checkout-btn">Proceed to Checkout</button>
+        </div>
+    </div>
+    
+    <!-- Analytics Scripts -->
+    <script>
+        window.AskMeAnalyticsClientId = 'test-apparel';
+    </script>
+    <script src="/lib/clientAnalytics/ask-me-analytics.min.js"></script>
+    <script src="/lib/clientAnalytics/askme-analytics-init-v2.js"></script>
+    
+    <script>
+        const products = [
+            {
+                id: 'hoodie-001',
+                name: 'Classic Pullover Hoodie',
+                price: 74.95,
+                currency: 'USD',
+                image: '👕',
+                colors: ['Gray', 'Black', 'Navy', 'Beige'],
+                sizes: ['XS', 'S', 'M', 'L', 'XL', '2XL']
+            },
+            {
+                id: 'tshirt-001',
+                name: 'Premium Cotton T-Shirt',
+                price: 29.95,
+                currency: 'USD',
+                image: '👔',
+                colors: ['White', 'Black', 'Gray', 'Red', 'Blue'],
+                sizes: ['S', 'M', 'L', 'XL', '2XL']
+            },
+            {
+                id: 'jeans-001',
+                name: 'Slim Fit Jeans',
+                price: 89.95,
+                currency: 'USD',
+                image: '👖',
+                colors: ['Dark Blue', 'Light Blue', 'Black'],
+                sizes: ['28', '30', '32', '34', '36', '38']
+            },
+            {
+                id: 'jacket-001',
+                name: 'Winter Jacket',
+                price: 149.95,
+                currency: 'USD',
+                image: '🧥',
+                colors: ['Black', 'Navy', 'Olive Green'],
+                sizes: ['S', 'M', 'L', 'XL', '2XL']
+            }
+        ];
+        
+        let cart = JSON.parse(localStorage.getItem('test-apparel-cart')) || [];
+        
+        function renderProducts() {
+            const grid = document.getElementById('products');
+            
+            grid.innerHTML = products.map(product => `
+                <div class="product-card" data-product-id="${product.id}">
+                    <div class="product-image">${product.image}</div>
+                    <div class="product-info">
+                        <div class="product-name" data-product-name="${product.name}">${product.name}</div>
+                        <div class="product-price" data-price="${product.price}" data-currency="${product.currency}">$${product.price.toFixed(2)}</div>
+                        
+                        <div class="attribute-selector">
+                            <label class="attribute-label">Color:</label>
+                            <div class="attribute-options" data-attribute-type="color">
+                                ${product.colors.map(color => `
+                                    <button class="attribute-option" data-attribute-name="color" data-attribute-value="${color}">${color}</button>
+                                `).join('')}
+                            </div>
+                        </div>
+                        
+                        <div class="attribute-selector">
+                            <label class="attribute-label">Size:</label>
+                            <div class="attribute-options" data-attribute-type="size">
+                                ${product.sizes.map(size => `
+                                    <button class="attribute-option" data-attribute-name="size" data-attribute-value="${size}">${size}</button>
+                                `).join('')}
+                            </div>
+                        </div>
+                        
+                        <button class="btn-add ph-track-add-to-cart" onclick="addToCart('${product.id}')">Add to Cart</button>
+                    </div>
+                </div>
+            `).join('');
+            
+            // Add attribute selection handlers
+            document.querySelectorAll('.attribute-option').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const type = this.closest('.attribute-options').dataset.attributeType;
+                    const card = this.closest('.product-card');
+                    card.querySelectorAll(`[data-attribute-type="${type}"] .attribute-option`).forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    this.classList.add('selected');
+                });
+            });
+        }
+        
+        function addToCart(productId) {
+            const product = products.find(p => p.id === productId);
+            const card = document.querySelector(`[data-product-id="${productId}"]`);
+            
+            // Get selected attributes
+            const selectedColor = card.querySelector('[data-attribute-name="color"].selected');
+            const selectedSize = card.querySelector('[data-attribute-name="size"].selected');
+            
+            if (!selectedColor || !selectedSize) {
+                alert('Please select color and size');
+                return;
+            }
+            
+            const cartItem = {
+                id: `${productId}-${selectedColor.dataset.attributeValue}-${selectedSize.dataset.attributeValue}`,
+                productId: productId,
+                name: product.name,
+                price: product.price,
+                currency: product.currency,
+                quantity: 1,
+                attributes: {
+                    color: selectedColor.dataset.attributeValue,
+                    size: selectedSize.dataset.attributeValue
+                }
+            };
+            
+            // Check if item with same attributes already exists
+            const existingIndex = cart.findIndex(item => item.id === cartItem.id);
+            if (existingIndex >= 0) {
+                cart[existingIndex].quantity++;
+            } else {
+                cart.push(cartItem);
+            }
+            
+            localStorage.setItem('test-apparel-cart', JSON.stringify(cart));
+            renderCart();
+            
+            console.log('✅ Added to cart:', cartItem);
+        }
+        
+        function removeFromCart(itemId) {
+            cart = cart.filter(item => item.id !== itemId);
+            localStorage.setItem('test-apparel-cart', JSON.stringify(cart));
+            renderCart();
+        }
+        
+        function renderCart() {
+            const cartItems = document.getElementById('cart-items');
+            const checkoutBtn = document.getElementById('checkout-btn');
+            
+            if (cart.length === 0) {
+                cartItems.innerHTML = '<p style="color: #999; text-align: center; padding: 2rem 0;">Your cart is empty</p>';
+                checkoutBtn.style.display = 'none';
+                document.getElementById('cart-total').textContent = '$0.00';
+                return;
+            }
+            
+            let total = 0;
+            
+            cartItems.innerHTML = cart.map(item => {
+                const itemTotal = item.price * item.quantity;
+                total += itemTotal;
+                
+                return `
+                    <div class="cart-item" data-cart-item="${item.id}">
+                        <div class="cart-item-name item-name" data-product-name="${item.name}">${item.name}</div>
+                        <div class="cart-item-attributes">
+                            <span class="item-attribute" data-attribute-name="color">Color: ${item.attributes.color}</span> | 
+                            <span class="item-attribute" data-attribute-name="size">Size: ${item.attributes.size}</span>
+                        </div>
+                        <div class="cart-item-details">
+                            <span>Qty: <span class="item-quantity" data-quantity="${item.quantity}">${item.quantity}</span></span>
+                            <span class="cart-item-price item-price" data-price="${item.price}">$${itemTotal.toFixed(2)}</span>
+                        </div>
+                        <button class="btn-remove btn-remove-item" onclick="removeFromCart('${item.id}')">Remove</button>
+                    </div>
+                `;
+            }).join('');
+            
+            document.getElementById('cart-total').textContent = `$${total.toFixed(2)}`;
+            checkoutBtn.style.display = 'block';
+        }
+        
+        function goToCheckout() {
+            window.location.href = '../checkout.html';
+        }
+        
+        // Initialize
+        renderProducts();
+        renderCart();
+    </script>
+</body>
+</html>
