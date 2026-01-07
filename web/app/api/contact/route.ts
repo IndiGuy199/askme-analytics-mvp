@@ -1,7 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+// Create Gmail transporter for SMS gateway (no restrictions)
+const gmailTransporter = process.env.GMAIL_APP_PASSWORD ? nodemailer.createTransport({
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true, // use SSL
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_APP_PASSWORD,
+  },
+  tls: {
+    rejectUnauthorized: false
+  }
+}) : null;
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,7 +30,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Send email using Resend
+    // Send email notification to Gmail
     const { data, error } = await resend.emails.send({
       from: process.env.SMTP_FROM || 'onboarding@resend.dev',
       to: 'proservices330@gmail.com',
@@ -52,6 +67,24 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to send email', details: error.message },
         { status: 500 }
       );
+    }
+
+    // Send SMS notification via email-to-SMS gateway using Gmail SMTP
+    if (process.env.SMS_EMAIL_GATEWAY && gmailTransporter) {
+      try {
+        console.log('Attempting to send SMS to:', process.env.SMS_EMAIL_GATEWAY);
+        await gmailTransporter.sendMail({
+          from: process.env.GMAIL_USER,
+          to: process.env.SMS_EMAIL_GATEWAY,
+          subject: 'New Contact',
+          text: `Contact: ${name} (${email}) | ${company || 'N/A'} | ${subject}`,
+        });
+        console.log('SMS notification sent successfully via Gmail');
+      } catch (smsError: any) {
+        console.error('Failed to send SMS notification:', smsError);
+      }
+    } else {
+      console.log('Gmail SMTP not configured, skipping SMS');
     }
 
     return NextResponse.json(

@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { getRedirectUrl } from '@/lib/auth-utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Mail, ArrowRight, Sparkles, BarChart3, Users, Zap } from 'lucide-react'
+import { Mail, ArrowRight, Sparkles, BarChart3, Users, Zap, ArrowLeft } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -81,6 +82,14 @@ export default function LoginPage() {
       
       <div className="flex-1 flex items-center justify-center px-4 py-8 relative">
         <div className="w-full max-w-md space-y-8">
+          {/* Back to Home Link */}
+          <div className="text-center">
+            <Link href="/" className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors">
+              <ArrowLeft className="h-4 w-4" />
+              <span className="font-medium">Back to Home</span>
+            </Link>
+          </div>
+
           {/* Logo/Brand */}
           <div className="text-center">
             <div className="inline-flex items-center gap-3 mb-6">

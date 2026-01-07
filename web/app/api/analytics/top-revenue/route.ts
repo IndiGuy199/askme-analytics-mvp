@@ -8,8 +8,10 @@ import { getTopRevenue } from '@/lib/queries/revenue'
  * - companyId: Company ID (required)
  * - from: Start date (default: '30d')
  * - to: End date (default: 'now')
+ * - compare: Whether to include previous period data (default: false)
  * 
  * Returns top revenue items aggregated by product_name
+ * When compare=true, also returns previousData for comparison
  */
 export async function GET(req: NextRequest) {
   try {
@@ -17,6 +19,7 @@ export async function GET(req: NextRequest) {
     const companyId = searchParams.get('companyId')
     const from = searchParams.get('from') ?? '30d'
     const to = searchParams.get('to') ?? 'now'
+    const compare = searchParams.get('compare') === 'true'
 
     if (!companyId) {
       return NextResponse.json(
@@ -25,11 +28,15 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    console.log('[Top Revenue API] Query:', { companyId, from, to })
+    console.log('[Top Revenue API] Query:', { companyId, from, to, compare })
 
-    const data = await getTopRevenue({ companyId, from, to })
+    const result = await getTopRevenue({ companyId, from, to, compare })
 
-    return NextResponse.json({ ok: true, data })
+    return NextResponse.json({ 
+      ok: true, 
+      data: result.data,
+      ...(result.previousData && { previousData: result.previousData })
+    })
   } catch (error) {
     console.error('[Top Revenue API] Error:', error)
     return NextResponse.json(

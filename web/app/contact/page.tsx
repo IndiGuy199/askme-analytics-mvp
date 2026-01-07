@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Mail, Phone, MapPin, Send } from 'lucide-react'
+import Link from 'next/link'
+import { Mail, Phone, MapPin, Send, ArrowLeft, BarChart3 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -65,9 +66,14 @@ export default function ContactPage() {
             <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">
               Thank you for contacting us. We'll get back to you within 24 hours.
             </p>
-            <Button onClick={() => setIsSuccess(false)} className="w-full text-sm sm:text-base">
-              Send Another Message
-            </Button>
+            <div className="space-y-3">
+              <Button onClick={() => setIsSuccess(false)} className="w-full text-sm sm:text-base">
+                Send Another Message
+              </Button>
+              <Button variant="outline" asChild className="w-full text-sm sm:text-base">
+                <Link href="/">Return to Home</Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -83,11 +89,24 @@ export default function ContactPage() {
       </div>
 
       <div className="relative max-w-7xl mx-auto px-4 py-8 sm:py-12 lg:py-16">
+        {/* Navigation Header */}
+        <div className="mb-8">
+          <Link href="/" className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors">
+            <ArrowLeft className="h-5 w-5" />
+            <span className="font-medium">Back to Home</span>
+          </Link>
+        </div>
+
         {/* Header */}
         <div className="text-center mb-8 sm:mb-12 lg:mb-16">
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-3 sm:mb-4">Get in Touch</h1>
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="p-2 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl">
+              <BarChart3 className="h-6 w-6 text-white" />
+            </div>
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900">Get in Touch</h1>
+          </div>
           <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-2xl mx-auto px-4">
-            Have questions about our analytics platform? We'd love to hear from you.
+            Ready for your free conversion check? Let's talk about protecting your website's performance.
           </p>
         </div>
 

@@ -6,9 +6,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { BarChart3, Settings, Users, Zap, LogOut, Shield, Brain } from 'lucide-react'
-import RevenueByChannelCard from '@/components/analytics/RevenueByChannelCard'
-import TopRevenueItemsCard from '@/components/analytics/TopRevenueItemsCard'
+import { BarChart3, Settings, Users, Zap, LogOut, Shield, Brain, DollarSign } from 'lucide-react'
 
 interface User {
   id: string
@@ -501,17 +499,6 @@ export default function DashboardPage() {
                 </Card>
               </div>
 
-              {/* Revenue Analytics Cards */}
-              {company && (
-                <div className="mb-8">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4">Revenue Analytics</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <RevenueByChannelCard companyId={company.id} from="30d" to="now" />
-                    <TopRevenueItemsCard companyId={company.id} from="30d" to="now" />
-                  </div>
-                </div>
-              )}
-
               {/* Analytics Content */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2">
@@ -622,6 +609,14 @@ export default function DashboardPage() {
                       >
                         <BarChart3 className="mr-2 h-4 w-4" />
                         Standard Web Analytics
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        className="w-full justify-start bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 hover:from-green-100 hover:to-emerald-100"
+                        onClick={() => router.push('/revenue-analytics')}
+                      >
+                        <DollarSign className="mr-2 h-4 w-4 text-green-600" />
+                        <span className="text-green-900 font-medium">Revenue Analytics</span>
                       </Button>
                       {showCustomAnalyticsLink && (
                         <Button 

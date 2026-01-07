@@ -17,20 +17,20 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <head>
-             
-        {/* AskMe Analytics - Configuration and Initialization */}
-       
-       <script dangerouslySetInnerHTML={{__html: `
-         window.AskMeAnalyticsClientId = 'askme-analytics-app';
-       `}} />
-      <script 
-        src="/lib/clientAnalytics/askme-analytics-init-v2.js"
-        async 
-        defer>
-      </script>
-      </head>
       <body className={inter.className}>
+        {/* AskMe Analytics - Configuration and Initialization */}
+        <Script 
+          id="askme-analytics-config"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{__html: `
+            window.AskMeAnalyticsClientId = 'askme-analytics-app';
+          `}} 
+        />
+        <Script 
+          src="/lib/clientAnalytics/askme-analytics-init-v2.js"
+          strategy="afterInteractive"
+        />
+        
         <div className="flex flex-col min-h-screen">
           <main className="flex-1">{children}</main>
           <Footer />

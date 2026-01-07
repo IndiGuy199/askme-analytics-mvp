@@ -9,11 +9,46 @@ import { createServiceClient } from '@/lib/supabase/server'
 
 const PH_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://app.posthog.com'
 
-type Range = { companyId: string; from: string; to: string }
+type Range = { companyId: string; from: string; to: string; compare?: boolean }
 
 interface RevenueDataPoint {
   label: string
   value: number
+}
+
+interface RevenueResponse {
+  data: RevenueDataPoint[]
+  previousData?: RevenueDataPoint[]
+}
+
+/**
+ * Calculate previous period dates based on current range
+ * If from is "30d", previous period is -60d to -30d
+ * If from/to are ISO dates, calculate same duration shifted back
+ */
+function calculatePreviousPeriod(from: string, to: string): { prevFrom: string; prevTo: string } {
+  // Handle relative dates like "30d", "7d", etc.
+  const relativeMatch = from.match(/^(\d+)d$/)
+  if (relativeMatch) {
+    const days = parseInt(relativeMatch[1], 10)
+    return {
+      prevFrom: `${days * 2}d`,
+      prevTo: `${days}d`
+    }
+  }
+  
+  // Handle ISO date strings
+  const fromDate = new Date(from)
+  const toDate = to === 'now' ? new Date() : new Date(to)
+  const duration = toDate.getTime() - fromDate.getTime()
+  
+  const prevToDate = new Date(fromDate.getTime() - 1) // Day before current period starts
+  const prevFromDate = new Date(prevToDate.getTime() - duration)
+  
+  return {
+    prevFrom: prevFromDate.toISOString().split('T')[0],
+    prevTo: prevToDate.toISOString().split('T')[0]
+  }
 }
 
 /**
@@ -86,110 +121,124 @@ async function queryPostHog(
  * 
  * Queries PostHog for checkout_completed events and sums cart_total by utm_source.
  * Returns data sorted by revenue (highest first).
+ * When compare=true, also returns previousData for the previous period.
  */
 export async function getRevenueByChannel({
   companyId,
   from,
   to,
-}: Range): Promise<RevenueDataPoint[]> {
+  compare = false,
+}: Range): Promise<RevenueResponse> {
   try {
     const { projectId, apiKey, clientId } = await getCompanyPostHogConfig(companyId)
     
     // DEMO MODE: Return hardcoded data for askme-analytics-app
     if (clientId === 'askme-analytics-app') {
-      return [
+      const currentData = [
         { label: 'Direct', value: 650.00 },
         { label: 'Google Ads', value: 520.50 },
         { label: 'Facebook', value: 435.25 },
         { label: 'Email Campaign', value: 380.00 },
         { label: 'Organic Search', value: 295.75 },
       ]
+      
+      if (compare) {
+        // Previous period data (simulated ~10-15% lower)
+        const previousData = [
+          { label: 'Direct', value: 580.00 },
+          { label: 'Google Ads', value: 470.00 },
+          { label: 'Facebook', value: 400.00 },
+          { label: 'Email Campaign', value: 350.00 },
+          { label: 'Organic Search', value: 260.00 },
+        ]
+        return { data: currentData, previousData }
+      }
+      return { data: currentData }
     }
     
-    // Query all events and aggregate manually to handle missing utm_source
-    const payload = {
-      query: {
-        kind: 'DataTableNode',
-        full: true,
-        source: {
-          kind: 'EventsQuery',
-          select: ['properties.cart_total', 'properties.cart_items', 'properties.utm_source', 'timestamp'],
-          orderBy: ['timestamp DESC'],
-          after: from === 'now' ? '-7d' : from,
-          before: to === 'now' ? null : to,
-          event: 'CHECKOUT_COMPLETED',
-          properties: clientId ? [
-            {
-              key: 'client_id',
-              value: [clientId],
-              operator: 'exact',
-              type: 'event',
-            },
-          ] : [],
+    // Helper function to query and aggregate revenue by channel
+    const queryChannelRevenue = async (queryFrom: string, queryTo: string): Promise<RevenueDataPoint[]> => {
+      const payload = {
+        query: {
+          kind: 'DataTableNode',
+          full: true,
+          source: {
+            kind: 'EventsQuery',
+            select: ['properties.cart_total', 'properties.cart_items', 'properties.utm_source', 'timestamp'],
+            orderBy: ['timestamp DESC'],
+            after: queryFrom === 'now' ? '-7d' : queryFrom,
+            before: queryTo === 'now' ? null : queryTo,
+            event: 'CHECKOUT_COMPLETED',
+            properties: clientId ? [
+              {
+                key: 'client_id',
+                value: [clientId],
+                operator: 'exact',
+                type: 'event',
+              },
+            ] : [],
+          },
         },
-      },
+      }
+      
+      const json = await queryPostHog(projectId, apiKey, payload)
+      const events = json?.results || []
+      
+      console.log(`[Revenue by Channel] Events count for ${queryFrom} to ${queryTo}:`, events.length)
+      
+      // Aggregate revenue by channel (utm_source)
+      const channelRevenue = new Map<string, number>()
+      
+      events.forEach((event: any, index: number) => {
+        // cart_total is in column 0, cart_items in column 1, utm_source in column 2
+        const cartTotalRaw = event[0]
+        const cartItemsRaw = event[1]
+        const utmSource = event[2] || 'direct'
+        
+        let revenue = 0
+        
+        if (cartTotalRaw) {
+          revenue = parseFloat(cartTotalRaw)
+        } else if (cartItemsRaw) {
+          try {
+            const cartItems = typeof cartItemsRaw === 'string' ? JSON.parse(cartItemsRaw) : cartItemsRaw
+            if (Array.isArray(cartItems)) {
+              revenue = cartItems.reduce((sum, item) => sum + parseFloat(item.item_total || 0), 0)
+            }
+          } catch (e) {
+            console.error(`[Revenue by Channel] Failed to parse cart_items for event ${index}:`, e)
+          }
+        }
+        
+        if (revenue > 0) {
+          const currentTotal = channelRevenue.get(utmSource) || 0
+          channelRevenue.set(utmSource, currentTotal + revenue)
+        }
+      })
+      
+      return Array.from(channelRevenue.entries())
+        .map(([label, value]) => ({ label, value }))
+        .filter((item: RevenueDataPoint) => item.value > 0)
+        .sort((a: RevenueDataPoint, b: RevenueDataPoint) => b.value - a.value)
     }
     
-    const json = await queryPostHog(projectId, apiKey, payload)
+    // Get current period data
+    const data = await queryChannelRevenue(from, to)
+    console.log('[Revenue by Channel] Current period data:', data)
     
-    // Parse results - manually aggregate by channel
-    const events = json?.results || []
+    // Get previous period data if compare is enabled
+    if (compare) {
+      const { prevFrom, prevTo } = calculatePreviousPeriod(from, to)
+      console.log(`[Revenue by Channel] Fetching previous period: ${prevFrom} to ${prevTo}`)
+      const previousData = await queryChannelRevenue(prevFrom, prevTo)
+      console.log('[Revenue by Channel] Previous period data:', previousData)
+      return { data, previousData }
+    }
     
-    console.log('[Revenue by Channel] Raw response:', json)
-    console.log('[Revenue by Channel] Events count:', events.length)
-    
-    // Aggregate revenue by channel (utm_source)
-    const channelRevenue = new Map<string, number>()
-    
-    events.forEach((event: any, index: number) => {
-      console.log(`[Revenue by Channel] Event ${index}:`, event)
-      
-      // cart_total is in column 0, cart_items in column 1, utm_source in column 2
-      const cartTotalRaw = event[0]
-      const cartItemsRaw = event[1]
-      const utmSource = event[2] || 'direct' // Default to 'direct' if no utm_source
-      
-      let revenue = 0
-      
-      // Try cart_total first
-      if (cartTotalRaw) {
-        revenue = parseFloat(cartTotalRaw)
-      } 
-      // Fallback: Calculate from cart_items if cart_total is missing
-      else if (cartItemsRaw) {
-        try {
-          const cartItems = typeof cartItemsRaw === 'string' ? JSON.parse(cartItemsRaw) : cartItemsRaw
-          if (Array.isArray(cartItems)) {
-            revenue = cartItems.reduce((sum, item) => sum + parseFloat(item.item_total || 0), 0)
-            console.log(`[Revenue by Channel] Calculated revenue from cart_items: ${revenue}`)
-          }
-        } catch (e) {
-          console.error(`[Revenue by Channel] Failed to parse cart_items for event ${index}:`, e)
-        }
-      }
-      
-      if (revenue > 0) {
-        console.log(`[Revenue by Channel] Channel: ${utmSource}, Revenue: ${revenue}`)
-        const currentTotal = channelRevenue.get(utmSource) || 0
-        channelRevenue.set(utmSource, currentTotal + revenue)
-      }
-    })
-    
-    console.log('[Revenue by Channel] Aggregated channel revenue:', Array.from(channelRevenue.entries()))
-    
-    // Convert to array and sort
-    const data: RevenueDataPoint[] = Array.from(channelRevenue.entries())
-      .map(([label, value]) => ({ label, value }))
-      .filter((item: RevenueDataPoint) => item.value > 0)
-      .sort((a: RevenueDataPoint, b: RevenueDataPoint) => b.value - a.value)
-    
-    console.log('[Revenue by Channel] Final data:', data)
-    
-    return data
+    return { data }
   } catch (error) {
     console.error('[Revenue by Channel] Error:', error)
-    // Return empty array instead of throwing to prevent page crashes
-    return []
+    return { data: [] }
   }
 }
 
@@ -199,113 +248,120 @@ export async function getRevenueByChannel({
  * Queries PostHog for CHECKOUT_COMPLETED events, parses cart_items array,
  * and aggregates revenue by individual products.
  * Returns top products sorted by revenue (highest first).
+ * When compare=true, also returns previousData for the previous period.
  */
 export async function getTopRevenue({
   companyId,
   from,
   to,
-}: Range): Promise<RevenueDataPoint[]> {
+  compare = false,
+}: Range): Promise<RevenueResponse> {
   try {
     const { projectId, apiKey, clientId } = await getCompanyPostHogConfig(companyId)
     
     // DEMO MODE: Return hardcoded data for askme-analytics-app
     if (clientId === 'askme-analytics-app') {
-      return [
+      const currentData = [
         { label: 'Premium Plan', value: 690.00 },
         { label: 'Enterprise Plan', value: 580.00 },
         { label: 'Professional Services', value: 445.50 },
         { label: 'Add-on: Priority Support', value: 320.25 },
         { label: 'Add-on: Custom Integration', value: 215.00 },
       ]
+      
+      if (compare) {
+        // Previous period data (simulated ~10-15% lower)
+        const previousData = [
+          { label: 'Premium Plan', value: 620.00 },
+          { label: 'Enterprise Plan', value: 530.00 },
+          { label: 'Professional Services', value: 400.00 },
+          { label: 'Add-on: Priority Support', value: 280.00 },
+          { label: 'Add-on: Custom Integration', value: 190.00 },
+        ]
+        return { data: currentData, previousData }
+      }
+      return { data: currentData }
     }
     
-    // Get all checkout_completed events with cart_items
-    const payload = {
-      query: {
-        kind: 'DataTableNode',
-        full: true,
-        source: {
-          kind: 'EventsQuery',
-          select: ['properties.cart_items', 'timestamp'],
-          orderBy: ['timestamp DESC'],
-          after: from === 'now' ? '-7d' : from,
-          before: to === 'now' ? null : to,
-          event: 'CHECKOUT_COMPLETED',
-          properties: clientId ? [
-            {
-              key: 'client_id',
-              value: [clientId],
-              operator: 'exact',
-              type: 'event',
-            },
-          ] : [],
+    // Helper function to query and aggregate revenue by product
+    const queryProductRevenue = async (queryFrom: string, queryTo: string): Promise<RevenueDataPoint[]> => {
+      const payload = {
+        query: {
+          kind: 'DataTableNode',
+          full: true,
+          source: {
+            kind: 'EventsQuery',
+            select: ['properties.cart_items', 'timestamp'],
+            orderBy: ['timestamp DESC'],
+            after: queryFrom === 'now' ? '-7d' : queryFrom,
+            before: queryTo === 'now' ? null : queryTo,
+            event: 'CHECKOUT_COMPLETED',
+            properties: clientId ? [
+              {
+                key: 'client_id',
+                value: [clientId],
+                operator: 'exact',
+                type: 'event',
+              },
+            ] : [],
+          },
         },
-      },
+      }
+      
+      const json = await queryPostHog(projectId, apiKey, payload)
+      const events = json?.results || []
+      
+      console.log(`[Top Revenue] Events count for ${queryFrom} to ${queryTo}:`, events.length)
+      
+      // Aggregate revenue by product name
+      const productRevenue = new Map<string, number>()
+      
+      events.forEach((event: any, index: number) => {
+        const cartItemsRaw = event[0]
+        
+        if (!cartItemsRaw) return
+        
+        let cartItems: any[]
+        try {
+          cartItems = typeof cartItemsRaw === 'string' ? JSON.parse(cartItemsRaw) : cartItemsRaw
+        } catch (e) {
+          console.error(`[Top Revenue] Failed to parse cart_items for event ${index}:`, e)
+          return
+        }
+        
+        if (Array.isArray(cartItems)) {
+          cartItems.forEach((item: any) => {
+            const name = item.name || 'Unknown Product'
+            const itemTotal = parseFloat(item.item_total || 0)
+            const currentTotal = productRevenue.get(name) || 0
+            productRevenue.set(name, currentTotal + itemTotal)
+          })
+        }
+      })
+      
+      return Array.from(productRevenue.entries())
+        .map(([label, value]) => ({ label, value }))
+        .filter((item: RevenueDataPoint) => item.value > 0)
+        .sort((a: RevenueDataPoint, b: RevenueDataPoint) => b.value - a.value)
+        .slice(0, 10) // Top 10 products
     }
     
-    const json = await queryPostHog(projectId, apiKey, payload)
+    // Get current period data
+    const data = await queryProductRevenue(from, to)
+    console.log('[Top Revenue] Current period data:', data)
     
-    console.log('[Top Revenue] Raw response:', json)
+    // Get previous period data if compare is enabled
+    if (compare) {
+      const { prevFrom, prevTo } = calculatePreviousPeriod(from, to)
+      console.log(`[Top Revenue] Fetching previous period: ${prevFrom} to ${prevTo}`)
+      const previousData = await queryProductRevenue(prevFrom, prevTo)
+      console.log('[Top Revenue] Previous period data:', previousData)
+      return { data, previousData }
+    }
     
-    // Parse results - cart_items is an array of products in each event
-    const events = json?.results || []
-    console.log('[Top Revenue] Events count:', events.length)
-    
-    // Aggregate revenue by product name
-    const productRevenue = new Map<string, number>()
-    
-    events.forEach((event: any, index: number) => {
-      console.log(`[Top Revenue] Event ${index}:`, event)
-      
-      // cart_items is in the first column (index 0) as a JSON string
-      const cartItemsRaw = event[0]
-      
-      if (!cartItemsRaw) {
-        console.warn(`[Top Revenue] Event ${index} has no cart_items`)
-        return
-      }
-      
-      // Parse the JSON string to get the actual array
-      let cartItems: any[]
-      try {
-        cartItems = typeof cartItemsRaw === 'string' ? JSON.parse(cartItemsRaw) : cartItemsRaw
-      } catch (e) {
-        console.error(`[Top Revenue] Failed to parse cart_items for event ${index}:`, e)
-        return
-      }
-      
-      if (Array.isArray(cartItems)) {
-        console.log(`[Top Revenue] Processing ${cartItems.length} cart items`)
-        
-        cartItems.forEach((item: any) => {
-          const name = item.name || 'Unknown Product'
-          const itemTotal = parseFloat(item.item_total || 0)
-          
-          console.log(`[Top Revenue] Product: ${name}, Revenue: ${itemTotal}`)
-          
-          const currentTotal = productRevenue.get(name) || 0
-          productRevenue.set(name, currentTotal + itemTotal)
-        })
-      } else {
-        console.warn('[Top Revenue] cart_items is not an array after parsing:', cartItems)
-      }
-    })
-    
-    console.log('[Top Revenue] Aggregated product revenue:', Array.from(productRevenue.entries()))
-    
-    // Convert to array and sort
-    const data: RevenueDataPoint[] = Array.from(productRevenue.entries())
-      .map(([label, value]) => ({ label, value }))
-      .filter((item: RevenueDataPoint) => item.value > 0)
-      .sort((a: RevenueDataPoint, b: RevenueDataPoint) => b.value - a.value)
-      .slice(0, 10) // Top 10 products
-    
-    console.log('[Top Revenue] Final data:', data)
-    
-    return data
+    return { data }
   } catch (error) {
     console.error('[Top Revenue] Error:', error)
-    // Return empty array instead of throwing to prevent page crashes
-    return []
+    return { data: [] }
   }
 }

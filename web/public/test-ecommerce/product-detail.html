@@ -71,7 +71,10 @@
     <header>
         <div class="header-content">
             <div class="logo">🍴 Test Restaurant</div>
-            <a href="index.html" class="back-link">← Back to Menu</a>
+            <nav style="display: flex; gap: 1.5rem;">
+                <a href="index.html" class="back-link">← Back to Menu</a>
+                <a href="checkout.html" class="back-link">Cart 🛒</a>
+            </nav>
         </div>
     </header>
     
@@ -199,8 +202,8 @@
     <script>
         window.AskMeAnalyticsClientId = 'test-ecommerce';
     </script>
-    <script src="/lib/clientAnalytics/ask-me-analytics.min.js"></script>
-    <script src="/lib/clientAnalytics/askme-analytics-init-v2.js"></script>
+    <script src="../lib/clientAnalytics/ask-me-analytics.min.js"></script>
+    <script src="../lib/clientAnalytics/askme-analytics-init-v2.js"></script>
     
     <script>
         const BASE_PRICE = 24.99;
@@ -208,25 +211,65 @@
         
         // Initialize sub-selection listeners
         document.querySelectorAll('.sub-selection-option').forEach(option => {
-            option.addEventListener('click', function() {
+            // Handle clicks on the label (not the radio input)
+            option.addEventListener('click', function(e) {
+                // Prevent double-firing if clicking directly on radio
+                if (e.target.type === 'radio') return;
+                
                 const group = this.dataset.subSelectionGroup;
+                const radio = this.querySelector('input[type="radio"]');
+                
+                // Deselect all options in this group
                 document.querySelectorAll(`[data-sub-selection-group="${group}"]`).forEach(opt => {
                     opt.classList.remove('selected');
                 });
+                
+                // Select this option
                 this.classList.add('selected');
-                this.querySelector('input').checked = true;
+                radio.checked = true;
+                
+                console.log('✅ Sub-selection selected:', radio.dataset.subSelectionName);
                 updatePrice();
             });
+            
+            // Also handle direct radio change
+            const radio = option.querySelector('input[type="radio"]');
+            if (radio) {
+                radio.addEventListener('change', function() {
+                    const group = option.dataset.subSelectionGroup;
+                    document.querySelectorAll(`[data-sub-selection-group="${group}"]`).forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    option.classList.add('selected');
+                    console.log('✅ Sub-selection changed:', this.dataset.subSelectionName);
+                    updatePrice();
+                });
+            }
         });
         
         // Initialize add-on listeners
         document.querySelectorAll('.add-on-option').forEach(option => {
-            option.addEventListener('click', function() {
+            option.addEventListener('click', function(e) {
+                // Prevent double-firing if clicking directly on checkbox
+                if (e.target.type === 'checkbox') return;
+                
                 const checkbox = this.querySelector('input[type="checkbox"]');
                 checkbox.checked = !checkbox.checked;
                 this.classList.toggle('selected', checkbox.checked);
+                
+                console.log('✅ Add-on toggled:', checkbox.dataset.addOnName, checkbox.checked ? 'ON' : 'OFF');
                 updatePrice();
             });
+            
+            // Also handle direct checkbox change
+            const checkbox = option.querySelector('input[type="checkbox"]');
+            if (checkbox) {
+                checkbox.addEventListener('change', function() {
+                    option.classList.toggle('selected', this.checked);
+                    console.log('✅ Add-on checkbox changed:', this.dataset.addOnName, this.checked ? 'ON' : 'OFF');
+                    updatePrice();
+                });
+            }
         });
         
         function changeQuantity(delta) {
@@ -353,6 +396,9 @@
         
         // Initialize
         updatePrice();
+        console.log('✅ Product detail page initialized');
+        console.log('📋 Sub-selections found:', document.querySelectorAll('.sub-selection-option').length);
+        console.log('📋 Add-ons found:', document.querySelectorAll('.add-on-option').length);
     </script>
 </body>
 </html>

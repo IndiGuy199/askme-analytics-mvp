@@ -84,9 +84,9 @@
     <nav>
         <ul>
             <li><a href="index.html">Menu</a></li>
-            <li><a href="appetizers.html">Appetizers</a></li>
-            <li><a href="entrees.html">Entrées</a></li>
-            <li><a href="family-bundles.html">Family Bundles</a></li>
+            <li><a href="product-detail.html">Customize Dish</a></li>
+            <li><a href="apparel.html">Apparel</a></li>
+            <li><a href="checkout.html">Checkout</a></li>
         </ul>
     </nav>
     
@@ -130,7 +130,7 @@
                 </div>
             </div>
             
-            <!-- Product 4 -->
+            <!-- Product 4 - Links to product detail page for customization -->
             <div class="product-card" data-product-id="tour-of-italy">
                 <div class="product-image" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);"></div>
                 <div class="product-info">
@@ -138,7 +138,7 @@
                     <p class="product-description">Chicken Parmigiana, Lasagna Classico & Fettuccine Alfredo</p>
                     <div class="product-price" data-price="24.99" data-currency="USD">$24.99</div>
                     <div class="product-calories">1,520 cal</div>
-                    <button class="btn-add-to-cart" onclick="addToCart(this)">Add to Cart</button>
+                    <button class="btn-add-to-cart" onclick="goToProductDetail('tour-of-italy')" style="background: #28a745;">Customize & Add</button>
                 </div>
             </div>
             
@@ -200,8 +200,8 @@
         // Set client ID for analytics
         window.AskMeAnalyticsClientId = 'test-ecommerce';
     </script>
-    <script src="/lib/clientAnalytics/ask-me-analytics.min.js"></script>
-    <script src="/lib/clientAnalytics/askme-analytics-init-v2.js"></script>
+    <script src="../lib/clientAnalytics/ask-me-analytics.min.js"></script>
+    <script src="../lib/clientAnalytics/askme-analytics-init-v2.js"></script>
     
     <!-- Cart Management -->
     <script>
@@ -318,6 +318,11 @@
                 return;
             }
             window.location.href = 'checkout.html';
+        }
+        
+        function goToProductDetail(productId) {
+            // Navigate to product detail page with product ID
+            window.location.href = `product-detail.html?product=${productId}`;
         }
         
         // Initialize cart display

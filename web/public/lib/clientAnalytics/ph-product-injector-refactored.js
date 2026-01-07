@@ -46,6 +46,141 @@
     const sentButtons = new WeakSet();
     let hasAnyProductHint = false;
     
+    /* ═══════════════════════════════════════════════════════════════════
+     * LOCK PUBLIC API (window.AMA)
+     * Prevents accidental overwrites of critical identity functions
+     * ═══════════════════════════════════════════════════════════════════ */
+    
+    (function lockAMA() {
+        const AMA = window.AMA;
+        if (!AMA) {
+            console.error('[ph-injector] ❌ AMA not found - ph-identity.js must load first');
+            return;
+        }
+        
+        // List of functions to lock (must be non-writable)
+        const requiredFunctions = ['preAuthMark', 'afterLoginIdentify', 'onLogoutCleanup'];
+        const optionalFunctions = ['_takePreAuthId', 'identifyUser'];
+        
+        // Verify required functions exist
+        for (const fn of requiredFunctions) {
+            if (typeof AMA[fn] !== 'function') {
+                console.error('[ph-injector] ❌ Missing required AMA.' + fn);
+                return;
+            }
+        }
+        
+        // Lock functions with Object.defineProperty
+        const allFunctions = [...requiredFunctions, ...optionalFunctions];
+        for (const fn of allFunctions) {
+            if (typeof AMA[fn] === 'function') {
+                const originalFn = AMA[fn];
+                try {
+                    Object.defineProperty(AMA, fn, {
+                        value: originalFn,
+                        writable: false,
+                        configurable: false,
+                        enumerable: true
+                    });
+                } catch (e) {
+                    // Already locked or browser doesn't support
+                    if (window.AskMeAnalyticsConfig?.debug) {
+                        console.warn('[ph-injector] Could not lock AMA.' + fn + ':', e.message);
+                    }
+                }
+            }
+        }
+        
+        // Lock version and isReady
+        try {
+            Object.defineProperty(AMA, 'version', {
+                value: AMA.version || '2.0.0',
+                writable: false,
+                configurable: false
+            });
+            Object.defineProperty(AMA, 'isReady', {
+                value: true,
+                writable: false,
+                configurable: false
+            });
+        } catch (e) { /* ignore */ }
+        
+        // Debug mode self-test
+        if (window.AskMeAnalyticsConfig?.debug) {
+            console.log('[ph-injector] 🔒 AMA API locked. Contract:');
+            console.log('  version:', AMA.version);
+            console.log('  isReady:', AMA.isReady);
+            console.log('  Functions:', Object.keys(AMA).filter(k => typeof AMA[k] === 'function'));
+            
+            // Verify overwrite protection
+            try {
+                AMA.preAuthMark = function() { return 'HACKED'; };
+                console.warn('[ph-injector] ⚠️ AMA.preAuthMark was overwritten! Lock failed.');
+            } catch (e) {
+                console.log('[ph-injector] ✅ Overwrite protection working');
+            }
+        }
+    })();
+    
+    /* ---------- Runtime Guards -------------------------------- */
+    
+    /**
+     * Safe storage access - won't throw in private browsing mode
+     */
+    function safeStorage(type) {
+        try {
+            const storage = type === 'session' ? sessionStorage : localStorage;
+            storage.setItem('__ph_test__', '1');
+            storage.removeItem('__ph_test__');
+            return storage;
+        } catch { return null; }
+    }
+    
+    function safeGetItem(type, key, fallback = null) {
+        try {
+            const storage = safeStorage(type);
+            return storage ? (storage.getItem(key) ?? fallback) : fallback;
+        } catch { return fallback; }
+    }
+    
+    function safeSetItem(type, key, value) {
+        try {
+            const storage = safeStorage(type);
+            if (storage) storage.setItem(key, value);
+            return true;
+        } catch { return false; }
+    }
+    
+    /**
+     * Safe number parsing - never returns NaN
+     */
+    function safeNumber(x, fallback = 0) {
+        if (typeof x === 'number' && isFinite(x)) return x;
+        if (typeof x === 'string') {
+            const n = parseFloat(x.replace(/[^0-9.-]/g, ''));
+            return isFinite(n) ? n : fallback;
+        }
+        return fallback;
+    }
+    
+    function safePrice(x) { return safeNumber(x, 0).toFixed(2); }
+    function safeQuantity(x) { return Math.max(1, Math.round(safeNumber(x, 1))); }
+    
+    /**
+     * Safe PostHog capture - NOOP if posthog missing
+     */
+    function safeCapture(event, props) {
+        try {
+            if (window.posthog?.capture) {
+                window.posthog.capture(event, props);
+                return true;
+            }
+        } catch (e) {
+            console.warn('[ph-injector] Capture failed:', e.message);
+        }
+        return false;
+    }
+    
     /* ---------- Helper Functions -------------------------------- */
     
     function text(el) {
@@ -878,55 +1013,73 @@
 
     /* ---------- Boot -------------------------------- */
     function boot() {
-        console.log('[ph-injector] 🚀 Boot function called (REFACTORED v2.0)');
-        
-        captureUTMParams();
-        
-        const rules = parseSteps();
-        Steps.applyAllRules(rules, DS, Extract.extractRevenueData, null);
-        
-        if (pageMatches(DS.pageMatch)) {
-            scanAndAnnotate();
-            bindPriceChangeListeners();
-        }
-        
-        bindGlobalClick();
-        Steps.scanForPhTrackClasses(Extract.extractRevenueData, productPropsFrom);
+        try {
+            console.log('[ph-injector] 🚀 Boot function called (REFACTORED v2.0)');
+            
+            captureUTMParams();
+            
+            const rules = parseSteps();
+            Steps.applyAllRules(rules, DS, Extract.extractRevenueData, null);
+            
+            if (pageMatches(DS.pageMatch)) {
+                scanAndAnnotate();
+                bindPriceChangeListeners();
+            }
+            
+            bindGlobalClick();
+            Steps.scanForPhTrackClasses(Extract.extractRevenueData, productPropsFrom);
 
-        // Fire events for existing hidden inputs
-        document
-            .querySelectorAll('input[type="hidden"][data-ph]')
-            .forEach((n) => {
-                const name = n.getAttribute('data-ph');
-                if (U.isNonEmptyStr(name)) {
-                    Capture.captureOnce(name, { [P.PATH]: location.pathname, auto: true }, { scopePath: true });
-                }
-            });
+            // Fire events for existing hidden inputs
+            document
+                .querySelectorAll('input[type="hidden"][data-ph]')
+                .forEach((n) => {
+                    try {
+                        const name = n.getAttribute('data-ph');
+                        if (U.isNonEmptyStr(name)) {
+                            Capture.captureOnce(name, { [P.PATH]: location.pathname, auto: true }, { scopePath: true });
+                        }
+                    } catch (e) {
+                        console.warn('[ph-injector] Failed to process hidden input:', e);
+                    }
+                });
+        } catch (e) {
+            console.error('[ph-injector] Boot failed:', e);
+        }
     }
 
     /* ---------- Initialize -------------------------------- */
-    if (document.readyState === 'complete' || document.readyState === 'interactive') {
-        setTimeout(boot, 0);
-    } else {
-        window.addEventListener('DOMContentLoaded', boot, { once: true });
+    try {
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            setTimeout(boot, 0);
+        } else {
+            window.addEventListener('DOMContentLoaded', boot, { once: true });
+        }
+        window.addEventListener('load', boot);
+
+        hookSPA();
+        
+        // Setup observers with error handling
+        Observe.onMutation((muts) => {
+            try {
+                onMutations(muts);
+            } catch (e) {
+                console.warn('[ph-injector] Mutation handler error:', e);
+            }
+        });
+        Observe.onRouteChange(onRoute);
+        Observe.startMutationObserver(document.documentElement);
+        Observe.startRouteObserver();
+        
+        // Store mutation observer reference globally
+        window.__phMutationObserver = {
+            disconnect: () => Observe.stopMutationObserver(),
+            observe: (target, config) => Observe.startMutationObserver(target, config)
+        };
+        
+        window.addEventListener('ph:routechange', () => setTimeout(onRoute, 0));
+
+        console.log('[ph-injector] ✅ Injector orchestration layer initialized (v2.0)');
+    } catch (e) {
+        console.error('[ph-injector] Initialization failed:', e);
     }
-    window.addEventListener('load', boot);
-
-    hookSPA();
-    
-    // Setup observers
-    Observe.onMutation(onMutations);
-    Observe.onRouteChange(onRoute);
-    Observe.startMutationObserver(document.documentElement);
-    Observe.startRouteObserver();
-    
-    // Store mutation observer reference globally
-    window.__phMutationObserver = {
-        disconnect: () => Observe.stopMutationObserver(),
-        observe: (target, config) => Observe.startMutationObserver(target, config)
-    };
-    
-    window.addEventListener('ph:routechange', () => setTimeout(onRoute, 0));
-
-    console.log('[ph-injector] ✅ Injector orchestration layer initialized (v2.0)');
 })();
