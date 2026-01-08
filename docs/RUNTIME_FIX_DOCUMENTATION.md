@@ -412,4 +412,4 @@ Comment out scripts in `layout.tsx`:
 ---
 
 *Last Updated: November 4, 2025*
-*Tested On: Windows 11, Node.js 20.x, Next.js 15.4.6*
+*Tested On: Windows 11, Node.js 20.x, Next.js 15.4.10*
