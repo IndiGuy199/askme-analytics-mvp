@@ -1,0 +1,41 @@
+/*
+ * Scopes the embedded @n8n/chat widget to the Sunrise Motors demo page layout.
+ * The library's own stylesheet makes .chat-window-wrapper `position: fixed`
+ * (bottom-right of the viewport). These overrides make it participate in
+ * normal document flow instead, centered below the demo instructions, on
+ * both desktop and mobile.
+ */
+
+#sunrise-chat {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+#sunrise-chat .chat-window-wrapper {
+  position: relative;
+  inset: auto;
+  bottom: auto;
+  right: auto;
+  margin: 0 auto;
+  max-width: 100%;
+  max-height: none;
+}
+
+#sunrise-chat .chat-window-wrapper .chat-window-toggle {
+  margin: 0 auto;
+}
+
+#sunrise-chat .chat-window-wrapper .chat-window {
+  width: min(400px, 100%);
+  height: min(600px, 70vh);
+  max-width: 100%;
+  margin: 0 auto 1rem;
+}
+
+@media (max-width: 480px) {
+  #sunrise-chat .chat-window-wrapper .chat-window {
+    width: 100%;
+    height: 65vh;
+  }
+}

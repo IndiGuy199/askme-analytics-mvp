@@ -16,6 +16,8 @@
 (function () {
     'use strict';
 
+    const dbg = (...a) => { if (window.AskMeAnalyticsConfig?.debug) console.log(...a); };
+
     /* ---------- Dependency check -------------------------------- */
     const dependencies = [
         'PH_KEYS', 'PH_DATA_KEYS', 'PH_PRODUCT_DOM', 'PH_PRODUCT_EVENT', 'PH_PROPS',
@@ -43,6 +45,8 @@
     const Steps = window.PHStepTracker;
 
     /* ---------- State -------------------------------- */
+    let bootCalled = false;         // guard: boot() runs only once per page load
+    let globalClickBound = false;   // guard: document click listener attached only once
     const sentButtons = new WeakSet();
     let hasAnyProductHint = false;
     
@@ -107,17 +111,17 @@
         
         // Debug mode self-test
         if (window.AskMeAnalyticsConfig?.debug) {
-            console.log('[ph-injector] 🔒 AMA API locked. Contract:');
-            console.log('  version:', AMA.version);
-            console.log('  isReady:', AMA.isReady);
-            console.log('  Functions:', Object.keys(AMA).filter(k => typeof AMA[k] === 'function'));
+            dbg('[ph-injector] 🔒 AMA API locked. Contract:');
+            dbg('  version:', AMA.version);
+            dbg('  isReady:', AMA.isReady);
+            dbg('  Functions:', Object.keys(AMA).filter(k => typeof AMA[k] === 'function'));
             
             // Verify overwrite protection
             try {
                 AMA.preAuthMark = function() { return 'HACKED'; };
                 console.warn('[ph-injector] ⚠️ AMA.preAuthMark was overwritten! Lock failed.');
             } catch (e) {
-                console.log('[ph-injector] ✅ Overwrite protection working');
+                dbg('[ph-injector] ✅ Overwrite protection working');
             }
         }
     })();
@@ -397,7 +401,7 @@
         let raw = [];
         try { raw = JSON.parse(DS.stepsRaw); } catch { raw = []; }
         
-        console.log('[ph-injector] 🔍 Raw steps before filter:', raw.length);
+        dbg('[ph-injector] 🔍 Raw steps before filter:', raw.length);
         const filtered = raw.filter(r => {
             const valid = r && typeof r === 'object' && r.key && Object.values(EK).includes(r.key);
             if (!valid && r?.key) {
@@ -405,7 +409,7 @@
             }
             return valid;
         });
-        console.log('[ph-injector] 🔍 Steps after filter:', filtered.length);
+        dbg('[ph-injector] 🔍 Steps after filter:', filtered.length);
 
         return filtered
             .map(r => {
@@ -537,7 +541,7 @@
         const props = window.PHCartExtractor.formatCartPropertiesForPostHog(cartData);
         
         if (props) {
-            console.log('[ph-injector] 🛒 Cart checkout detected:', props);
+            dbg('[ph-injector] 🛒 Cart checkout detected:', props);
             
             // Cache cart data for CHECKOUT_COMPLETED event
             try {
@@ -556,7 +560,7 @@
                     total_quantity: cartData.items.reduce((sum, item) => sum + item.quantity, 0),
                     cached_at: new Date().toISOString()
                 }));
-                console.log('[ph-injector] 💾 Cart data cached for checkout completion');
+                dbg('[ph-injector] 💾 Cart data cached for checkout completion');
             } catch (e) {
                 console.warn('[ph-injector] Failed to cache cart data:', e);
             }
@@ -667,7 +671,7 @@
                 [P.PATH]: location.pathname
             };
             
-            console.log('[ph-injector] 🛒 PRODUCT_SELECTED:', props);
+            dbg('[ph-injector] 🛒 PRODUCT_SELECTED:', props);
             Capture.captureOnce(EK.PRODUCT_SELECTED, props, { scopePath: false });
             
         } catch (e) {
@@ -723,7 +727,7 @@
                 [P.PATH]: location.pathname
             };
             
-            console.log('[ph-injector] 🗑️ PRODUCT_REMOVED:', props);
+            dbg('[ph-injector] 🗑️ PRODUCT_REMOVED:', props);
             Capture.captureOnce(EK.PRODUCT_REMOVED, props, { scopePath: false });
             
         } catch (e) {
@@ -733,6 +737,9 @@
 
     /* ---------- Global click capture -------------------------------- */
     function bindGlobalClick() {
+        if (globalClickBound) return;
+        globalClickBound = true;
+
         const productEventName = DS.eventName || EV.DEFAULT_NAME || 'product_click';
 
         document.addEventListener('click', (e) => {
@@ -802,7 +809,7 @@
                                         total_quantity: cartData.items.reduce((sum, item) => sum + item.quantity, 0),
                                         cached_at: new Date().toISOString()
                                     }));
-                                    console.log('[ph-injector] 💾 Cart data cached for:', name);
+                                    dbg('[ph-injector] 💾 Cart data cached for:', name);
                                 } catch (e) {
                                     console.warn('[ph-injector] Failed to cache cart:', e);
                                 }
@@ -858,7 +865,7 @@
                                     total_quantity: cartData.items.reduce((sum, item) => sum + item.quantity, 0),
                                     cached_at: new Date().toISOString()
                                 }));
-                                console.log('[ph-injector] 💾 Cart data cached for:', eventName);
+                                dbg('[ph-injector] 💾 Cart data cached for:', eventName);
                             } catch (e) {
                                 console.warn('[ph-injector] Failed to cache cart:', e);
                             }
@@ -888,7 +895,7 @@
                 if (btn && !sentButtons.has(btn)) {
                     // PRIORITY 1: Check if this is a cart checkout button
                     if (isCartCheckoutButton(btn)) {
-                        console.log('[ph-injector] 🛒 Cart checkout button detected');
+                        dbg('[ph-injector] 🛒 Cart checkout button detected');
                         const handled = handleCartCheckout(btn, 'CHECKOUT_SUBMITTED');
                         if (handled) {
                             sentButtons.add(btn);
@@ -935,21 +942,9 @@
     }
 
     /* ---------- SPA hooks -------------------------------- */
-    function hookSPA() {
-        const wrap = (t) => {
-            const orig = history[t];
-            return function () {
-                const r = orig.apply(this, arguments);
-                window.dispatchEvent(new Event('ph:routechange'));
-                return r;
-            };
-        };
-        try { 
-            history.pushState = wrap('pushState'); 
-            history.replaceState = wrap('replaceState'); 
-        } catch {}
-        window.addEventListener('popstate', () => window.dispatchEvent(new Event('ph:routechange')));
-    }
+    // NOTE: hookSPA() removed — history patching is now owned by ph-observers.js.
+    // ph-observers.js::startRouteObserver() monkeypatches pushState/replaceState and
+    // calls all PHObservers.onRouteChange() callbacks, which includes onRoute() below.
 
     /* ---------- Route/mutation handlers -------------------------------- */
     function onRoute() {
@@ -1013,8 +1008,10 @@
 
     /* ---------- Boot -------------------------------- */
     function boot() {
+        if (bootCalled) return;  // ensure single execution even if DOMContentLoaded + load both fire
+        bootCalled = true;
         try {
-            console.log('[ph-injector] 🚀 Boot function called (REFACTORED v2.0)');
+            dbg('[ph-injector] 🚀 Boot function called (REFACTORED v2.0)');
             
             captureUTMParams();
             
@@ -1054,11 +1051,9 @@
         } else {
             window.addEventListener('DOMContentLoaded', boot, { once: true });
         }
-        window.addEventListener('load', boot);
+        window.addEventListener('load', boot); // bootCalled guard makes second call a no-op
 
-        hookSPA();
-        
-        // Setup observers with error handling
+        // ph-observers.js owns history patching; register route-change callback here
         Observe.onMutation((muts) => {
             try {
                 onMutations(muts);
@@ -1069,16 +1064,14 @@
         Observe.onRouteChange(onRoute);
         Observe.startMutationObserver(document.documentElement);
         Observe.startRouteObserver();
-        
+
         // Store mutation observer reference globally
         window.__phMutationObserver = {
             disconnect: () => Observe.stopMutationObserver(),
             observe: (target, config) => Observe.startMutationObserver(target, config)
         };
-        
-        window.addEventListener('ph:routechange', () => setTimeout(onRoute, 0));
 
-        console.log('[ph-injector] ✅ Injector orchestration layer initialized (v2.0)');
+        dbg('[ph-injector] ✅ Injector orchestration layer initialized (v2.0)');
     } catch (e) {
         console.error('[ph-injector] Initialization failed:', e);
     }

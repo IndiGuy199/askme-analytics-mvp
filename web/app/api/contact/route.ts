@@ -20,7 +20,7 @@ const gmailTransporter = process.env.GMAIL_APP_PASSWORD ? nodemailer.createTrans
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, email, company, subject, message } = await request.json();
+    const { name, email, company, service, subject, message } = await request.json();
 
     // Validate required fields
     if (!name || !email || !subject || !message) {
@@ -29,6 +29,13 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const serviceLabels: Record<string, string> = {
+      analytics: 'Analytics / Conversion Guardian',
+      'ai-automation': 'AI Automation',
+      integrations: 'Software Integrations',
+    };
+    const serviceLabel = service ? (serviceLabels[service] || service) : 'General Inquiry';
 
     // Send email notification to Gmail
     const { data, error } = await resend.emails.send({
@@ -46,6 +53,7 @@ export async function POST(request: NextRequest) {
             <p style="margin: 10px 0;"><strong>From:</strong> ${name}</p>
             <p style="margin: 10px 0;"><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p>
             <p style="margin: 10px 0;"><strong>Company:</strong> ${company || 'Not provided'}</p>
+            <p style="margin: 10px 0;"><strong>Interested in:</strong> ${serviceLabel}</p>
             <p style="margin: 10px 0;"><strong>Subject:</strong> ${subject}</p>
           </div>
           
@@ -77,7 +85,7 @@ export async function POST(request: NextRequest) {
           from: process.env.GMAIL_USER,
           to: process.env.SMS_EMAIL_GATEWAY,
           subject: 'New Contact',
-          text: `Contact: ${name} (${email}) | ${company || 'N/A'} | ${subject}`,
+          text: `Contact: ${name} (${email}) | ${company || 'N/A'} | ${serviceLabel} | ${subject}`,
         });
         console.log('SMS notification sent successfully via Gmail');
       } catch (smsError: any) {

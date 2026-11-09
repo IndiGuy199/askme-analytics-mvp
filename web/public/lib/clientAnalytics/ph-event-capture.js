@@ -13,19 +13,58 @@
 
     window.PHEventCapture = window.PHEventCapture || {};
 
+    const dbg = (...a) => { if (window.AskMeAnalyticsConfig?.debug) console.log(...a); };
+
     const P = window.PH_PROPS;
     const EK = window.PH_KEYS;
 
+    /* ---------- Dedup config -------------------------------- */
+    const DEDUP_MAX_SIZE = 500;
+
+    /**
+     * Build the dedup key for an event.
+     * Scope is controlled by config.dedupScope:
+     *   'path'       — default, per event+pathname
+     *   'path+query' — event+pathname+search
+     *   'full_url'   — event+full href
+     */
+    function buildDedupKey(name, scopePath) {
+        if (!scopePath) return name;
+        const cfg = window.AskMeAnalyticsConfig || {};
+        switch (cfg.dedupScope) {
+            case 'path+query': return `${name}::${location.pathname}${location.search}`;
+            case 'full_url':   return `${name}::${location.href}`;
+            default:           return `${name}::${location.pathname}`; // 'path' or unset
+        }
+    }
+
     /* ---------- State -------------------------------- */
-    const sentOncePath = (() => {
-        if (window.__phFiredOnce) return window.__phFiredOnce;
+    // sentOncePathOrder mirrors the Set in insertion order for FIFO eviction.
+    const sentOncePathOrder = (() => {
+        if (window.__phFiredOnceOrder) return window.__phFiredOnceOrder;
         try {
             const stored = sessionStorage.getItem('__phFiredOnce');
-            return window.__phFiredOnce = stored ? new Set(JSON.parse(stored)) : new Set();
+            return window.__phFiredOnceOrder = stored ? JSON.parse(stored) : [];
         } catch {
-            return window.__phFiredOnce = new Set();
+            return window.__phFiredOnceOrder = [];
         }
     })();
+
+    const sentOncePath = (() => {
+        if (window.__phFiredOnce) return window.__phFiredOnce;
+        return window.__phFiredOnce = new Set(sentOncePathOrder);
+    })();
+
+    function addToDedupSet(key) {
+        if (sentOncePath.has(key)) return;
+        // Evict oldest entries when at capacity
+        while (sentOncePathOrder.length >= DEDUP_MAX_SIZE) {
+            const oldest = sentOncePathOrder.shift();
+            sentOncePath.delete(oldest);
+        }
+        sentOncePath.add(key);
+        sentOncePathOrder.push(key);
+    }
 
     const queue = [];
     let phReady = false;
@@ -36,12 +75,12 @@
     function flushPH() {
         if (window.posthog && typeof window.posthog.capture === 'function') {
             phReady = true;
-            console.log(`[ph-event-capture] ✅ PostHog ready! Flushing ${queue.length} events`);
+            dbg(`[ph-event-capture] ✅ PostHog ready! Flushing ${queue.length} events`);
             while (queue.length) {
                 const { name, props } = queue.shift();
                 try {
                     window.posthog.capture(name, props);
-                    console.log(`[ph-event-capture] ✅ Queued event sent: ${name}`);
+                    dbg(`[ph-event-capture] ✅ Queued event sent: ${name}`);
                 } catch (e) {
                     console.warn('[ph-event-capture] ❌ capture failed', e);
                 }
@@ -53,13 +92,13 @@
         if (!phReady) {
             pollCount++;
             if (pollCount % 10 === 0) {
-                console.log(`[ph-event-capture] ⏳ Waiting for PostHog... ${pollCount}/${MAX_POLL_ATTEMPTS}`);
+                dbg(`[ph-event-capture] ⏳ Waiting for PostHog... ${pollCount}/${MAX_POLL_ATTEMPTS}`);
             }
             flushPH();
             if (!phReady && pollCount < MAX_POLL_ATTEMPTS) {
                 setTimeout(pollPH, 150);
             } else if (pollCount >= MAX_POLL_ATTEMPTS) {
-                console.error('[ph-event-capture] ❌ PostHog failed to initialize');
+                console.error('[ph-event-capture] ❌ PostHog failed to initialize after', MAX_POLL_ATTEMPTS, 'attempts');
             }
         }
     })();
@@ -130,9 +169,12 @@
             const quantity = parseInt(props[P.QUANTITY] || props.quantity || '1', 10);
             const revenue = price * quantity;
             
-            props[P.REVENUE] = revenue.toFixed(2);
-            props[P.UNIT_PRICE] = price.toFixed(2);
-            props[P.QUANTITY] = String(quantity);
+            // Only set revenue if not already provided (e.g. by ph-step-tracker cart extraction)
+            if (!props[P.REVENUE]) {
+                props[P.REVENUE] = revenue.toFixed(2);
+                props[P.UNIT_PRICE] = price.toFixed(2);
+                props[P.QUANTITY] = String(quantity);
+            }
             
             if (props[P.PRODUCT]) {
                 props[P.PRODUCT_NAME] = props[P.PRODUCT];
@@ -152,37 +194,37 @@
     /* ---------- Main capture function -------------------------------- */
     function captureOnce(name, props = {}, { scopePath = true } = {}) {
         if (!name || typeof name !== 'string' || !name.trim()) return;
-        
-        const key = scopePath ? `${name}::${location.pathname}` : name;
+
+        const key = buildDedupKey(name, scopePath);
         if (scopePath && sentOncePath.has(key)) {
-            console.log(`[ph-event-capture] ⏭️ Event already fired: ${name} (path-scoped)`);
+            dbg(`[ph-event-capture] ⏭️ Event already fired: ${name} (dedup key: ${key})`);
             return;
         }
-        
+
         if (scopePath) {
-            sentOncePath.add(key);
+            addToDedupSet(key);
             try {
-                sessionStorage.setItem('__phFiredOnce', JSON.stringify([...sentOncePath]));
+                sessionStorage.setItem('__phFiredOnce', JSON.stringify(sentOncePathOrder));
             } catch {}
         }
-        
+
         enhanceRevenueProps(name, props);
-        
+
         const phStatus = window.posthog ?
             (typeof window.posthog.capture === 'function' ? 'ready' : 'loading') :
             'not-loaded';
-        console.log(`[ph-event-capture] 📊 Event: ${name} (PostHog: ${phStatus})`, props);
-        
+        dbg(`[ph-event-capture] 📊 Event: ${name} (PostHog: ${phStatus})`, props);
+
         if (phReady) {
             try {
                 window.posthog.capture(name, props);
-                console.log(`[ph-event-capture] ✅ Event sent: ${name}`);
+                dbg(`[ph-event-capture] ✅ Event sent: ${name}`);
             } catch (e) {
                 console.warn('[ph-event-capture] ❌ capture failed', e);
             }
         } else {
             queue.push({ name, props });
-            console.log(`[ph-event-capture] 📦 Event queued: ${name}`);
+            dbg(`[ph-event-capture] 📦 Event queued: ${name}`);
         }
     }
 
@@ -191,5 +233,5 @@
     PHEventCapture.isReady = () => phReady;
     PHEventCapture.getQueueLength = () => queue.length;
 
-    console.log('[ph-event-capture] ✅ Event capture module loaded');
+    dbg('[ph-event-capture] ✅ Event capture module loaded');
 })();

@@ -6,6 +6,8 @@
 (function () {
     'use strict';
 
+    const dbg = (...a) => { if (window.AskMeAnalyticsConfig?.debug) dbg(...a); };
+
     if (!window.PHUtils || !window.PH_PROPS || !window.PH_KEYS || !window.PHEventCapture) {
         console.warn('[ph-step-tracker] Missing dependencies. Load required modules first.');
         return;
@@ -31,7 +33,7 @@
         // Debug mode: Allow debug-demo-events.html to match /demo rules
         const isDebugPage = location.pathname.includes('debug-demo-events.html');
         if (isDebugPage && rule.url.includes('/demo')) {
-            console.log('[ph-step-tracker] 🐛 DEBUG MODE: Treating debug page as /demo');
+            dbg('[ph-step-tracker] 🐛 DEBUG MODE: Treating debug page as /demo');
             return true;
         }
         
@@ -46,12 +48,12 @@
     /* ---------- Apply Single Rule -------------------------------- */
     function tagElementsForRule(rule, config, extractRevenueData) {
         if (!rule || !rule.key) {
-            console.log('[ph-step-tracker] ⚠️ Rule skipped: no rule or no key');
+            dbg('[ph-step-tracker] ⚠️ Rule skipped: no rule or no key');
             return;
         }
         
         const urlMatchResult = urlMatches(rule);
-        console.log('[ph-step-tracker] 🔍 Checking rule:', rule.key, {
+        dbg('[ph-step-tracker] 🔍 Checking rule:', rule.key, {
             currentPath: location.pathname,
             ruleUrl: rule.url,
             urlMatch: rule.urlMatch,
@@ -61,12 +63,12 @@
         });
         
         if (!urlMatchResult) {
-            console.log('[ph-step-tracker] ⏭️ Rule skipped (URL mismatch):', rule.key);
+            dbg('[ph-step-tracker] ⏭️ Rule skipped (URL mismatch):', rule.key);
             return;
         }
 
         if (blockedRules.has(rule.key)) {
-            console.log('[ph-step-tracker] 🚫 Rule blocked:', rule.key);
+            dbg('[ph-step-tracker] 🚫 Rule blocked:', rule.key);
             return;
         }
 
@@ -77,10 +79,10 @@
             if (rule.requireSelectorPresent && U.isNonEmptyStr(rule.selector)) {
                 const selectorExists = U.first(document, rule.selector);
                 if (!selectorExists) {
-                    console.log('[ph-step-tracker] ⏭️ AutoFire blocked: required selector not present:', rule.key, rule.selector);
+                    dbg('[ph-step-tracker] ⏭️ AutoFire blocked: required selector not present:', rule.key, rule.selector);
                     return;
                 }
-                console.log('[ph-step-tracker] ✅ Required selector found:', rule.selector);
+                dbg('[ph-step-tracker] ✅ Required selector found:', rule.selector);
             }
             
             // Now check if already fired (after confirming selector is present)
@@ -88,15 +90,15 @@
             const fired = window.__phFiredOnce && window.__phFiredOnce.has(key);
             
             if (rule.oncePerPath && fired) {
-                console.log('[ph-step-tracker] ⏭️ Skipping already-fired event:', rule.key, 'on path:', location.pathname);
+                dbg('[ph-step-tracker] ⏭️ Skipping already-fired event:', rule.key, 'on path:', location.pathname);
                 return;
             }
             
-            console.log('[ph-step-tracker] 🔥 AutoFire event:', rule.key, 'on path:', location.pathname);
+            dbg('[ph-step-tracker] 🔥 AutoFire event:', rule.key, 'on path:', location.pathname);
             const props = { [P.PATH]: location.pathname, ...rule.metadata };
             
             // Cart extraction and caching for CHECKOUT_STARTED (if cart extractor available)
-            console.log('[ph-step-tracker] 🔍 Cart extraction check:', {
+            dbg('[ph-step-tracker] 🔍 Cart extraction check:', {
                 ruleKey: rule.key,
                 isCheckoutStarted: rule.key === EK.CHECKOUT_STARTED,
                 hasExtractCart: rule.extractCart,
@@ -108,17 +110,17 @@
                 const config = window.AskMeAnalyticsConfig;
                 if (config && config.cartExtractorConfig) {
                     try {
-                        console.log('[ph-step-tracker] 🛒 Attempting cart extraction for CHECKOUT_STARTED');
+                        dbg('[ph-step-tracker] 🛒 Attempting cart extraction for CHECKOUT_STARTED');
                         let cartData = window.PHCartExtractor.extractCartData(config.cartExtractorConfig);
-                        console.log('[ph-step-tracker] 📦 DOM extraction result:', cartData);
+                        dbg('[ph-step-tracker] 📦 DOM extraction result:', cartData);
                         
                         // Fallback: If DOM extraction failed, try localStorage (for test pages)
                         if (!cartData || !cartData.items || cartData.items.length === 0) {
-                            console.log('[ph-step-tracker] 🔍 DOM extraction empty, checking localStorage...');
+                            dbg('[ph-step-tracker] 🔍 DOM extraction empty, checking localStorage...');
                             const localCart = localStorage.getItem('test-cart');
                             if (localCart) {
                                 const items = JSON.parse(localCart);
-                                console.log('[ph-step-tracker] 📦 Found localStorage cart:', items);
+                                dbg('[ph-step-tracker] 📦 Found localStorage cart:', items);
                                 if (items && items.length > 0) {
                                     let subtotal = 0;
                                     
@@ -153,7 +155,7 @@
                                         total: subtotal + tax + shipping,
                                         currency: items[0]?.currency || 'USD'
                                     };
-                                    console.log('[ph-step-tracker] 💾 Loaded cart from localStorage:', cartData);
+                                    dbg('[ph-step-tracker] 💾 Loaded cart from localStorage:', cartData);
                                 } else {
                                     console.warn('[ph-step-tracker] ⚠️ localStorage cart is empty');
                                 }
@@ -197,7 +199,7 @@
                                 cart_items: formattedProps.cart_items,
                                 cached_at: new Date().toISOString()
                             }));
-                            console.log('[ph-step-tracker] 💾 Cart data extracted and cached at CHECKOUT_STARTED:', formattedProps);
+                            dbg('[ph-step-tracker] 💾 Cart data extracted and cached at CHECKOUT_STARTED:', formattedProps);
                         }
                     } catch (e) {
                         console.warn('[ph-step-tracker] Failed to extract/cache cart at CHECKOUT_STARTED:', e);
@@ -209,15 +211,15 @@
             if (rule.key === EK.CHECKOUT_COMPLETED || rule.key === EK.SUBSCRIPTION_COMPLETED) {
                 let revenueData = null;
                 
-                console.log('[ph-step-tracker] 💰 Processing revenue for:', rule.key);
+                dbg('[ph-step-tracker] 💰 Processing revenue for:', rule.key);
                 
                 // PRIORITY 1: Try cached cart data (for cart-based clients)
                 try {
                     const cachedCart = sessionStorage.getItem('ph_cart_data');
-                    console.log('[ph-step-tracker] 🔍 Checking sessionStorage for ph_cart_data:', cachedCart ? 'FOUND' : 'NOT FOUND');
+                    dbg('[ph-step-tracker] 🔍 Checking sessionStorage for ph_cart_data:', cachedCart ? 'FOUND' : 'NOT FOUND');
                     if (cachedCart) {
                         const cartData = JSON.parse(cachedCart);
-                        console.log('[ph-step-tracker] 💰 Using cached cart data for revenue:', cartData);
+                        dbg('[ph-step-tracker] 💰 Using cached cart data for revenue:', cartData);
                         revenueData = {
                             [P.REVENUE]: cartData.revenue.toFixed(2),
                             [P.CURRENCY]: cartData.currency,
@@ -254,7 +256,7 @@
                             const qtyNum = parseInt(qty, 10);
                             const revenue = (priceNum * qtyNum).toFixed(2);
                             
-                            console.log('[ph-step-tracker] 💰 Calculating revenue from static product:', {
+                            dbg('[ph-step-tracker] 💰 Calculating revenue from static product:', {
                                 product: prod,
                                 price: price,
                                 quantity: qty,
@@ -297,16 +299,16 @@
                 
                 // PRIORITY 3: Fallback to DOM extraction
                 if (!revenueData) {
-                    console.log('[ph-step-tracker] 💰 No cached data, extracting revenue from DOM');
+                    dbg('[ph-step-tracker] 💰 No cached data, extracting revenue from DOM');
                     revenueData = extractRevenueData(document.body);
                 }
                 
                 Object.assign(props, revenueData);
             }
             
-            console.log('[ph-step-tracker] 🚀 Calling captureOnce for:', rule.key);
+            dbg('[ph-step-tracker] 🚀 Calling captureOnce for:', rule.key);
             captureOnce(rule.key, props, { scopePath: rule.oncePerPath });
-            console.log('[ph-step-tracker] ✅ captureOnce completed for:', rule.key);
+            dbg('[ph-step-tracker] ✅ captureOnce completed for:', rule.key);
         }
 
         // Collect all visible elements matching selectors
@@ -357,7 +359,7 @@
         if (targets.length && rule.blockRules && rule.blockRules.length) {
             rule.blockRules.forEach(blockedKey => {
                 blockedRules.add(blockedKey);
-                console.log(`[ph-step-tracker] Rule "${rule.key}" is blocking "${blockedKey}"`);
+                dbg(`[ph-step-tracker] Rule "${rule.key}" is blocking "${blockedKey}"`);
             });
         }
 
@@ -382,7 +384,7 @@
                             const cachedCart = sessionStorage.getItem('ph_cart_data');
                             if (cachedCart) {
                                 const cartData = JSON.parse(cachedCart);
-                                console.log('[ph-step-tracker] 💰 Using cached cart data for revenue:', cartData);
+                                dbg('[ph-step-tracker] 💰 Using cached cart data for revenue:', cartData);
                                 revenueData = {
                                     [P.REVENUE]: cartData.revenue.toFixed(2),
                                     [P.CURRENCY]: cartData.currency,
@@ -417,7 +419,7 @@
                                     const qtyNum = parseInt(qty, 10);
                                     const revenue = (priceNum * qtyNum).toFixed(2);
                                     
-                                    console.log('[ph-step-tracker] 💰 Calculating revenue from static product:', {
+                                    dbg('[ph-step-tracker] 💰 Calculating revenue from static product:', {
                                         product: prod,
                                         price: price,
                                         quantity: qty,
@@ -445,7 +447,7 @@
                         
                         // PRIORITY 3: Fallback to DOM extraction
                         if (!revenueData) {
-                            console.log('[ph-step-tracker] 💰 No cached data, extracting revenue from DOM');
+                            dbg('[ph-step-tracker] 💰 No cached data, extracting revenue from DOM');
                             revenueData = extractRevenueData(targets[0]);
                         }
                         
@@ -453,7 +455,7 @@
                     }
                     
                     captureOnce(rule.key, props, { scopePath: rule.oncePerPath });
-                    console.log(`[ph-step-tracker] Rule "${rule.key}" created hidden element (requireSelectorPresent)`);
+                    dbg(`[ph-step-tracker] Rule "${rule.key}" created hidden element (requireSelectorPresent)`);
                 }
             }
             return;
@@ -501,7 +503,7 @@
 
     /* ---------- Apply All Rules -------------------------------- */
     function applyAllRules(rules, config, extractRevenueData, mutationObserver) {
-        console.log('[ph-step-tracker] 🔍 applyAllRules called, found', rules?.length || 0, 'rules on path:', location.pathname);
+        dbg('[ph-step-tracker] 🔍 applyAllRules called, found', rules?.length || 0, 'rules on path:', location.pathname);
         if (!Array.isArray(rules) || !rules.length) return;
 
         // Disconnect observer to prevent infinite loop
@@ -579,7 +581,7 @@
                             const cachedCart = sessionStorage.getItem('ph_cart_data');
                             if (cachedCart) {
                                 const cartData = JSON.parse(cachedCart);
-                                console.log('[ph-step-tracker] 💰 Using cached cart data for revenue:', cartData);
+                                dbg('[ph-step-tracker] 💰 Using cached cart data for revenue:', cartData);
                                 revenueData = {
                                     [P.REVENUE]: cartData.revenue.toFixed(2),
                                     [P.CURRENCY]: cartData.currency,
@@ -614,7 +616,7 @@
                                     const qtyNum = parseInt(qty, 10);
                                     const revenue = (priceNum * qtyNum).toFixed(2);
                                     
-                                    console.log('[ph-step-tracker] 💰 Calculating revenue from static product:', {
+                                    dbg('[ph-step-tracker] 💰 Calculating revenue from static product:', {
                                         product: prod,
                                         price: price,
                                         quantity: qty,
@@ -642,7 +644,7 @@
                         
                         // PRIORITY 3: Fallback to DOM extraction
                         if (!revenueData) {
-                            console.log('[ph-step-tracker] 💰 No cached data, extracting revenue from DOM');
+                            dbg('[ph-step-tracker] 💰 No cached data, extracting revenue from DOM');
                             revenueData = extractRevenueData(element);
                         }
                         
@@ -671,5 +673,5 @@
     PHStepTracker.scanForPhTrackClasses = scanForPhTrackClasses;
     PHStepTracker.sentStepEls = sentStepEls;
 
-    console.log('[ph-step-tracker] ✅ Step tracker module loaded');
+    dbg('[ph-step-tracker] ✅ Step tracker module loaded');
 })();

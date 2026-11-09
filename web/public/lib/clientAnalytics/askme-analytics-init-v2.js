@@ -23,6 +23,8 @@
 (function() {
     'use strict';
 
+    const dbg = (...a) => { if (window.AskMeAnalyticsConfig?.debug) dbg(...a); };
+
     // Module paths configuration - will be initialized after config loads
     function getModulePaths(config) {
         return {
@@ -46,7 +48,7 @@
             ? `/lib/clientAnalytics/configs/${clientId}.json`
             : `https://askme-analytics-mvp.vercel.app/lib/clientAnalytics/configs/${clientId}.json`;
         
-        console.log('[init-v2] 🔍 Loading config from:', configUrl);
+        dbg('[init-v2] 🔍 Loading config from:', configUrl);
         try {
             const response = await fetch(configUrl);
             if (!response.ok) {
@@ -100,7 +102,7 @@
     function loadScript(src, onLoad, onError) {
         const existingScript = document.querySelector(`script[src="${src}"]`);
         if (existingScript) {
-            console.log('[init-v2] ✅ Script already loaded:', src);
+            dbg('[init-v2] ✅ Script already loaded:', src);
             if (onLoad) onLoad();
             return existingScript;
         }
@@ -124,7 +126,7 @@
         
         if (window.GenericAnalytics) {
             if (window.posthog && window.posthog.__loaded) {
-                console.log('[init-v2] ✅ PostHog already initialized on page, reusing existing instance');
+                dbg('[init-v2] ✅ PostHog already initialized on page, reusing existing instance');
                 window.__askme_genericanalytics_initialized = true;
                 
                 window.dispatchEvent(new CustomEvent('askme:analytics:ready', {
@@ -178,7 +180,7 @@
         
         function loadNext() {
             if (index >= modules.length) {
-                console.log('[init-v2] ✅ All modules loaded successfully');
+                dbg('[init-v2] ✅ All modules loaded successfully');
                 if (onComplete) onComplete();
                 return;
             }
@@ -187,13 +189,13 @@
             
             // Skip optional modules if not configured
             if (module.optional) {
-                console.log(`[init-v2] ⏭️ Skipping optional module: ${module.name} (not configured)`);
+                dbg(`[init-v2] ⏭️ Skipping optional module: ${module.name} (not configured)`);
                 index++;
                 loadNext();
                 return;
             }
             
-            console.log(`[init-v2] 📦 Loading module ${index + 1}/${modules.length}: ${module.name}`);
+            dbg(`[init-v2] 📦 Loading module ${index + 1}/${modules.length}: ${module.name}`);
             
             // Special handling for the Injector module - create script with attributes BEFORE loading
             if (module.name === 'Injector') {
@@ -202,7 +204,7 @@
                 // Create script element
                 const existingScript = document.querySelector(`script[src="${module.path}"]`);
                 if (existingScript) {
-                    console.log('[init-v2] ✅ Injector script already loaded');
+                    dbg('[init-v2] ✅ Injector script already loaded');
                     index++;
                     loadNext();
                     return;
@@ -216,7 +218,7 @@
                 setupAttributesOnScript(script, config);
                 
                 script.onload = () => {
-                    console.log(`[init-v2] ✅ Module loaded: ${module.name}`);
+                    dbg(`[init-v2] ✅ Module loaded: ${module.name}`);
                     index++;
                     loadNext();
                 };
@@ -230,7 +232,7 @@
             } else {
                 loadScript(module.path,
                     () => {
-                        console.log(`[init-v2] ✅ Module loaded: ${module.name}`);
+                        dbg(`[init-v2] ✅ Module loaded: ${module.name}`);
                         index++;
                         loadNext();
                     },
@@ -319,18 +321,18 @@
 
         // Convert step keys to actual enum values
         if (config.steps && Array.isArray(config.steps) && config.steps.length > 0) {
-            console.log('[init-v2] 🔍 Config has', config.steps.length, 'steps');
+            dbg('[init-v2] 🔍 Config has', config.steps.length, 'steps');
             const resolvedSteps = config.steps.map(step => ({
                 ...step,
                 key: window.PH_KEYS[step.key] || step.key
             }));
-            console.log('[init-v2] 🔍 Resolved to', resolvedSteps.length, 'steps');
+            dbg('[init-v2] 🔍 Resolved to', resolvedSteps.length, 'steps');
             script.setAttribute(window.PH_DATA_KEYS.STEPS, JSON.stringify(resolvedSteps));
         } else {
             script.setAttribute(window.PH_DATA_KEYS.STEPS, JSON.stringify([]));
         }
 
-        console.log('[init-v2] ✅ Product injector attributes configured');
+        dbg('[init-v2] ✅ Product injector attributes configured');
     }
 
     /* =========================================
@@ -338,12 +340,12 @@
      * ========================================= */
     async function initialize() {
         if (window.__askme_analytics_initialized) {
-            console.log('[init-v2] ⚠️ Analytics already initialized');
+            dbg('[init-v2] ⚠️ Analytics already initialized');
             return;
         }
         window.__askme_analytics_initialized = true;
         
-        console.log('[init-v2] 🚀 Initializing AskMe Analytics v2.0 (Modular)');
+        dbg('[init-v2] 🚀 Initializing AskMe Analytics v2.0 (Modular)');
         
         // Step 0: Load configuration
         window.AskMeAnalyticsConfig = await loadClientConfig();
@@ -378,7 +380,7 @@
         ];
         
         loadModulesSequentially(modules, function() {
-            console.log('[init-v2] 🎉 AskMe Analytics v2.0 initialization complete');
+            dbg('[init-v2] 🎉 AskMe Analytics v2.0 initialization complete');
         });
     }
 
@@ -399,5 +401,5 @@
         version: '2.0.0'
     };
 
-    console.log('[init-v2] 📦 AskMe Analytics v2.0 loader ready');
+    dbg('[init-v2] 📦 AskMe Analytics v2.0 loader ready');
 })();

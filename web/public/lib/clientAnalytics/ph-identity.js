@@ -8,7 +8,9 @@
     'use strict';
 
     const root = window;
-    
+
+    const dbg = (...a) => { if (root.AskMeAnalyticsConfig?.debug) console.log(...a); };
+
     // ═══ Initialize AMA namespace (never replace existing) ═══
     root.AMA = root.AMA || {};
     const AMA = root.AMA;
@@ -84,17 +86,15 @@
 
     /* ---------- Helper: Retrieve Pre-Auth ID -------------------------------- */
     /**
-     * Retrieves the pre-auth ID from storage or URL
-     * @returns {string|null} The pre-auth ID or null
+     * Retrieves the pre-auth ID from sessionStorage only.
+     * URL-param fallback (?ph_id=) removed — it is a privacy risk and
+     * could allow session-hijacking via crafted links.
+     * @returns {string|null}
      */
     AMA._takePreAuthId = function _takePreAuthId() {
         try {
             const v = safeGetItem('session', 'ama:pre_ph_id');
             if (v) return v;
-        } catch {}
-        try {
-            const u = new URL(location.href);
-            return u.searchParams.get('ph_id');
         } catch {}
         return null;
     };
@@ -178,30 +178,56 @@
 
     /* ---------- Direct Identify (from injector) -------------------------------- */
     /**
-     * Identifies user by email (used by injector for email field detection)
-     * Note: This is different from afterLoginIdentify - it's for injector auto-detection
-     * @param {string} email - User email
+     * Identifies user by email (used by injector for email-field auto-detection).
+     *
+     * Security note: using a raw email as PostHog distinct_id leaks PII and makes
+     * cross-device dedup unreliable.  This function now defaults to setting the email
+     * as a person *property* only (via setPersonProperties), NOT as the distinct_id.
+     *
+     * Set config.allowEmailIdentify = true to restore the legacy behaviour where
+     * email is used as distinct_id (e.g. during a controlled migration period).
+     *
+     * @param {string} email - User email captured from DOM
      * @param {Object} properties - Additional properties
      */
     AMA.identifyUser = function identifyUser(email, properties = {}) {
         try {
             if (!email || typeof email !== 'string' || !email.trim()) return;
-            if (identifiedEmails.has(email)) return;
-            identifiedEmails.add(email);
+            const normalised = email.trim().toLowerCase();
+            if (identifiedEmails.has(normalised)) return;
+            identifiedEmails.add(normalised);
+
+            const config = root.AskMeAnalyticsConfig || {};
+            const allowEmailIdentify = config.allowEmailIdentify === true;
 
             const ph = root.posthog;
-            if (ph && typeof ph.identify === 'function') {
-                ph.identify(email, { email, identified_via: 'injector', ...properties });
-                if (root.AskMeAnalyticsConfig?.debug) {
-                    console.log('[ph-identity] User identified:', email);
+
+            function applyIdentity(ph) {
+                if (allowEmailIdentify) {
+                    // Legacy: use email as distinct_id (requires explicit opt-in)
+                    if (typeof ph.identify === 'function') {
+                        ph.identify(normalised, { email: normalised, identified_via: 'injector', ...properties });
+                        dbg('[ph-identity] identifyUser (email as distinct_id):', normalised);
+                    }
+                } else {
+                    // Safe default: set email as a person property WITHOUT changing distinct_id
+                    if (typeof ph.setPersonProperties === 'function') {
+                        ph.setPersonProperties({ email: normalised, identified_via: 'injector', ...properties });
+                    } else if (typeof ph.capture === 'function') {
+                        // Fallback for older PostHog bundle versions
+                        ph.capture('$set', { $set: { email: normalised, identified_via: 'injector', ...properties } });
+                    }
+                    dbg('[ph-identity] identifyUser (person property only):', normalised);
                 }
+            }
+
+            if (ph && typeof ph.capture === 'function') {
+                applyIdentity(ph);
             } else {
                 // Retry once if PostHog not yet ready
                 setTimeout(() => {
                     const ph2 = root.posthog;
-                    if (ph2 && typeof ph2.identify === 'function') {
-                        ph2.identify(email, { email, identified_via: 'injector', ...properties });
-                    }
+                    if (ph2 && typeof ph2.capture === 'function') applyIdentity(ph2);
                 }, 100);
             }
         } catch (e) {
@@ -216,9 +242,8 @@
     // Keep both as separate functions; alias is only for legacy code that calls identifyUser
     // expecting afterLoginIdentify behavior - they can use either
     
-    // ═══ Mark Ready ═══
     AMA.isReady = true;
     AMA._initialized = true;
 
-    console.log('[ph-identity] ✅ AMA v' + AMA.version + ' initialized');
+    dbg('[ph-identity] ✅ AMA v' + AMA.version + ' initialized');
 })();

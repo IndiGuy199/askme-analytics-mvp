@@ -6,13 +6,20 @@
 (function () {
     'use strict';
 
+    const dbg = (...a) => { if (window.AskMeAnalyticsConfig?.debug) console.log(...a); };
+
     window.PHObservers = window.PHObservers || {};
 
     let observerConfig = null;
     let mutationObserver = null;
-    let routeObserver = null;
+    let routeObserver = null;          // truthy when route observer is running
     let mutationDebounceTimer = null;
-    const MUTATION_DEBOUNCE_MS = 250; // Wait 250ms after last mutation before processing
+    const MUTATION_DEBOUNCE_MS = 250;
+
+    // Route observer internals – kept so stopRouteObserver() can clean up properly
+    let popstateHandler = null;
+    let origPushState = null;
+    let origReplaceState = null;
 
     let callbacks = {
         onMutation: [],
@@ -26,7 +33,7 @@
      */
     function startMutationObserver(targetNode = document.body, config = {}) {
         if (mutationObserver) {
-            console.log('[ph-observers] MutationObserver already running');
+            dbg('[ph-observers] MutationObserver already running');
             return;
         }
 
@@ -52,7 +59,7 @@
                 }
 
                 mutationDebounceTimer = setTimeout(() => {
-                    console.log('[ph-observers] DOM mutations detected, triggering callbacks (debounced)');
+                    dbg('[ph-observers] DOM mutations detected, triggering callbacks (debounced)');
                     callbacks.onMutation.forEach(cb => {
                         try {
                             cb(mutations);
@@ -66,7 +73,7 @@
         });
 
         mutationObserver.observe(targetNode, observerConfig);
-        console.log('[ph-observers] ✅ MutationObserver started');
+        dbg('[ph-observers] ✅ MutationObserver started');
     }
 
     /**
@@ -76,70 +83,87 @@
         if (mutationObserver) {
             mutationObserver.disconnect();
             mutationObserver = null;
-            console.log('[ph-observers] MutationObserver stopped');
+            dbg('[ph-observers] MutationObserver stopped');
         }
     }
 
     /* ---------- Route Change Observer -------------------------------- */
     /**
-     * Monitor for route/URL changes (SPA navigation)
-     * Calls registered callbacks when route changes
+     * Monitor for route/URL changes (SPA navigation).
+     * Uses history.pushState / replaceState monkeypatching + popstate.
+     * Safe to call multiple times — only installs once.
      */
     function startRouteObserver() {
         if (routeObserver) {
-            console.log('[ph-observers] Route observer already running');
+            dbg('[ph-observers] Route observer already running');
             return;
         }
+        routeObserver = true; // sentinel – set before patching so re-entrant calls bail
 
         let lastPath = location.pathname;
 
-        // Check for route changes periodically
-        routeObserver = setInterval(() => {
-            if (location.pathname !== lastPath) {
-                console.log('[ph-observers] Route changed:', lastPath, '→', location.pathname);
-                const oldPath = lastPath;
-                lastPath = location.pathname;
+        function emitRouteChange(oldPath, newPath) {
+            dbg('[ph-observers] Route changed:', oldPath, '→', newPath);
+            callbacks.onRouteChange.forEach(cb => {
+                try { cb(oldPath, newPath); }
+                catch (e) { console.warn('[ph-observers] Route change callback failed:', e); }
+            });
+        }
 
-                callbacks.onRouteChange.forEach(cb => {
-                    try {
-                        cb(oldPath, lastPath);
-                    } catch (e) {
-                        console.warn('[ph-observers] Route change callback failed:', e);
-                    }
-                });
-            }
-        }, 200);
-
-        // Also listen for popstate (back/forward navigation)
-        window.addEventListener('popstate', () => {
+        function handleNavigation() {
             const currentPath = location.pathname;
             if (currentPath !== lastPath) {
-                console.log('[ph-observers] Popstate route change:', lastPath, '→', currentPath);
                 const oldPath = lastPath;
                 lastPath = currentPath;
-
-                callbacks.onRouteChange.forEach(cb => {
-                    try {
-                        cb(oldPath, currentPath);
-                    } catch (e) {
-                        console.warn('[ph-observers] Route change callback failed:', e);
-                    }
-                });
+                emitRouteChange(oldPath, currentPath);
             }
-        });
+        }
 
-        console.log('[ph-observers] ✅ Route observer started');
+        // Monkeypatch pushState / replaceState (only if we haven't already)
+        if (!origPushState) {
+            origPushState = history.pushState.bind(history);
+            history.pushState = function (...args) {
+                const result = origPushState(...args);
+                handleNavigation();
+                return result;
+            };
+        }
+        if (!origReplaceState) {
+            origReplaceState = history.replaceState.bind(history);
+            history.replaceState = function (...args) {
+                const result = origReplaceState(...args);
+                handleNavigation();
+                return result;
+            };
+        }
+
+        // popstate covers back/forward navigation (browser doesn't fire pushState for those)
+        if (!popstateHandler) {
+            popstateHandler = () => handleNavigation();
+            window.addEventListener('popstate', popstateHandler);
+        }
+
+        dbg('[ph-observers] ✅ Route observer started (history monkeypatch)');
     }
 
     /**
-     * Stop route observer
+     * Stop route observer and restore all patched history methods.
      */
     function stopRouteObserver() {
-        if (routeObserver) {
-            clearInterval(routeObserver);
-            routeObserver = null;
-            console.log('[ph-observers] Route observer stopped');
+        if (!routeObserver) return;
+        routeObserver = null;
+
+        // Restore original history methods
+        if (origPushState) { history.pushState = origPushState; origPushState = null; }
+        if (origReplaceState) { history.replaceState = origReplaceState; origReplaceState = null; }
+
+        // Remove popstate listener
+        if (popstateHandler) {
+            window.removeEventListener('popstate', popstateHandler);
+            popstateHandler = null;
         }
+
+        dbg('[ph-observers] Route observer stopped');
     }
 
     /* ---------- Callback Registration -------------------------------- */
@@ -191,5 +215,5 @@
     PHObservers.onRouteChange = onRouteChange;
     PHObservers.watchVisibility = watchVisibility;
 
-    console.log('[ph-observers] ✅ Observer module loaded');
+    dbg('[ph-observers] ✅ Observer module loaded');
 })();

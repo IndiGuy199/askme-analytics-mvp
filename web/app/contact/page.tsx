@@ -1,17 +1,42 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { Mail, Phone, MapPin, Send, ArrowLeft, BarChart3 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
+const SERVICE_OPTIONS = [
+  { value: '', label: 'General Inquiry' },
+  { value: 'analytics', label: 'Analytics / Conversion Guardian' },
+  { value: 'ai-automation', label: 'AI Automation' },
+  { value: 'integrations', label: 'Software Integrations' },
+] as const
+
+const SERVICE_VALUES = SERVICE_OPTIONS.map((option) => option.value)
+
 export default function ContactPage() {
+  return (
+    <Suspense fallback={null}>
+      <ContactForm />
+    </Suspense>
+  )
+}
+
+function ContactForm() {
+  const searchParams = useSearchParams()
+  const requestedService = searchParams?.get('service') || ''
+  const initialService = (SERVICE_VALUES as readonly string[]).includes(requestedService)
+    ? requestedService
+    : ''
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     company: '',
+    service: initialService,
     subject: '',
     message: ''
   })
@@ -44,6 +69,7 @@ export default function ContactPage() {
         name: '',
         email: '',
         company: '',
+        service: '',
         subject: '',
         message: ''
       })
@@ -106,7 +132,7 @@ export default function ContactPage() {
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900">Get in Touch</h1>
           </div>
           <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-2xl mx-auto px-4">
-            Ready for your free conversion check? Let's talk about protecting your website's performance.
+            Whether it's a free conversion check, AI automation, or connecting your tools — let's talk.
           </p>
         </div>
 
@@ -168,6 +194,25 @@ export default function ContactPage() {
                   disabled={isSubmitting}
                   className="text-sm sm:text-base"
                 />
+              </div>
+
+              <div>
+                <label htmlFor="service" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                  What are you interested in?
+                </label>
+                <select
+                  id="service"
+                  value={formData.service}
+                  onChange={(e) => setFormData(prev => ({ ...prev, service: e.target.value }))}
+                  disabled={isSubmitting}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base bg-white"
+                >
+                  {SERVICE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>

@@ -6,8 +6,9 @@ import Script from 'next/script'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
-  title: 'AskMe Analytics - AI-Powered Analytics Dashboard',
-  description: 'Transform your data into actionable insights with AI-powered analytics',
+  title: 'AskMe Analytics - Analytics, AI Automation & Software Integrations',
+  description:
+    'AskMe Analytics helps small businesses understand performance with conversion analytics, automate repetitive work with AI, and connect the tools they already use.',
 }
 
 export default function RootLayout({

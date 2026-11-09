@@ -15,8 +15,8 @@ export default function Footer() {
               <span className="text-xl font-bold text-white">AskMe Analytics</span>
             </div>
             <p className="text-gray-400 mb-4 max-w-md">
-              Transform your data into actionable insights with AI-powered analytics. 
-              Get the answers you need to grow your business.
+              Analytics, AI automation, and software integrations that help small businesses
+              understand performance, connect their tools, and automate repetitive work.
             </p>
             <p className="text-sm text-gray-500">
               © {new Date().getFullYear()} AskMe Analytics. All rights reserved.
@@ -25,16 +25,26 @@ export default function Footer() {
 
           {/* Product */}
           <div>
-            <h3 className="text-white font-semibold mb-4">Product</h3>
+            <h3 className="text-white font-semibold mb-4">Services</h3>
             <ul className="space-y-2">
               <li>
-                <Link href="/pricing" className="hover:text-white transition-colors">
-                  Pricing
+                <Link href="/services/analytics" className="hover:text-white transition-colors">
+                  Analytics
                 </Link>
               </li>
               <li>
-                <Link href="/analytics" className="hover:text-white transition-colors">
-                  Analytics
+                <Link href="/services/ai-automation" className="hover:text-white transition-colors">
+                  AI Automation
+                </Link>
+              </li>
+              <li>
+                <Link href="/services/integrations" className="hover:text-white transition-colors">
+                  Software Integrations
+                </Link>
+              </li>
+              <li>
+                <Link href="/pricing" className="hover:text-white transition-colors">
+                  Pricing
                 </Link>
               </li>
               <li>
