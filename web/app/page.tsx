@@ -90,10 +90,10 @@ export default async function HomePage() {
             </h2>
 
             <p className="text-lg sm:text-xl text-gray-600 mb-10 leading-relaxed max-w-3xl mx-auto">
-              AskMe Analytics helps small businesses understand how their website and funnels are performing,
-              connect the systems they already use, and automate the repetitive work eating up their time.
+              AskMe Analytics helps small businesses capture customer inquiries, automate repetitive work,
+              connect disconnected software, and understand where opportunities are being lost.
               <br className="hidden sm:block" />
-              <span className="font-medium text-gray-700">No dashboards to dig through. No guesswork. Just clear answers.</span>
+              <span className="font-medium text-gray-700">Practical solutions built around the systems you already use—without unnecessary complexity.</span>
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-6">
@@ -104,7 +104,7 @@ export default async function HomePage() {
                 </a>
               </Button>
               <Button size="lg" variant="outline" className="text-lg px-8 py-6" asChild>
-                <a href="/contact">Talk to Us</a>
+                <a href="/contact">Discuss Your Project</a>
               </Button>
             </div>
 
@@ -177,6 +177,14 @@ export default async function HomePage() {
                   <div className="flex justify-center gap-4 text-sm">
                     <a href="/services/ai-automation" className="text-gray-600 hover:text-gray-900 font-medium">
                       Learn more
+                    </a>
+                    <a href="/demos/sunrise-motors" className="text-gray-600 hover:text-gray-900 font-medium">
+                      Try the Sunrise Motors Demo
+                    </a>
+                  </div>
+                  <div className="flex justify-center text-sm">
+                    <a href="/demos/lead-assistant" className="text-gray-500 hover:text-gray-900 font-medium">
+                      Try the Lead Assistant Demo
                     </a>
                   </div>
                 </div>

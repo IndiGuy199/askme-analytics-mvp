@@ -1,0 +1,148 @@
+/*
+ * Shared styling for embedded @n8n/chat widgets across /demos/* pages (Sunrise Motors,
+ * AI Lead Assistant, and any future demo). Apply the `askme-chat-widget` class to a page's
+ * chat target div (which also needs its own unique id, passed as createChat's `target`).
+ * Visuals (navy header, blue accents, message styling, larger default size, drag-to-resize)
+ * are ported from docs/chatBot/bot.html + customStyles.css. The library's own stylesheet
+ * makes .chat-window-wrapper `position: fixed` (bottom-right of the viewport); these
+ * overrides make it participate in normal document flow instead, centered below each
+ * demo's instructions, on both desktop and mobile.
+ */
+
+.askme-chat-widget {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  /* Demo pages wrap the chat target in a text-center container for the instruction above it;
+     override that inherited centering so chat content reads normally (left-aligned). */
+  text-align: left;
+
+  /* @n8n/chat theme tokens, scoped here (cascades into the widget mounted inside) */
+  --chat--window--width: 520px;
+  --chat--window--height: 650px;
+  --chat--window--border-radius: 16px;
+
+  --chat--color--primary: #2455a3;
+  --chat--color--secondary: #182b4c;
+
+  --chat--header--background: #182b4c;
+  --chat--header--color: #ffffff;
+
+  --chat--message--font-size: 15px;
+  --chat--message-line-height: 1.6;
+  --chat--message--border-radius: 12px;
+  --chat--message--bot--background: #f1f5fa;
+  --chat--message--bot--color: #1e293b;
+  --chat--message--user--background: #2455a3;
+  --chat--message--user--color: #ffffff;
+}
+
+.askme-chat-widget .chat-window-wrapper {
+  position: relative;
+  inset: auto;
+  bottom: auto;
+  right: auto;
+  margin: 0 auto;
+  max-width: 100%;
+  max-height: none;
+}
+
+.askme-chat-widget .chat-window-wrapper .chat-window-toggle {
+  margin: 0 auto;
+}
+
+.askme-chat-widget .chat-window-wrapper .chat-window {
+  width: var(--chat--window--width);
+  height: var(--chat--window--height);
+  max-width: 100%;
+  max-height: 80vh;
+  margin: 0 auto 1rem;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.16);
+  position: relative;
+}
+
+.askme-chat-widget .askme-resize-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 25px;
+  height: 25px;
+  z-index: 10;
+  cursor: nwse-resize;
+  touch-action: none;
+  background: rgba(255, 255, 255, 0.18);
+  border-bottom-right-radius: 12px;
+}
+
+.askme-chat-widget .askme-resize-handle::after {
+  content: "↖";
+  display: block;
+  color: white;
+  font-size: 17px;
+  text-align: center;
+  line-height: 25px;
+}
+
+/* Header title/subtitle: left-aligned, tighter spacing */
+.askme-chat-widget .chat-header {
+  align-items: flex-start;
+  gap: 0.35rem;
+  padding: 1.1rem 1.25rem;
+}
+
+.askme-chat-widget .chat-header h1 {
+  font-size: 1.4em;
+  line-height: 1.25;
+}
+
+.askme-chat-widget .chat-header p {
+  margin: 0;
+  opacity: 0.85;
+}
+
+/* Bot replies render as markdown (.n8n-markdown); restore list markers, indentation and
+   line-height that Tailwind's preflight reset otherwise strips from <ul>/<ol>/<li>/<p>. */
+.askme-chat-widget .n8n-markdown ul,
+.askme-chat-widget .n8n-markdown ol {
+  list-style-position: outside !important;
+  padding-left: 1.25em !important;
+  margin: 0.5em 0 !important;
+}
+
+.askme-chat-widget .n8n-markdown ul {
+  list-style-type: disc !important;
+}
+
+.askme-chat-widget .n8n-markdown ul ul {
+  list-style-type: circle !important;
+}
+
+.askme-chat-widget .n8n-markdown ol {
+  list-style-type: decimal !important;
+}
+
+.askme-chat-widget .n8n-markdown li {
+  display: list-item !important;
+  margin: 0.2em 0 !important;
+  line-height: var(--chat--message-line-height, 1.6);
+}
+
+.askme-chat-widget .n8n-markdown p {
+  margin: 0.4em 0 !important;
+  line-height: var(--chat--message-line-height, 1.6);
+}
+
+@media (max-width: 600px) {
+  .askme-chat-widget {
+    --chat--window--width: calc(100vw - 24px);
+    --chat--window--height: min(75dvh, 650px);
+  }
+
+  .askme-chat-widget .chat-window-wrapper .chat-window {
+    width: 100%;
+  }
+
+  .askme-chat-widget .askme-resize-handle {
+    display: none;
+  }
+}

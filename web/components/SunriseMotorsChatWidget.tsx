@@ -1,9 +1,8 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { ensureN8nChatStylesheet, loadN8nChat, watchForChatWindow } from '@/lib/embeddedChat'
 
-const CHAT_CSS_URL = 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css'
-const CHAT_JS_URL = 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js'
 const CHAT_TARGET_SELECTOR = '#sunrise-chat'
 
 interface SunriseMotorsChatWidgetProps {
@@ -19,17 +18,12 @@ export default function SunriseMotorsChatWidget({ webhookUrl }: SunriseMotorsCha
     if (initialized.current) return
     initialized.current = true
 
-    if (!document.querySelector('link[data-n8n-chat-style]')) {
-      const link = document.createElement('link')
-      link.rel = 'stylesheet'
-      link.href = CHAT_CSS_URL
-      link.setAttribute('data-n8n-chat-style', 'true')
-      document.head.appendChild(link)
-    }
+    ensureN8nChatStylesheet()
 
     let cancelled = false
-    // webpackIgnore: resolve this import against the CDN at runtime instead of bundling it
-    import(/* webpackIgnore: true */ CHAT_JS_URL).then(({ createChat }) => {
+    let observer: MutationObserver | null = null
+
+    loadN8nChat().then(({ createChat }) => {
       if (cancelled) return
       createChat({
         webhookUrl,
@@ -50,13 +44,20 @@ export default function SunriseMotorsChatWidget({ webhookUrl }: SunriseMotorsCha
           },
         },
       })
+
+      if (cancelled) return
+      const container = document.querySelector(CHAT_TARGET_SELECTOR)
+      if (container) {
+        observer = watchForChatWindow(container, () => cancelled)
+      }
     })
 
     return () => {
       cancelled = true
+      observer?.disconnect()
     }
   }, [webhookUrl])
 
-  // The page renders #sunrise-chat; it unmounts (taking the widget with it) when the route changes
+  // The page renders #sunrise-chat; it unmounts (taking the widget and resize handle with it) when the route changes
   return null
 }

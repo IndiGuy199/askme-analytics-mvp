@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { ArrowLeft, Car, MessageCircle, Sparkles, AlertTriangle } from 'lucide-react'
 import SunriseMotorsChatWidget from '@/components/SunriseMotorsChatWidget'
-import './sunrise-chat.css'
+import '../chat-widget.css'
 
 export const metadata = {
   title: 'Sunrise Motors Chatbot Demo - AskMe Analytics',
@@ -70,7 +70,7 @@ export default function SunriseMotorsDemoPage() {
             <p className="text-sm text-gray-500 mb-6">
               Click the chat button below to try the demo.
             </p>
-            <div id="sunrise-chat" />
+            <div id="sunrise-chat" className="askme-chat-widget" />
             <SunriseMotorsChatWidget webhookUrl={webhookUrl} />
           </div>
         ) : (

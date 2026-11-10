@@ -6,6 +6,7 @@ import {
   ArrowRight,
   Sparkles,
   MessageSquare,
+  MessageSquareText,
   UserPlus,
   CalendarClock,
   ListChecks,
@@ -101,24 +102,46 @@ export default function AIAutomationServicePage() {
           </Button>
         </div>
 
-        {/* Try the demo */}
+        {/* Try the demos */}
         <div className="mb-16">
-          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 sm:p-10 text-white">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
-              <div className="flex items-center gap-4 text-center sm:text-left">
-                <div className="hidden sm:flex p-3 bg-white/15 rounded-xl">
+          <div className="text-center mb-8">
+            <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">See It In Action</h3>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Two interactive, fictional demos of the patterns above
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 text-white flex flex-col">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="p-3 bg-white/15 rounded-xl">
                   <Car className="h-8 w-8 text-white" />
                 </div>
-                <div>
-                  <h3 className="text-xl sm:text-2xl font-bold mb-1">See an inventory assistant in action</h3>
-                  <p className="text-white/90">
-                    Try the Sunrise Motors chatbot — a fictional dealership demo of an inventory &amp; lead-capture assistant.
-                  </p>
-                </div>
+                <h4 className="text-xl font-bold">Sunrise Motors Chatbot</h4>
               </div>
-              <Button size="lg" variant="secondary" className="whitespace-nowrap" asChild>
-                <Link href="/demos/sunrise-motors" className="flex items-center gap-2">
+              <p className="text-white/90 mb-6 flex-1">
+                Fictional dealership demo of an inventory &amp; lead-capture assistant.
+              </p>
+              <Button size="lg" variant="secondary" className="w-full" asChild>
+                <Link href="/demos/sunrise-motors" className="flex items-center justify-center gap-2">
                   Try the Sunrise Motors Chatbot
+                  <ArrowRight className="h-5 w-5" />
+                </Link>
+              </Button>
+            </div>
+
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 text-white flex flex-col">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="p-3 bg-white/15 rounded-xl">
+                  <MessageSquareText className="h-8 w-8 text-white" />
+                </div>
+                <h4 className="text-xl font-bold">AI Lead Assistant</h4>
+              </div>
+              <p className="text-white/90 mb-6 flex-1">
+                Sample inquiry-capture demo showing how a conversation turns into a qualified lead.
+              </p>
+              <Button size="lg" variant="secondary" className="w-full" asChild>
+                <Link href="/demos/lead-assistant" className="flex items-center justify-center gap-2">
+                  Try the Lead Assistant Demo
                   <ArrowRight className="h-5 w-5" />
                 </Link>
               </Button>

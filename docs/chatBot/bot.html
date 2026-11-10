@@ -1,0 +1,125 @@
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Tic Tac Toe Exercise</title>
+  <link rel="stylesheet" type="text/css" href="blog1.css">
+     <link
+  rel="stylesheet"
+  href="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css"
+/>
+<link rel="stylesheet" type="text/css" href="css/customStyles.css">
+
+<script type="module">
+  import { createChat } from
+    'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
+
+  createChat({
+    webhookUrl: 'https://proservices330.app.n8n.cloud/webhook/ffaab508-8381-4bc1-b928-83712ceff458/chat',
+    mode: 'window',
+    loadPreviousSession: false,
+    initialMessages: [
+      'Welcome to the Sunrise Motors demo!',
+      'Try asking: “Do you have any available Hondas?”'
+    ],
+    i18n: {
+      en: {
+        title: 'Sunrise Motors Demo',
+        subtitle: 'Explore sample inventory and try a sales inquiry.',
+        footer: '',
+        getStarted: 'Start chat',
+        inputPlaceholder: 'Ask about a vehicle…'
+      }
+    }
+  });
+  
+  
+</script>
+
+</head>
+<body>
+   <p>November 23 2015 <p>
+
+   
+   	<h2> This Is My First Article </h2>
+   
+   <p class="borderCl">
+   	Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.
+   </p>
+   <p>
+   	It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution of letters, as opposed to using 'Content here, content here', making it look like readable English. Many desktop publishing packages and web page editors now use Lorem Ipsum as their default model text, and a search for 'lorem ipsum' will uncover many web sites still in their infancy. Various versions have evolved over the years, sometimes by accident, sometimes on purpose (injected humour and the like).
+   </p>
+   
+<script>
+
+function enableChatResize() {
+  const attach = () => {
+    const windowEl = document.querySelector('.chat-window');
+    if (!windowEl) return false;
+    if (windowEl.querySelector('.askme-resize-handle')) return true;
+
+    const handle = document.createElement('div');
+    handle.className = 'askme-resize-handle';
+    handle.title = 'Drag to resize chat';
+    handle.setAttribute('role', 'separator');
+    handle.setAttribute('aria-label', 'Resize chat window');
+    windowEl.appendChild(handle);
+
+    handle.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0) return;
+
+      event.preventDefault();
+      handle.setPointerCapture(event.pointerId);
+
+      const startX = event.clientX;
+      const startY = event.clientY;
+      const startWidth = windowEl.offsetWidth;
+      const startHeight = windowEl.offsetHeight;
+
+      const move = (e) => {
+        const maxWidth = Math.max(280, window.innerWidth - 40);
+        const maxHeight = Math.max(300, window.innerHeight - 100);
+
+        const width = Math.min(maxWidth,
+          Math.max(Math.min(340, maxWidth),
+            startWidth + startX - e.clientX));
+
+        const height = Math.min(maxHeight,
+          Math.max(Math.min(360, maxHeight),
+            startHeight + startY - e.clientY));
+
+        windowEl.style.width = `${width}px`;
+        windowEl.style.height = `${height}px`;
+      };
+
+      const stop = () => {
+        handle.removeEventListener('pointermove', move);
+        handle.removeEventListener('pointerup', stop);
+        handle.removeEventListener('pointercancel', stop);
+      };
+
+      handle.addEventListener('pointermove', move);
+      handle.addEventListener('pointerup', stop);
+      handle.addEventListener('pointercancel', stop);
+    });
+    return true;
+  };
+
+  if (attach()) return;
+
+  const observer = new MutationObserver(() => {
+    if (attach()) observer.disconnect();
+  });
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+}
+
+enableChatResize();
+
+
+</script>
+
+</body>
+</html>
+

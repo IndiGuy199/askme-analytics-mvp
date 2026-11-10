@@ -1,0 +1,57 @@
+
+:root {
+  --chat--window--width: 520px;
+  --chat--window--height: 650px;
+  --chat--window--border-radius: 16px;
+
+  --chat--color--primary: #2455a3;
+  --chat--color--secondary: #182b4c;
+
+  --chat--header--background: #182b4c;
+  --chat--header--color: #ffffff;
+
+  --chat--message--font-size: 15px;
+  --chat--message-line-height: 1.6;
+  --chat--message--border-radius: 12px;
+  --chat--message--bot--background: #f1f5fa;
+  --chat--message--bot--color: #1e293b;
+  --chat--message--user--background: #2455a3;
+  --chat--message--user--color: #ffffff;
+}
+
+.chat-window {
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.16);
+  position: relative;
+}
+
+.askme-resize-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 25px;
+  height: 25px;
+  z-index: 10;
+  cursor: nwse-resize;
+  touch-action: none;
+  background: rgba(255,255,255,0.18);
+  border-bottom-right-radius: 12px;
+}
+
+.askme-resize-handle::after {
+  content: "↖";
+  display: block;
+  color: white;
+  font-size: 17px;
+  text-align: center;
+  line-height: 25px;
+}
+
+@media (max-width: 600px) {
+  :root {
+    --chat--window--width: calc(100vw - 24px);
+    --chat--window--height: min(75dvh, 650px);
+  }
+  .askme-resize-handle {
+    display: none;
+  }
+}
